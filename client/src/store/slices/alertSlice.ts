@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { alertAPI } from '../../services/api';
 
 export interface Alert {
   id: string;
@@ -48,8 +47,28 @@ export const fetchAlerts = createAsyncThunk(
   'alert/fetchAlerts',
   async (params: any = {}, { rejectWithValue }) => {
     try {
-      const data = await alertAPI.getAlerts(params);
-      return data;
+      const token = localStorage.getItem('token');
+      const queryString = new URLSearchParams();
+      
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryString.append(key, String(value));
+        }
+      });
+
+      const response = await fetch(`/api/alerts?${queryString.toString()}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取告警列表失败');
     }
@@ -61,7 +80,21 @@ export const updateAlertStatusAsync = createAsyncThunk(
   'alert/updateAlertStatus',
   async ({ alertId, status }: { alertId: string; status: 'active' | 'acknowledged' | 'resolved' }, { rejectWithValue }) => {
     try {
-      await alertAPI.updateAlertStatus(alertId, status);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/alerts/${alertId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
       return { alertId, status };
     } catch (error: any) {
       return rejectWithValue(error.message || '更新告警状态失败');
@@ -74,7 +107,20 @@ export const acknowledgeAlert = createAsyncThunk(
   'alert/acknowledgeAlert',
   async (alertId: string, { rejectWithValue }) => {
     try {
-      await alertAPI.acknowledgeAlert(alertId);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/alerts/${alertId}/acknowledge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
       return { alertId, status: 'acknowledged' as const };
     } catch (error: any) {
       return rejectWithValue(error.message || '确认告警失败');
@@ -87,7 +133,20 @@ export const resolveAlert = createAsyncThunk(
   'alert/resolveAlert',
   async (alertId: string, { rejectWithValue }) => {
     try {
-      await alertAPI.resolveAlert(alertId);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/alerts/${alertId}/resolve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
       return { alertId, status: 'resolved' as const };
     } catch (error: any) {
       return rejectWithValue(error.message || '解决告警失败');

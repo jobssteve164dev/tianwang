@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { dashboardAPI } from '../../services/api';
 
 export interface SecurityMetrics {
   totalThreats: number;
@@ -29,8 +28,20 @@ export const fetchSecurityMetrics = createAsyncThunk(
   'dashboard/fetchSecurityMetrics',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await dashboardAPI.getSecurityMetrics();
-      return data;
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/security-metrics', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取安全指标失败');
     }
@@ -42,8 +53,20 @@ export const fetchThreatTrends = createAsyncThunk(
   'dashboard/fetchThreatTrends',
   async (timeRange: string = '7d', { rejectWithValue }) => {
     try {
-      const data = await dashboardAPI.getThreatTrends(timeRange);
-      return data;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/dashboard/threat-trends?range=${timeRange}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取威胁趋势失败');
     }
@@ -55,8 +78,20 @@ export const fetchThreatDistribution = createAsyncThunk(
   'dashboard/fetchThreatDistribution',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await dashboardAPI.getThreatDistribution();
-      return data;
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/threat-distribution', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取威胁分布失败');
     }
@@ -68,8 +103,20 @@ export const fetchDeviceStats = createAsyncThunk(
   'dashboard/fetchDeviceStats',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await dashboardAPI.getDeviceStats();
-      return data;
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/device-stats', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取设备统计失败');
     }

@@ -1,12 +1,17 @@
 // API服务层 - 统一管理所有API调用
-import { store } from '../store';
 
+// eslint-disable-next-line no-undef
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+
+// 获取token的函数 - 避免循环依赖
+const getAuthToken = () => {
+  const token = localStorage.getItem('token');
+  return token;
+};
 
 // 通用请求函数
 const request = async (endpoint: string, options: any = {}) => {
-  const state = store.getState();
-  const token = state.auth.token;
+  const token = getAuthToken();
 
   const config: any = {
     headers: {
@@ -283,8 +288,7 @@ export class WebSocketManager {
 
   connect() {
     try {
-      const state = store.getState();
-      const token = state.auth.token;
+      const token = getAuthToken();
       
       this.ws = new WebSocket(`${this.url}?token=${token}`);
       

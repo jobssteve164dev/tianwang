@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { deviceAPI } from '../../services/api';
 
 export interface Device {
   id: string;
@@ -38,7 +37,28 @@ export const fetchDevices = createAsyncThunk(
   'device/fetchDevices',
   async (params: { type?: string; status?: string; search?: string } = {}, { rejectWithValue }) => {
     try {
-      const data = await deviceAPI.getDevices(params);
+      const token = localStorage.getItem('token');
+      const queryString = new URLSearchParams();
+      
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryString.append(key, String(value));
+        }
+      });
+
+      const response = await fetch(`/api/devices?${queryString.toString()}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      const data = await response.json();
       return Array.isArray(data) ? data : data.devices || [];
     } catch (error: any) {
       return rejectWithValue(error.message || '获取设备列表失败');
@@ -51,8 +71,20 @@ export const fetchDeviceById = createAsyncThunk(
   'device/fetchDeviceById',
   async (deviceId: string, { rejectWithValue }) => {
     try {
-      const data = await deviceAPI.getDeviceById(deviceId);
-      return data;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/devices/${deviceId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '获取设备详情失败');
     }
@@ -64,7 +96,21 @@ export const controlDevice = createAsyncThunk(
   'device/controlDevice',
   async ({ deviceId, action }: { deviceId: string; action: 'start' | 'stop' | 'restart' }, { rejectWithValue }) => {
     try {
-      await deviceAPI.controlDevice(deviceId, action);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/devices/${deviceId}/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
       return { deviceId, action };
     } catch (error: any) {
       return rejectWithValue(error.message || '设备控制失败');
@@ -77,7 +123,20 @@ export const deleteDevice = createAsyncThunk(
   'device/deleteDevice',
   async (deviceId: string, { rejectWithValue }) => {
     try {
-      await deviceAPI.deleteDevice(deviceId);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
       return deviceId;
     } catch (error: any) {
       return rejectWithValue(error.message || '删除设备失败');
@@ -90,8 +149,22 @@ export const updateDevice = createAsyncThunk(
   'device/updateDevice',
   async ({ deviceId, data }: { deviceId: string; data: Partial<Device> }, { rejectWithValue }) => {
     try {
-      const updatedDevice = await deviceAPI.updateDevice(deviceId, data);
-      return updatedDevice;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/devices/${deviceId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
     } catch (error: any) {
       return rejectWithValue(error.message || '更新设备失败');
     }
