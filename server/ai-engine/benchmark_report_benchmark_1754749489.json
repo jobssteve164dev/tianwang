@@ -1,0 +1,190 @@
+{
+  "report_id": "benchmark_1754749489",
+  "timestamp": "2025-08-09T22:24:49.809691",
+  "system_info": {
+    "python_version": "3.9.6",
+    "platform": "darwin",
+    "test_environment": "development",
+    "timestamp": "2025-08-09T22:19:58.276649",
+    "working_directory": "/Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang/server/ai-engine"
+  },
+  "test_results": [
+    {
+      "suite_name": "准确性测试",
+      "passed": false,
+      "execution_time": 28.543455123901367,
+      "key_metrics": {
+        "extraction_error": "could not convert string to float: 'Accuracy): 0.916 '"
+      },
+      "issues": [
+        "准确性测试执行失败",
+        "准确率0.0%未达到95%要求",
+        "误报率100.0%超过5%限制"
+      ],
+      "recommendations": [
+        "增加训练数据量和质量",
+        "优化机器学习模型参数",
+        "增强特征工程",
+        "实现模型集成和投票机制",
+        "调整检测阈值",
+        "增加白名单过滤机制",
+        "优化规则引擎逻辑",
+        "实现上下文感知检测"
+      ]
+    },
+    {
+      "suite_name": "性能压力测试",
+      "passed": true,
+      "execution_time": 237.56017422676086,
+      "key_metrics": {
+        "avg_response_time_ms": 59.7,
+        "throughput": 5833.7,
+        "max_concurrent": 1000
+      },
+      "issues": [],
+      "recommendations": []
+    },
+    {
+      "suite_name": "威胁覆盖测试",
+      "passed": true,
+      "execution_time": 24.999892950057983,
+      "key_metrics": {
+        "avg_detection_rate": 0.907,
+        "effective_threat_types": 10
+      },
+      "issues": [],
+      "recommendations": []
+    },
+    {
+      "suite_name": "端到端集成测试",
+      "passed": false,
+      "execution_time": 0.4287450313568115,
+      "key_metrics": {
+        "avg_e2e_response_time": 0.063,
+        "e2e_success_rate": 1.0,
+        "functional_accuracy": 0.5329999999999999
+      },
+      "issues": [
+        "端到端集成测试执行失败",
+        "功能准确性53.3%未达到90%要求"
+      ],
+      "recommendations": [
+        "增强组件间通信可靠性",
+        "实现容错和重试机制",
+        "优化工作流编排",
+        "增加监控和告警"
+      ]
+    }
+  ],
+  "overall_assessment": {
+    "overall_score": 0.5,
+    "grade": "D",
+    "status": "需要改进",
+    "critical_failures": 1,
+    "total_issues": 5,
+    "passed_suites": 2,
+    "total_suites": 4
+  },
+  "performance_baseline": {
+    "accuracy_metrics": {
+      "target_accuracy": 0.95,
+      "target_false_positive_rate": 0.05,
+      "target_threat_coverage": 8
+    },
+    "performance_metrics": {
+      "target_max_concurrent": 1000,
+      "target_response_time_ms": 30000,
+      "target_throughput": 1000
+    },
+    "integration_metrics": {
+      "target_e2e_success_rate": 0.95,
+      "target_functional_accuracy": 0.9,
+      "target_e2e_response_time": 5.0
+    },
+    "current_performance": {
+      "accuracy": 0,
+      "false_positive_rate": 1,
+      "threat_coverage": 0,
+      "max_concurrent": 1000,
+      "avg_response_time_ms": 59.7,
+      "throughput": 5833.7,
+      "e2e_success_rate": 1.0,
+      "functional_accuracy": 0.5329999999999999,
+      "avg_e2e_response_time": 0.063
+    }
+  },
+  "optimization_roadmap": [
+    {
+      "phase": "第一阶段：关键问题修复",
+      "priority": "高",
+      "timeline": "1-2周",
+      "tasks": [
+        {
+          "suite": "准确性测试",
+          "issue": "准确性测试执行失败",
+          "recommendations": [
+            "增加训练数据量和质量",
+            "优化机器学习模型参数"
+          ]
+        },
+        {
+          "suite": "准确性测试",
+          "issue": "准确率0.0%未达到95%要求",
+          "recommendations": [
+            "增加训练数据量和质量",
+            "优化机器学习模型参数"
+          ]
+        },
+        {
+          "suite": "准确性测试",
+          "issue": "误报率100.0%超过5%限制",
+          "recommendations": [
+            "增加训练数据量和质量",
+            "优化机器学习模型参数"
+          ]
+        },
+        {
+          "suite": "端到端集成测试",
+          "issue": "端到端集成测试执行失败",
+          "recommendations": [
+            "增强组件间通信可靠性",
+            "实现容错和重试机制"
+          ]
+        },
+        {
+          "suite": "端到端集成测试",
+          "issue": "功能准确性53.3%未达到90%要求",
+          "recommendations": [
+            "增强组件间通信可靠性",
+            "实现容错和重试机制"
+          ]
+        }
+      ],
+      "success_criteria": "所有测试套件通过基本要求"
+    },
+    {
+      "phase": "第三阶段：功能增强",
+      "priority": "低",
+      "timeline": "4-8周",
+      "tasks": [
+        {
+          "task": "增加新的威胁检测类型",
+          "type": "feature"
+        },
+        {
+          "task": "实现自适应学习机制",
+          "type": "feature"
+        },
+        {
+          "task": "增强可视化监控",
+          "type": "feature"
+        },
+        {
+          "task": "实现A/B测试框架",
+          "type": "feature"
+        }
+      ],
+      "success_criteria": "系统功能完整性和用户体验显著提升"
+    }
+  ]
+}
