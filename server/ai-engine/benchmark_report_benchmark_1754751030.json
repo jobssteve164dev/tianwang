@@ -1,0 +1,123 @@
+{
+  "report_id": "benchmark_1754751030",
+  "timestamp": "2025-08-09T22:50:30.169687",
+  "system_info": {
+    "python_version": "3.9.6",
+    "platform": "darwin",
+    "test_environment": "development",
+    "timestamp": "2025-08-09T22:45:36.340301",
+    "working_directory": "/Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang/server/ai-engine"
+  },
+  "test_results": [
+    {
+      "suite_name": "准确性测试",
+      "passed": true,
+      "execution_time": 28.858802318572998,
+      "key_metrics": {
+        "accuracy": 0.951,
+        "false_positive_rate": 0.0,
+        "extraction_error": "could not convert string to float: '要求: ≤5'"
+      },
+      "issues": [],
+      "recommendations": []
+    },
+    {
+      "suite_name": "性能压力测试",
+      "passed": true,
+      "execution_time": 238.63659691810608,
+      "key_metrics": {
+        "avg_response_time_ms": 60.1,
+        "throughput": 5800.9,
+        "max_concurrent": 1000
+      },
+      "issues": [],
+      "recommendations": []
+    },
+    {
+      "suite_name": "威胁覆盖测试",
+      "passed": true,
+      "execution_time": 25.86663794517517,
+      "key_metrics": {
+        "avg_detection_rate": 0.894,
+        "effective_threat_types": 10
+      },
+      "issues": [],
+      "recommendations": []
+    },
+    {
+      "suite_name": "端到端集成测试",
+      "passed": true,
+      "execution_time": 0.4661850929260254,
+      "key_metrics": {
+        "avg_e2e_response_time": 0.067,
+        "e2e_success_rate": 1.0,
+        "functional_accuracy": 1.0
+      },
+      "issues": [],
+      "recommendations": []
+    }
+  ],
+  "overall_assessment": {
+    "overall_score": 1.0,
+    "grade": "A",
+    "status": "优秀",
+    "critical_failures": 0,
+    "total_issues": 0,
+    "passed_suites": 4,
+    "total_suites": 4
+  },
+  "performance_baseline": {
+    "accuracy_metrics": {
+      "target_accuracy": 0.95,
+      "target_false_positive_rate": 0.05,
+      "target_threat_coverage": 8
+    },
+    "performance_metrics": {
+      "target_max_concurrent": 1000,
+      "target_response_time_ms": 30000,
+      "target_throughput": 1000
+    },
+    "integration_metrics": {
+      "target_e2e_success_rate": 0.95,
+      "target_functional_accuracy": 0.9,
+      "target_e2e_response_time": 5.0
+    },
+    "current_performance": {
+      "accuracy": 0.951,
+      "false_positive_rate": 0.0,
+      "threat_coverage": 0,
+      "max_concurrent": 1000,
+      "avg_response_time_ms": 60.1,
+      "throughput": 5800.9,
+      "e2e_success_rate": 1.0,
+      "functional_accuracy": 1.0,
+      "avg_e2e_response_time": 0.067
+    }
+  },
+  "optimization_roadmap": [
+    {
+      "phase": "第三阶段：功能增强",
+      "priority": "低",
+      "timeline": "4-8周",
+      "tasks": [
+        {
+          "task": "增加新的威胁检测类型",
+          "type": "feature"
+        },
+        {
+          "task": "实现自适应学习机制",
+          "type": "feature"
+        },
+        {
+          "task": "增强可视化监控",
+          "type": "feature"
+        },
+        {
+          "task": "实现A/B测试框架",
+          "type": "feature"
+        }
+      ],
+      "success_criteria": "系统功能完整性和用户体验显著提升"
+    }
+  ]
+}

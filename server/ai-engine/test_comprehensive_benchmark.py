@@ -161,15 +161,23 @@ class ComprehensiveBenchmarkTest:
                 # 提取准确性相关指标
                 lines = output.split('\n')
                 for line in lines:
-                    if "准确率 (Accuracy):" in line:
-                        accuracy = line.split('(')[1].split('%')[0]
-                        metrics["accuracy"] = float(accuracy) / 100
-                    elif "误报率:" in line:
-                        fpr = line.split('(')[1].split('%')[0]
-                        metrics["false_positive_rate"] = float(fpr) / 100
-                    elif "威胁类型覆盖:" in line:
-                        coverage = line.split(':')[1].split('种')[0].strip()
-                        metrics["threat_coverage"] = int(coverage)
+                    # 修复准确率提取
+                    if "准确率 (Accuracy):" in line and "(" in line and "%" in line:
+                        # 格式: "   准确率 (Accuracy): 0.944 (94.4%)"
+                        parts = line.split('(')
+                        if len(parts) >= 3:
+                            accuracy_str = parts[2].split('%')[0]
+                            metrics["accuracy"] = float(accuracy_str) / 100
+                    elif "误报率:" in line and "(" in line and "%" in line:
+                        # 格式: "   误报率: 0.000 (0.0%)"
+                        parts = line.split('(')
+                        if len(parts) >= 2:
+                            fpr_str = parts[1].split('%')[0]
+                            metrics["false_positive_rate"] = float(fpr_str) / 100
+                    elif "威胁类型覆盖:" in line and "种" in line:
+                        # 格式: "   威胁类型覆盖: 10种 ✅ 达标"
+                        coverage_str = line.split(':')[1].split('种')[0].strip()
+                        metrics["threat_coverage"] = int(coverage_str)
             
             elif "性能压力测试" in suite_name:
                 # 提取性能相关指标
@@ -189,10 +197,10 @@ class ComprehensiveBenchmarkTest:
                 # 提取威胁覆盖相关指标
                 lines = output.split('\n')
                 for line in lines:
-                    if "有效威胁类型覆盖:" in line:
-                        coverage = line.split(':')[1].split('种')[0].strip()
-                        metrics["effective_threat_types"] = int(coverage)
-                    elif "平均检测率:" in line:
+                    if "有效威胁类型覆盖:" in line and "种" in line:
+                        coverage_str = line.split(':')[1].split('种')[0].strip()
+                        metrics["effective_threat_types"] = int(coverage_str)
+                    elif "平均检测率:" in line and "%" in line:
                         detection_rate = line.split(':')[1].split('%')[0].strip()
                         metrics["avg_detection_rate"] = float(detection_rate) / 100
             
@@ -200,15 +208,18 @@ class ComprehensiveBenchmarkTest:
                 # 提取集成测试相关指标
                 lines = output.split('\n')
                 for line in lines:
-                    if "端到端成功率:" in line:
-                        success_rate = line.split(':')[1].split('%')[0].strip()
-                        metrics["e2e_success_rate"] = float(success_rate) / 100
-                    elif "功能准确性:" in line:
-                        functional_accuracy = line.split(':')[1].split('%')[0].strip()
-                        metrics["functional_accuracy"] = float(functional_accuracy) / 100
-                    elif "平均响应时间:" in line and "s" in line:
-                        response_time = line.split(':')[1].split('s')[0].strip()
-                        metrics["avg_e2e_response_time"] = float(response_time)
+                    if "端到端成功率:" in line and "%" in line:
+                        # 格式: "   端到端成功率: 100.0% ✅ 达标"
+                        success_rate_str = line.split(':')[1].split('%')[0].strip()
+                        metrics["e2e_success_rate"] = float(success_rate_str) / 100
+                    elif "功能准确性:" in line and "%" in line:
+                        # 格式: "   功能准确性: 66.7% ❌ 未达标"
+                        functional_accuracy_str = line.split(':')[1].split('%')[0].strip()
+                        metrics["functional_accuracy"] = float(functional_accuracy_str) / 100
+                    elif "平均响应时间:" in line and "s" in line and "ms" not in line:
+                        # 格式: "   平均响应时间: 0.062s"
+                        response_time_str = line.split(':')[1].split('s')[0].strip()
+                        metrics["avg_e2e_response_time"] = float(response_time_str)
         
         except Exception as e:
             metrics["extraction_error"] = str(e)
