@@ -1,12 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { dashboardAPI } from '../../services/api';
 
 export interface SecurityMetrics {
   totalThreats: number;
   activeAlerts: number;
   connectedDevices: number;
-  threatsTrend: Array<{ time: string; count: number }>;
-  threatTypes: Array<{ type: string; count: number }>;
-  deviceStatus: Array<{ status: string; count: number }>;
+  threatTrend: number;
+  systemHealth: 'healthy' | 'warning' | 'critical';
+  lastUpdated: string;
 }
 
 export interface DashboardState {
@@ -25,24 +26,52 @@ const initialState: DashboardState = {
 
 // 获取安全指标
 export const fetchSecurityMetrics = createAsyncThunk(
-  'dashboard/fetchMetrics',
-  async (_, { rejectWithValue, getState }) => {
+  'dashboard/fetchSecurityMetrics',
+  async (_, { rejectWithValue }) => {
     try {
-      const state = getState() as { auth: { token: string } };
-      const response = await fetch('/api/dashboard/metrics', {
-        headers: {
-          'Authorization': `Bearer ${state.auth.token}`,
-        },
-      });
+      const data = await dashboardAPI.getSecurityMetrics();
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取安全指标失败');
+    }
+  }
+);
 
-      if (!response.ok) {
-        const error = await response.json();
-        return rejectWithValue(error.message || '获取安全指标失败');
-      }
+// 获取威胁趋势数据
+export const fetchThreatTrends = createAsyncThunk(
+  'dashboard/fetchThreatTrends',
+  async (timeRange: string = '7d', { rejectWithValue }) => {
+    try {
+      const data = await dashboardAPI.getThreatTrends(timeRange);
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取威胁趋势失败');
+    }
+  }
+);
 
-      return await response.json();
-    } catch (error) {
-      return rejectWithValue('网络错误，请稍后重试');
+// 获取威胁类型分布
+export const fetchThreatDistribution = createAsyncThunk(
+  'dashboard/fetchThreatDistribution',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await dashboardAPI.getThreatDistribution();
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取威胁分布失败');
+    }
+  }
+);
+
+// 获取设备统计
+export const fetchDeviceStats = createAsyncThunk(
+  'dashboard/fetchDeviceStats',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await dashboardAPI.getDeviceStats();
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取设备统计失败');
     }
   }
 );
@@ -55,12 +84,13 @@ const dashboardSlice = createSlice({
       state.error = null;
     },
     updateMetrics: (state, action) => {
-      state.metrics = action.payload;
+      state.metrics = { ...state.metrics, ...action.payload };
       state.lastUpdated = new Date().toISOString();
     },
   },
   extraReducers: (builder) => {
     builder
+      // 获取安全指标
       .addCase(fetchSecurityMetrics.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -71,6 +101,42 @@ const dashboardSlice = createSlice({
         state.lastUpdated = new Date().toISOString();
       })
       .addCase(fetchSecurityMetrics.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取威胁趋势
+      .addCase(fetchThreatTrends.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchThreatTrends.fulfilled, (state) => {
+        state.loading = false;
+        // 可以在这里处理威胁趋势数据
+      })
+      .addCase(fetchThreatTrends.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取威胁分布
+      .addCase(fetchThreatDistribution.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchThreatDistribution.fulfilled, (state) => {
+        state.loading = false;
+        // 可以在这里处理威胁分布数据
+      })
+      .addCase(fetchThreatDistribution.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取设备统计
+      .addCase(fetchDeviceStats.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchDeviceStats.fulfilled, (state) => {
+        state.loading = false;
+        // 可以在这里处理设备统计数据
+      })
+      .addCase(fetchDeviceStats.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
