@@ -135,17 +135,17 @@ async function setupConsumers() {
 
           // 根据主题处理消息
           switch (topic) {
-            case config.kafka.topics.logs:
-              await handleLogMessage(data);
-              break;
-            case config.kafka.topics.alerts:
-              await handleAlertMessage(data);
-              break;
-            case config.kafka.topics.actions:
-              await handleActionMessage(data);
-              break;
-            default:
-              logger.warn(`Unknown topic: ${topic}`);
+          case config.kafka.topics.logs:
+            await handleLogMessage(data);
+            break;
+          case config.kafka.topics.alerts:
+            await handleAlertMessage(data);
+            break;
+          case config.kafka.topics.actions:
+            await handleActionMessage(data);
+            break;
+          default:
+            logger.warn(`Unknown topic: ${topic}`);
           }
 
         } catch (error) {

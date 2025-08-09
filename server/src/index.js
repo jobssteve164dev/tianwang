@@ -19,10 +19,12 @@ const logger = require('./utils/logger');
 const config = require('./config');
 const { connectDatabases } = require('./config/database');
 const { initializeKafka } = require('./config/kafka');
-const routes = require('./routes');
+const { router: routes, setServices: setRouteServices } = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { setupSwagger } = require('./config/swagger');
 const WebSocketService = require('./services/WebSocketService');
+const NotificationService = require('./services/NotificationService');
+const ReportService = require('./services/ReportService');
 
 // 创建Express应用
 const app = express();
@@ -120,6 +122,10 @@ io.on('connection', (socket) => {
 // 将io实例附加到app，供其他模块使用
 app.set('io', io);
 
+// 初始化服务实例
+let notificationService = null;
+let reportService = null;
+
 // 错误处理中间件（必须在最后）
 app.use(errorHandler);
 
@@ -152,6 +158,21 @@ async function initialize() {
     WebSocketService.initialize(server);
     logger.info('✅ WebSocket service initialized successfully');
 
+    // 初始化通知服务
+    logger.info('📧 Initializing notification service...');
+    notificationService = new NotificationService();
+    await notificationService.initialize();
+    logger.info('✅ Notification service initialized successfully');
+
+    // 初始化报告服务
+    logger.info('📊 Initializing report service...');
+    reportService = new ReportService();
+    await reportService.initialize();
+    logger.info('✅ Report service initialized successfully');
+
+    // 设置路由服务实例
+    setRouteServices(notificationService, reportService);
+
     // 启动服务器
     const port = config.app.port;
     server.listen(port, config.app.host, () => {
@@ -172,6 +193,8 @@ async function initialize() {
 process.on('SIGTERM', () => {
   logger.info('🛑 SIGTERM received, shutting down gracefully...');
   WebSocketService.close();
+  if (notificationService) notificationService.cleanup();
+  if (reportService) reportService.cleanup();
   server.close(() => {
     logger.info('✅ Server closed');
     process.exit(0);
@@ -181,6 +204,8 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   logger.info('🛑 SIGINT received, shutting down gracefully...');
   WebSocketService.close();
+  if (notificationService) notificationService.cleanup();
+  if (reportService) reportService.cleanup();
   server.close(() => {
     logger.info('✅ Server closed');
     process.exit(0);

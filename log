@@ -2,44 +2,8 @@ Compiled with problems:
 ×
 ERROR
 [eslint] 
-src/store/slices/alertSlice.ts
-  Line 83:13:   'alertAPI' is not defined  no-undef
-  Line 96:13:   'alertAPI' is not defined  no-undef
-  Line 109:13:  'alertAPI' is not defined  no-undef
+src/store/slices/authSlice.ts
+  Line 188:10:  '_' is defined but never used         no-unused-vars
+  Line 188:15:  'dispatch' is defined but never used  no-unused-vars
 
-Search for the keywords to learn more about each error.
-ERROR
-[eslint] 
-src/store/slices/alertSlice.ts
-  Line 83:13:   'alertAPI' is not defined  no-undef
-  Line 96:13:   'alertAPI' is not defined  no-undef
-  Line 109:13:  'alertAPI' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-ERROR in src/store/slices/alertSlice.ts:83:13
-TS2552: Cannot find name 'alertAPI'. Did you mean 'alertId'?
-    81 |   async ({ alertId, status }: { alertId: string; status: 'active' | 'acknowledged' | 'resolved' }, { rejectWithValue }) => {
-    82 |     try {
-  > 83 |       await alertAPI.updateAlertStatus(alertId, status);
-       |             ^^^^^^^^
-    84 |       return { alertId, status };
-    85 |     } catch (error: any) {
-    86 |       return rejectWithValue(error.message || '更新告警状态失败');
-ERROR in src/store/slices/alertSlice.ts:96:13
-TS2552: Cannot find name 'alertAPI'. Did you mean 'alertId'?
-    94 |   async (alertId: string, { rejectWithValue }) => {
-    95 |     try {
-  > 96 |       await alertAPI.acknowledgeAlert(alertId);
-       |             ^^^^^^^^
-    97 |       return { alertId, status: 'acknowledged' as const };
-    98 |     } catch (error: any) {
-    99 |       return rejectWithValue(error.message || '确认告警失败');
-ERROR in src/store/slices/alertSlice.ts:109:13
-TS2552: Cannot find name 'alertAPI'. Did you mean 'alertId'?
-    107 |   async (alertId: string, { rejectWithValue }) => {
-    108 |     try {
-  > 109 |       await alertAPI.resolveAlert(alertId);
-        |             ^^^^^^^^
-    110 |       return { alertId, status: 'resolved' as const };
-    111 |     } catch (error: any) {
-    112 |       return rejectWithValue(error.message || '解决告警失败');
+Search for the keywords to learn more about each error.image.png
