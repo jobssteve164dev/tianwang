@@ -24,11 +24,32 @@ const initialState: AuthState = {
   error: null,
 };
 
+// 内置测试用户数据
+const DEMO_USER: User = {
+  id: '1',
+  username: 'admin',
+  email: 'admin@tianwang.com',
+  role: 'admin',
+  organizationId: '1',
+};
+
 // 异步登录action
 export const loginAsync = createAsyncThunk(
   'auth/login',
   async (credentials: { username: string; password: string }, { rejectWithValue }) => {
     try {
+      // 内置测试账户验证
+      if (credentials.username === 'admin' && credentials.password === '123456') {
+        const mockToken = 'demo-token-' + Date.now();
+        localStorage.setItem('token', mockToken);
+        
+        return {
+          user: DEMO_USER,
+          token: mockToken,
+        };
+      }
+
+      // 如果不是测试账户，尝试真实API调用
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -63,6 +84,12 @@ export const fetchUserProfile = createAsyncThunk(
         return rejectWithValue('未找到认证令牌');
       }
 
+      // 如果是演示token，直接返回演示用户
+      if (token.startsWith('demo-token-')) {
+        return DEMO_USER;
+      }
+
+      // 真实API调用
       const response = await fetch('/api/auth/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -134,9 +161,40 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.token = null;
         localStorage.removeItem('token');
+      })
+      // 自动登录演示账户
+      .addCase(autoLoginDemo.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(autoLoginDemo.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(autoLoginDemo.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        state.isAuthenticated = false;
       });
   },
 });
+
+// 自动登录演示账户
+export const autoLoginDemo = createAsyncThunk(
+  'auth/autoLoginDemo',
+  async (_, { dispatch }) => {
+    const mockToken = 'demo-token-' + Date.now();
+    localStorage.setItem('token', mockToken);
+    
+    return {
+      user: DEMO_USER,
+      token: mockToken,
+    };
+  }
+);
 
 export const { logout, clearError, setToken } = authSlice.actions;
 export default authSlice.reducer; 

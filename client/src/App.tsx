@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { useAppDispatch, useAppSelector } from './store/hooks';
-import { fetchUserProfile } from './store/slices/authSlice';
+import { fetchUserProfile, autoLoginDemo } from './store/slices/authSlice';
 import AuthLayout from './components/layout/AuthLayout';
 import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
@@ -18,6 +18,11 @@ const App: React.FC = () => {
     // 如果有token但未认证，尝试获取用户信息
     if (token && !isAuthenticated) {
       dispatch(fetchUserProfile() as any);
+    }
+    
+    // 如果没有token且未认证，自动登录演示账户
+    if (!token && !isAuthenticated) {
+      dispatch(autoLoginDemo() as any);
     }
   }, [dispatch, token, isAuthenticated]);
 
