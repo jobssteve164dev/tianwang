@@ -1,0 +1,69 @@
+{
+  "name": "tianwang",
+  "version": "1.0.0-alpha.1",
+  "description": "AI驱动的网络安全监控系统 - AI-Powered Network Security Monitoring System",
+  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm run dev",
+    "build": "npm run server:build && npm run client:build",
+    "server:build": "cd server && npm run build",
+    "client:build": "cd client && npm run build",
+    "test": "npm run server:test && npm run client:test",
+    "server:test": "cd server && npm test",
+    "client:test": "cd client && npm test",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "setup": "npm install && cd server && npm install && cd ../client && npm install",
+    "clean": "rm -rf node_modules server/node_modules client/node_modules",
+    "lint": "eslint . --ext .js,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
+    "db:migrate": "cd server && npm run db:migrate",
+    "db:seed": "cd server && npm run db:seed",
+    "agents:build": "npm run agents:build:windows && npm run agents:build:linux && npm run agents:build:macos",
+    "agents:build:windows": "cd agents/windows && npm run build",
+    "agents:build:linux": "cd agents/linux && make build",
+    "agents:build:macos": "cd agents/macos && make build",
+    "agents:build:openwrt": "cd agents/openwrt && make build"
+  },
+  "keywords": [
+    "security",
+    "monitoring",
+    "ai",
+    "threat-detection",
+    "network-security",
+    "intrusion-detection",
+    "firewall",
+    "siem"
+  ],
+  "author": "TianWang Security Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/tianwang.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/tianwang/issues"
+  },
+  "homepage": "https://github.com/your-org/tianwang#readme",
+  "devDependencies": {
+    "concurrently": "^7.6.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+} 

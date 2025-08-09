@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库 - 用户、配置等关系型数据
+  postgres:
+    image: postgres:15-alpine
+    container_name: tianwang-postgres
+    environment:
+      POSTGRES_DB: tianwang
+      POSTGRES_USER: tianwang
+      POSTGRES_PASSWORD: tianwang123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/database/init:/docker-entrypoint-initdb.d
+    networks:
+      - tianwang-network
+
+  # InfluxDB 时序数据库 - 日志、指标等时序数据
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: tianwang-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: tianwang
+      DOCKER_INFLUXDB_INIT_PASSWORD: tianwang123
+      DOCKER_INFLUXDB_INIT_ORG: tianwang
+      DOCKER_INFLUXDB_INIT_BUCKET: security_logs
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: tianwang-super-secret-auth-token
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - tianwang-network
+
+  # Redis 缓存数据库 - 会话、缓存
+  redis:
+    image: redis:7-alpine
+    container_name: tianwang-redis
+    command: redis-server --requirepass tianwang123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tianwang-network
+
+  # Apache Kafka 消息队列
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: tianwang-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tianwang-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: tianwang-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - tianwang-network
+
+  # 后端API服务
+  server:
+    build:
+      context: ./server
+      dockerfile: ../docker/server/Dockerfile
+    container_name: tianwang-server
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: tianwang
+      DB_USER: tianwang
+      DB_PASSWORD: tianwang123
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: tianwang-super-secret-auth-token
+      INFLUXDB_ORG: tianwang
+      INFLUXDB_BUCKET: security_logs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: tianwang123
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: tianwang-jwt-super-secret-key
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+      - ./server/logs:/app/logs
+    depends_on:
+      - postgres
+      - influxdb
+      - redis
+      - kafka
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+  # 前端Web应用
+  client:
+    build:
+      context: ./client
+      dockerfile: ../docker/client/Dockerfile
+    container_name: tianwang-client
+    environment:
+      REACT_APP_API_BASE_URL: http://localhost:8000/api
+      REACT_APP_WS_URL: ws://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      - server
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+  # AI分析引擎 (Python服务)
+  ai-engine:
+    build:
+      context: ./server/ai-engine
+      dockerfile: ../../docker/ai-engine/Dockerfile
+    container_name: tianwang-ai-engine
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BROKERS: kafka:9092
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: tianwang-super-secret-auth-token
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: tianwang123
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./server/ai-engine:/app
+      - ./data/models:/app/models
+    depends_on:
+      - kafka
+      - influxdb
+      - redis
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: tianwang-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - server
+      - client
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  influxdb_data:
+  influxdb_config:
+  redis_data:
+  kafka_data:
+
+networks:
+  tianwang-network:
+    driver: bridge 
