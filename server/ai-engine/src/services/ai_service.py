@@ -30,6 +30,7 @@ class AIService:
         self.scalers: Dict[str, StandardScaler] = {}
         self.data_processor = DataProcessor()
         self.feature_extractor = FeatureExtractor()
+        self.external_api_service = None  # 外部API服务引用
         self.is_initialized = False
         self.metrics = {
             "predictions_count": 0,
@@ -59,6 +60,270 @@ class AIService:
         except Exception as e:
             logger.error(f"AI服务初始化失败: {e}")
             raise
+    
+    def set_external_api_service(self, external_api_service):
+        """设置外部API服务引用"""
+        self.external_api_service = external_api_service
+        logger.info("外部API服务引用已设置")
+    
+    async def analyze_with_hybrid_intelligence(
+        self,
+        data: Dict[str, Any],
+        analysis_type: str = "comprehensive",
+        use_external_api: bool = True
+    ) -> Dict[str, Any]:
+        """混合智能分析 - 结合本地模型和外部大模型"""
+        try:
+            results = {
+                "local_analysis": {},
+                "llm_analysis": {},
+                "hybrid_conclusion": {},
+                "confidence_score": 0.0,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # 1. 本地模型分析
+            logger.info("开始本地模型分析...")
+            local_results = await self._perform_local_analysis(data, analysis_type)
+            results["local_analysis"] = local_results
+            
+            # 2. 外部大模型分析（如果可用且启用）
+            if use_external_api and self.external_api_service and self.external_api_service.is_healthy():
+                logger.info("开始外部大模型分析...")
+                llm_prompt = self._generate_llm_prompt(data, local_results, analysis_type)
+                
+                llm_result = await self.external_api_service.analyze_with_llm(
+                    prompt=llm_prompt,
+                    analysis_type=analysis_type,
+                    use_cache=True
+                )
+                
+                if llm_result.get("success", False):
+                    results["llm_analysis"] = {
+                        "content": llm_result.get("content", ""),
+                        "provider": llm_result.get("provider", ""),
+                        "model": llm_result.get("model", ""),
+                        "from_cache": llm_result.get("from_cache", False)
+                    }
+                else:
+                    results["llm_analysis"] = {
+                        "error": llm_result.get("error", "外部API调用失败")
+                    }
+            
+            # 3. 混合推理结论
+            hybrid_conclusion = await self._generate_hybrid_conclusion(
+                results["local_analysis"],
+                results["llm_analysis"]
+            )
+            results["hybrid_conclusion"] = hybrid_conclusion
+            results["confidence_score"] = hybrid_conclusion.get("confidence", 0.0)
+            
+            # 4. 更新指标
+            self.metrics["predictions_count"] += 1
+            self.metrics["last_prediction_time"] = datetime.now().isoformat()
+            
+            if hybrid_conclusion.get("threat_detected", False):
+                self.metrics["threats_identified"] += 1
+            
+            if hybrid_conclusion.get("anomaly_detected", False):
+                self.metrics["anomalies_detected"] += 1
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"混合智能分析失败: {e}")
+            return {
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    async def _perform_local_analysis(self, data: Dict[str, Any], analysis_type: str) -> Dict[str, Any]:
+        """执行本地模型分析"""
+        try:
+            local_results = {}
+            
+            if analysis_type in ["comprehensive", "anomaly"]:
+                anomaly_result = await self.detect_anomaly(data)
+                local_results["anomaly_detection"] = anomaly_result
+            
+            if analysis_type in ["comprehensive", "malware"]:
+                malware_result = await self.detect_malware(data)
+                local_results["malware_detection"] = malware_result
+            
+            if analysis_type in ["comprehensive", "network"]:
+                network_result = await self.detect_network_intrusion(data)
+                local_results["network_intrusion"] = network_result
+            
+            if analysis_type in ["comprehensive", "behavior"]:
+                behavior_result = await self.analyze_user_behavior(data)
+                local_results["behavior_analysis"] = behavior_result
+            
+            return local_results
+            
+        except Exception as e:
+            logger.error(f"本地分析失败: {e}")
+            return {"error": str(e)}
+    
+    def _generate_llm_prompt(
+        self,
+        data: Dict[str, Any],
+        local_results: Dict[str, Any],
+        analysis_type: str
+    ) -> str:
+        """生成大模型分析提示词"""
+        try:
+            # 基础上下文
+            context = f"""
+作为网络安全专家，请分析以下数据和本地AI模型的初步分析结果：
+
+## 原始数据：
+{json.dumps(data, indent=2, ensure_ascii=False)}
+
+## 本地AI模型分析结果：
+{json.dumps(local_results, indent=2, ensure_ascii=False)}
+
+## 分析类型：{analysis_type}
+"""
+            
+            # 根据分析类型添加特定指导
+            if analysis_type == "log_analysis":
+                context += """
+请重点关注：
+1. 日志中是否存在异常模式或可疑活动
+2. 时间序列分析，识别异常时间点
+3. 用户行为异常检测
+4. 系统资源使用异常
+5. 网络通信异常模式
+"""
+            elif analysis_type == "threat_detection":
+                context += """
+请重点关注：
+1. 已知威胁特征匹配
+2. 攻击向量分析
+3. 恶意代码特征识别
+4. 网络入侵指标(IOCs)
+5. 威胁等级评估
+"""
+            elif analysis_type == "behavior_analysis":
+                context += """
+请重点关注：
+1. 用户行为基线偏差
+2. 权限滥用检测
+3. 异常登录模式
+4. 数据访问异常
+5. 系统操作异常
+"""
+            
+            context += """
+请提供：
+1. 详细的安全分析报告
+2. 威胁等级评估（高/中/低/无）
+3. 具体的威胁类型识别
+4. 建议的响应措施
+5. 置信度评分（0-100）
+
+请以结构化的JSON格式回复，包含以下字段：
+- threat_level: 威胁等级
+- threat_types: 威胁类型列表
+- confidence: 置信度(0-100)
+- summary: 分析摘要
+- recommendations: 建议措施列表
+- technical_details: 技术细节
+"""
+            
+            return context
+            
+        except Exception as e:
+            logger.error(f"生成LLM提示词失败: {e}")
+            return f"请分析以下安全数据：{json.dumps(data, ensure_ascii=False)}"
+    
+    async def _generate_hybrid_conclusion(
+        self,
+        local_results: Dict[str, Any],
+        llm_results: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """生成混合推理结论"""
+        try:
+            conclusion = {
+                "threat_detected": False,
+                "anomaly_detected": False,
+                "threat_level": "无",
+                "threat_types": [],
+                "confidence": 0.0,
+                "summary": "",
+                "recommendations": [],
+                "analysis_method": "hybrid"
+            }
+            
+            # 分析本地结果
+            local_threats = []
+            local_confidence = 0.0
+            
+            for analysis_type, result in local_results.items():
+                if isinstance(result, dict) and result.get("anomaly_detected", False):
+                    conclusion["anomaly_detected"] = True
+                    local_threats.append(analysis_type)
+                    local_confidence += result.get("confidence", 0.5)
+            
+            # 分析LLM结果
+            llm_confidence = 0.0
+            llm_threats = []
+            
+            if llm_results.get("content") and not llm_results.get("error"):
+                try:
+                    # 尝试解析LLM的JSON响应
+                    llm_content = llm_results["content"]
+                    if llm_content.strip().startswith("{"):
+                        llm_analysis = json.loads(llm_content)
+                        
+                        if llm_analysis.get("threat_level", "无") != "无":
+                            conclusion["threat_detected"] = True
+                            conclusion["threat_level"] = llm_analysis.get("threat_level", "低")
+                            llm_threats = llm_analysis.get("threat_types", [])
+                            llm_confidence = llm_analysis.get("confidence", 0) / 100.0
+                            conclusion["summary"] = llm_analysis.get("summary", "")
+                            conclusion["recommendations"] = llm_analysis.get("recommendations", [])
+                    
+                except json.JSONDecodeError:
+                    # 如果不是JSON格式，进行文本分析
+                    content_lower = llm_content.lower()
+                    if any(keyword in content_lower for keyword in ["威胁", "攻击", "异常", "可疑", "恶意"]):
+                        conclusion["threat_detected"] = True
+                        conclusion["summary"] = llm_content[:500] + "..." if len(llm_content) > 500 else llm_content
+                        llm_confidence = 0.7  # 默认置信度
+            
+            # 混合决策逻辑
+            if local_threats and llm_threats:
+                # 本地和LLM都检测到威胁
+                conclusion["confidence"] = min(1.0, (local_confidence + llm_confidence) / 2)
+                conclusion["threat_types"] = list(set(local_threats + llm_threats))
+                conclusion["threat_detected"] = True
+            elif local_threats or llm_threats:
+                # 只有一种方法检测到威胁
+                conclusion["confidence"] = max(local_confidence, llm_confidence)
+                conclusion["threat_types"] = local_threats + llm_threats
+                conclusion["threat_detected"] = len(conclusion["threat_types"]) > 0
+            else:
+                # 都没有检测到威胁
+                conclusion["confidence"] = 0.9  # 高置信度认为安全
+                conclusion["threat_level"] = "无"
+            
+            # 确保置信度在合理范围内
+            conclusion["confidence"] = max(0.0, min(1.0, conclusion["confidence"]))
+            
+            return conclusion
+            
+        except Exception as e:
+            logger.error(f"生成混合结论失败: {e}")
+            return {
+                "threat_detected": False,
+                "anomaly_detected": False,
+                "threat_level": "未知",
+                "confidence": 0.0,
+                "summary": f"分析失败: {str(e)}",
+                "analysis_method": "hybrid",
+                "error": str(e)
+            }
     
     async def _initialize_anomaly_detection_model(self):
         """初始化异常检测模型"""

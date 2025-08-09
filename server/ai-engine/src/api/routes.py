@@ -7,9 +7,10 @@ from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from loguru import logger
 import asyncio
+from datetime import datetime
 
 # 导入服务实例（在main.py中初始化）
-from ..main import ai_service, kafka_service, rule_engine
+from ..main import ai_service, kafka_service, rule_engine, external_api_service
 
 router = APIRouter()
 
@@ -21,6 +22,22 @@ class AnalysisRequest(BaseModel):
 class TrainingRequest(BaseModel):
     model_name: str
     training_data: List[Dict[str, Any]]
+
+class LLMAnalysisRequest(BaseModel):
+    """大模型分析请求"""
+    content: str
+    analysis_type: str = "log_analysis"  # log_analysis, threat_detection, behavior_analysis
+    preferred_provider: Optional[str] = None
+    use_cache: bool = True
+
+class HybridAnalysisRequest(BaseModel):
+    """混合智能分析请求"""
+    data: Dict[str, Any]
+    analysis_type: str = "comprehensive"  # comprehensive, anomaly, malware, network, behavior
+    use_external_api: bool = True
+
+class StatusRequest(BaseModel):
+    detailed: bool = False
     
 class ThreatData(BaseModel):
     data: Dict[str, Any]
@@ -97,7 +114,76 @@ async def analyze_threat(request: AnalysisRequest):
         
     except Exception as e:
         logger.error(f"威胁分析失败: {e}")
-        raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/llm-analysis", response_model=AnalysisResponse)
+async def llm_analysis(request: LLMAnalysisRequest):
+    """大模型智能分析接口"""
+    try:
+        if not external_api_service or not external_api_service.is_healthy():
+            raise HTTPException(status_code=503, detail="外部API服务不可用")
+        
+        # 使用大模型进行分析
+        result = await external_api_service.analyze_with_llm(
+            prompt=request.content,
+            analysis_type=request.analysis_type,
+            preferred_provider=request.preferred_provider,
+            use_cache=request.use_cache
+        )
+        
+        if result.get("success", False):
+            return AnalysisResponse(
+                success=True,
+                results={
+                    "analysis": result.get("content", ""),
+                    "provider": result.get("provider", ""),
+                    "model": result.get("model", ""),
+                    "tokens_used": result.get("tokens_used", 0),
+                    "from_cache": result.get("from_cache", False)
+                },
+                message="大模型分析完成"
+            )
+        else:
+            return AnalysisResponse(
+                success=False,
+                results={"error": result.get("error", "未知错误")},
+                message="大模型分析失败"
+            )
+            
+    except Exception as e:
+        logger.error(f"大模型分析失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/hybrid-analysis", response_model=AnalysisResponse)
+async def hybrid_analysis(request: HybridAnalysisRequest):
+    """混合智能分析接口 - 结合本地模型和外部大模型"""
+    try:
+        if not ai_service or not ai_service.is_initialized:
+            raise HTTPException(status_code=503, detail="AI服务不可用")
+        
+        # 执行混合智能分析
+        result = await ai_service.analyze_with_hybrid_intelligence(
+            data=request.data,
+            analysis_type=request.analysis_type,
+            use_external_api=request.use_external_api
+        )
+        
+        if "error" not in result:
+            return AnalysisResponse(
+                success=True,
+                results=result,
+                message="混合智能分析完成"
+            )
+        else:
+            return AnalysisResponse(
+                success=False,
+                results={"error": result["error"]},
+                message="混合智能分析失败"
+            )
+            
+    except Exception as e:
+        logger.error(f"混合智能分析失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/train")
 async def train_model(request: TrainingRequest, background_tasks: BackgroundTasks):
@@ -370,3 +456,28 @@ async def send_protection_action(action: Dict[str, Any]):
     except Exception as e:
         logger.error(f"发送防护动作失败: {e}")
         raise HTTPException(status_code=500, detail=f"发送动作失败: {str(e)}") 
+
+@router.get("/api-status")
+async def get_api_status(detailed: bool = False):
+    """获取API状态信息"""
+    try:
+        status = {
+            "ai_service": ai_service.is_healthy() if ai_service else False,
+            "kafka_service": kafka_service.is_healthy() if kafka_service else False,
+            "rule_engine": rule_engine.is_healthy() if rule_engine else False,
+            "external_api_service": external_api_service.is_healthy() if external_api_service else False
+        }
+        
+        if detailed and external_api_service:
+            external_status = await external_api_service.get_api_status()
+            status["external_apis"] = external_status
+        
+        return {
+            "success": True,
+            "status": status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"获取API状态失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) 

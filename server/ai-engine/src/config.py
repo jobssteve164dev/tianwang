@@ -3,7 +3,7 @@ AI引擎配置文件
 """
 import os
 from typing import Dict, Any
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class AIEngineConfig(BaseSettings):
     """AI引擎配置类"""
@@ -73,11 +73,102 @@ class AIEngineConfig(BaseSettings):
     openai_api_key: str = ""
     claude_api_key: str = ""
     gemini_api_key: str = ""
-    
+    openrouter_api_key: str = ""
+    deepseek_api_key: str = ""
+
     # API调用配置
     api_timeout: int = 30
     api_retry_count: int = 3
     api_rate_limit: int = 100  # 每小时请求数
+
+    # 外部大模型API详细配置
+    external_apis: Dict[str, Dict[str, Any]] = {
+        "openai": {
+            "enabled": True,
+            "base_url": "https://api.openai.com/v1",
+            "models": ["gpt-4", "gpt-3.5-turbo"],
+            "default_model": "gpt-3.5-turbo",
+            "priority": 1,
+            "cost_per_token": 0.0000015,  # GPT-3.5-turbo价格
+            "max_tokens": 4096,
+            "rate_limit": 3500,  # RPM
+            "timeout": 30
+        },
+        "claude": {
+            "enabled": True,
+            "base_url": "https://api.anthropic.com/v1",
+            "models": ["claude-3-haiku", "claude-3-sonnet"],
+            "default_model": "claude-3-haiku",
+            "priority": 2,
+            "cost_per_token": 0.000001,  # Claude-3-haiku价格
+            "max_tokens": 4096,
+            "rate_limit": 1000,  # RPM
+            "timeout": 30
+        },
+        "openrouter": {
+            "enabled": True,
+            "base_url": "https://openrouter.ai/api/v1",
+            "models": [
+                "openai/gpt-4",
+                "anthropic/claude-3-haiku",
+                "google/gemini-pro",
+                "meta-llama/llama-2-70b-chat",
+                "mistralai/mixtral-8x7b-instruct"
+            ],
+            "default_model": "openai/gpt-4",
+            "priority": 3,
+            "cost_per_token": 0.000002,  # 平均价格
+            "max_tokens": 4096,
+            "rate_limit": 200,  # RPM
+            "timeout": 45
+        },
+        "deepseek": {
+            "enabled": True,
+            "base_url": "https://api.deepseek.com/v1",
+            "models": ["deepseek-chat", "deepseek-coder"],
+            "default_model": "deepseek-chat",
+            "priority": 4,
+            "cost_per_token": 0.0000005,  # DeepSeek价格优势
+            "max_tokens": 4096,
+            "rate_limit": 600,  # RPM
+            "timeout": 30
+        }
+    }
+
+    # API负载均衡配置
+    load_balancing: Dict[str, Any] = {
+        "strategy": "priority_with_fallback",  # priority_with_fallback, round_robin, least_cost
+        "health_check_interval": 60,  # 健康检查间隔（秒）
+        "failure_threshold": 3,  # 失败阈值
+        "recovery_timeout": 300,  # 恢复超时（秒）
+        "enable_circuit_breaker": True
+    }
+
+    # API成本控制配置
+    cost_control: Dict[str, Any] = {
+        "daily_budget": 10.0,  # 每日预算（美元）
+        "monthly_budget": 300.0,  # 每月预算（美元）
+        "cost_alert_threshold": 0.8,  # 预算告警阈值
+        "enable_cost_tracking": True,
+        "cost_optimization": {
+            "prefer_cheaper_models": True,
+            "cache_duration": 3600,  # 缓存1小时
+            "batch_requests": True
+        }
+    }
+
+    # API缓存配置
+    api_cache: Dict[str, Any] = {
+        "enabled": True,
+        "backend": "redis",  # redis, memory
+        "default_ttl": 3600,  # 默认缓存1小时
+        "max_cache_size": "100MB",
+        "cache_strategies": {
+            "log_analysis": 7200,  # 日志分析缓存2小时
+            "threat_detection": 1800,  # 威胁检测缓存30分钟
+            "behavior_analysis": 3600  # 行为分析缓存1小时
+        }
+    }
     
     # 威胁情报配置
     misp_url: str = ""

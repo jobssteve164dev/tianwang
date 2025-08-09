@@ -12,17 +12,19 @@ from .config import config, validate_config
 from .services.ai_service import AIService
 from .services.kafka_service import KafkaService
 from .services.rule_engine import RuleEngine
+from .services.external_api_service import ExternalAPIService
 from .api.routes import router as api_router
 
 # 全局服务实例
 ai_service: AIService = None
 kafka_service: KafkaService = None
 rule_engine: RuleEngine = None
+external_api_service: ExternalAPIService = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    global ai_service, kafka_service, rule_engine
+    global ai_service, kafka_service, rule_engine, external_api_service
     
     # 启动时初始化
     logger.info("正在启动天网AI分析引擎...")
@@ -36,11 +38,16 @@ async def lifespan(app: FastAPI):
     ai_service = AIService()
     kafka_service = KafkaService()
     rule_engine = RuleEngine()
+    external_api_service = ExternalAPIService()
     
     # 启动服务
     await ai_service.initialize()
     await kafka_service.start()
     await rule_engine.initialize()
+    await external_api_service.initialize()
+    
+    # 设置服务间的引用关系
+    ai_service.set_external_api_service(external_api_service)
     
     logger.info(f"AI分析引擎启动成功，监听端口: {config.port}")
     
@@ -51,6 +58,7 @@ async def lifespan(app: FastAPI):
     await kafka_service.stop()
     await ai_service.cleanup()
     await rule_engine.cleanup()
+    await external_api_service.cleanup()
     logger.info("AI分析引擎已关闭")
 
 # 创建FastAPI应用
