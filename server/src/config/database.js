@@ -1,0 +1,233 @@
+/**
+ * 数据库连接配置
+ * Database Connection Configuration
+ */
+
+const { Sequelize } = require('sequelize');
+const { InfluxDB } = require('@influxdata/influxdb-client');
+const Redis = require('redis');
+const config = require('./index');
+const logger = require('../utils/logger');
+
+let sequelize = null;
+let influxDB = null;
+let redisClient = null;
+
+/**
+ * PostgreSQL连接配置
+ */
+function initializePostgreSQL() {
+  const { postgres } = config.database;
+  
+  sequelize = new Sequelize({
+    database: postgres.database,
+    username: postgres.username,
+    password: postgres.password,
+    host: postgres.host,
+    port: postgres.port,
+    dialect: 'postgres',
+    logging: config.app.env === 'development' ? 
+      (msg) => logger.debug(`[PostgreSQL] ${msg}`) : false,
+    pool: postgres.pool,
+    dialectOptions: {
+      ssl: postgres.ssl ? {
+        require: true,
+        rejectUnauthorized: false
+      } : false
+    },
+    define: {
+      timestamps: true,
+      underscored: true,
+      freezeTableName: true
+    }
+  });
+
+  return sequelize;
+}
+
+/**
+ * InfluxDB连接配置
+ */
+function initializeInfluxDB() {
+  const { influxdb } = config.database;
+  
+  influxDB = new InfluxDB({
+    url: influxdb.url,
+    token: influxdb.token
+  });
+
+  return influxDB;
+}
+
+/**
+ * Redis连接配置
+ */
+function initializeRedis() {
+  const { redis } = config.database;
+  
+  redisClient = Redis.createClient({
+    socket: {
+      host: redis.host,
+      port: redis.port
+    },
+    password: redis.password,
+    database: redis.db
+  });
+
+  // Redis事件监听
+  redisClient.on('connect', () => {
+    logger.info('✅ Redis connected');
+  });
+
+  redisClient.on('error', (error) => {
+    logger.error('❌ Redis connection error:', error);
+  });
+
+  redisClient.on('ready', () => {
+    logger.info('🚀 Redis ready');
+  });
+
+  redisClient.on('end', () => {
+    logger.info('🔌 Redis connection ended');
+  });
+
+  return redisClient;
+}
+
+/**
+ * 连接所有数据库
+ */
+async function connectDatabases() {
+  try {
+    // 初始化PostgreSQL
+    logger.info('📊 Initializing PostgreSQL...');
+    initializePostgreSQL();
+    await sequelize.authenticate();
+    logger.info('✅ PostgreSQL connected successfully');
+
+    // 初始化InfluxDB
+    logger.info('📈 Initializing InfluxDB...');
+    initializeInfluxDB();
+    
+    // 测试InfluxDB连接
+    const health = await influxDB.health();
+    if (health.status === 'pass') {
+      logger.info('✅ InfluxDB connected successfully');
+    } else {
+      throw new Error(`InfluxDB health check failed: ${health.message}`);
+    }
+
+    // 初始化Redis
+    logger.info('🔄 Initializing Redis...');
+    initializeRedis();
+    await redisClient.connect();
+    logger.info('✅ Redis connected successfully');
+
+    // 同步数据库模型（仅在开发环境）
+    if (config.app.env === 'development') {
+      logger.info('🔄 Syncing database models...');
+      await sequelize.sync({ alter: true });
+      logger.info('✅ Database models synced');
+    }
+
+  } catch (error) {
+    logger.error('❌ Database connection failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * 关闭所有数据库连接
+ */
+async function closeDatabases() {
+  try {
+    if (sequelize) {
+      await sequelize.close();
+      logger.info('✅ PostgreSQL connection closed');
+    }
+
+    if (redisClient && redisClient.isOpen) {
+      await redisClient.quit();
+      logger.info('✅ Redis connection closed');
+    }
+
+    // InfluxDB客户端会自动关闭连接
+    logger.info('✅ All database connections closed');
+
+  } catch (error) {
+    logger.error('❌ Error closing database connections:', error);
+  }
+}
+
+/**
+ * 获取数据库实例
+ */
+function getSequelize() {
+  if (!sequelize) {
+    throw new Error('PostgreSQL not initialized. Call connectDatabases() first.');
+  }
+  return sequelize;
+}
+
+function getInfluxDB() {
+  if (!influxDB) {
+    throw new Error('InfluxDB not initialized. Call connectDatabases() first.');
+  }
+  return influxDB;
+}
+
+function getRedisClient() {
+  if (!redisClient) {
+    throw new Error('Redis not initialized. Call connectDatabases() first.');
+  }
+  return redisClient;
+}
+
+/**
+ * 数据库健康检查
+ */
+async function healthCheck() {
+  const status = {
+    postgres: 'unknown',
+    influxdb: 'unknown',
+    redis: 'unknown'
+  };
+
+  try {
+    // PostgreSQL健康检查
+    await sequelize.authenticate();
+    status.postgres = 'healthy';
+  } catch (error) {
+    status.postgres = 'unhealthy';
+    logger.error('PostgreSQL health check failed:', error.message);
+  }
+
+  try {
+    // InfluxDB健康检查
+    const health = await influxDB.health();
+    status.influxdb = health.status === 'pass' ? 'healthy' : 'unhealthy';
+  } catch (error) {
+    status.influxdb = 'unhealthy';
+    logger.error('InfluxDB health check failed:', error.message);
+  }
+
+  try {
+    // Redis健康检查
+    await redisClient.ping();
+    status.redis = 'healthy';
+  } catch (error) {
+    status.redis = 'unhealthy';
+    logger.error('Redis health check failed:', error.message);
+  }
+
+  return status;
+}
+
+module.exports = {
+  connectDatabases,
+  closeDatabases,
+  getSequelize,
+  getInfluxDB,
+  getRedisClient,
+  healthCheck
+}; 
