@@ -1,13 +1,33 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
+const agentController = require('../controllers/agentController');
 
-router.get('/', authenticate, (req, res) => {
-  res.json({ message: 'Get agents - TODO: Implement' });
-});
+// 代理注册 (公开接口，不需要认证)
+router.post('/register', agentController.registerAgent);
 
-router.post('/', authenticate, (req, res) => {
-  res.json({ message: 'Create agent - TODO: Implement' });
-});
+// 代理认证 (公开接口，不需要认证)
+router.post('/auth', agentController.authenticateAgent);
+
+// 以下接口需要认证
+router.use(authenticate);
+
+// 获取代理列表
+router.get('/', agentController.getAgents);
+
+// 获取代理详情
+router.get('/:agentId', agentController.getAgent);
+
+// 更新代理状态
+router.patch('/:agentId/status', agentController.updateAgentStatus);
+
+// 删除代理
+router.delete('/:agentId', agentController.deleteAgent);
+
+// 代理心跳
+router.post('/:agentId/heartbeat', agentController.heartbeat);
+
+// 接收代理数据
+router.post('/:agentId/data', agentController.receiveData);
 
 module.exports = router; 

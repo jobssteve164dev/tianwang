@@ -22,6 +22,7 @@ const { initializeKafka } = require('./config/kafka');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { setupSwagger } = require('./config/swagger');
+const WebSocketService = require('./services/WebSocketService');
 
 // 创建Express应用
 const app = express();
@@ -146,12 +147,18 @@ async function initialize() {
     await initializeKafka();
     logger.info('✅ Kafka initialized successfully');
 
+    // 初始化WebSocket服务
+    logger.info('🔗 Initializing WebSocket service...');
+    WebSocketService.initialize(server);
+    logger.info('✅ WebSocket service initialized successfully');
+
     // 启动服务器
     const port = config.app.port;
     server.listen(port, config.app.host, () => {
       logger.info(`🌟 Server running on ${config.app.host}:${port}`);
       logger.info(`📖 API Documentation: http://${config.app.host}:${port}/api-docs`);
       logger.info(`🔍 Health Check: http://${config.app.host}:${port}/health`);
+      logger.info(`🔗 WebSocket Endpoint: ws://${config.app.host}:${port}/ws`);
       logger.info(`🌍 Environment: ${config.app.env}`);
     });
 
@@ -164,6 +171,7 @@ async function initialize() {
 // 优雅关闭处理
 process.on('SIGTERM', () => {
   logger.info('🛑 SIGTERM received, shutting down gracefully...');
+  WebSocketService.close();
   server.close(() => {
     logger.info('✅ Server closed');
     process.exit(0);
@@ -172,6 +180,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   logger.info('🛑 SIGINT received, shutting down gracefully...');
+  WebSocketService.close();
   server.close(() => {
     logger.info('✅ Server closed');
     process.exit(0);
