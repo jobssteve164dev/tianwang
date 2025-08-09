@@ -1,0 +1,85 @@
+# 混合推理引擎配置
+hybrid_inference:
+  # 调度策略配置
+  scheduler:
+    default_method: "rule_engine"  # 默认推理方法
+    enable_adaptive_routing: true  # 启用自适应路由
+    performance_threshold: 0.85    # 性能阈值
+    cost_budget_daily: 100.0      # 日成本预算(USD)
+    
+  # 本地模型配置
+  local_models:
+    anomaly_detection:
+      model_path: "./models/anomaly_autoencoder.pkl"
+      threshold: 0.7
+      batch_size: 32
+      device: "cpu"  # 或 "cuda"
+      
+    network_ids:
+      model_path: "./models/network_ids_model.pkl"
+      confidence_threshold: 0.8
+      feature_columns: 78
+      
+    malware_detection:
+      model_path: "./models/malware_classifier.pkl"
+      min_confidence: 0.75
+      
+  # 规则引擎配置
+  rule_engine:
+    suricata:
+      enabled: true
+      rules_path: "./rules/suricata/"
+      update_interval: 3600  # 1小时更新一次
+      
+    yara:
+      enabled: true
+      rules_path: "./rules/yara/"
+      max_scan_size: "100MB"
+      
+    sigma:
+      enabled: true
+      rules_path: "./rules/sigma/"
+      
+    misp:
+      enabled: true
+      api_url: "https://misp.example.com"
+      api_key: "${MISP_API_KEY}"
+      
+  # 外部API配置
+  external_apis:
+    openai:
+      enabled: true
+      model: "gpt-4"
+      max_tokens: 1000
+      temperature: 0.1
+      cost_per_1k_tokens: 0.03
+      
+    claude:
+      enabled: true
+      model: "claude-3-sonnet"
+      max_tokens: 1000
+      cost_per_1k_tokens: 0.015
+      
+    gemini:
+      enabled: false
+      model: "gemini-pro"
+      
+  # 性能监控配置
+  monitoring:
+    metrics_retention_days: 30
+    alert_thresholds:
+      error_rate: 0.05
+      avg_latency_ms: 5000
+      cost_overrun_percent: 20
+      
+  # 缓存配置
+  cache:
+    enabled: true
+    ttl_seconds: 300  # 5分钟缓存
+    max_size: 1000
+    
+  # 并发控制
+  concurrency:
+    max_concurrent_requests: 100
+    queue_timeout_seconds: 30
+    rate_limit_per_minute: 1000 
