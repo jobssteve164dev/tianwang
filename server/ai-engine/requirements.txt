@@ -34,6 +34,9 @@ aiokafka==0.8.11
 yara-python==4.3.1
 suricata-update==1.3.2
 
+# Git操作
+GitPython==3.1.40
+
 # API客户端
 openai==1.3.8
 anthropic==0.7.8
