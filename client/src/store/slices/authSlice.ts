@@ -185,7 +185,7 @@ const authSlice = createSlice({
 // 自动登录演示账户
 export const autoLoginDemo = createAsyncThunk(
   'auth/autoLoginDemo',
-  async (_, { dispatch }) => {
+  async () => {
     const mockToken = 'demo-token-' + Date.now();
     localStorage.setItem('token', mockToken);
     
