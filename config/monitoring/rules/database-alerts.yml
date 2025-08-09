@@ -1,0 +1,29 @@
+groups:
+- name: database
+  rules:
+  - alert: DatabaseDown
+    expr: up{job="postgres"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "数据库 {{ $labels.instance }} 已下线"
+      description: "PostgreSQL数据库已停止响应"
+
+  - alert: HighDatabaseConnections
+    expr: pg_stat_database_numbackends{job="postgres"} > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "数据库连接数过高"
+      description: "数据库连接数超过100个"
+
+  - alert: SlowQueries
+    expr: rate(pg_stat_activity_max_tx_duration{job="postgres"}[5m]) > 30
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "数据库查询缓慢"
+      description: "存在执行时间超过30秒的查询"

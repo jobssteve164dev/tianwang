@@ -1,0 +1,35 @@
+{
+  "title": "安全事件监控",
+  "panels": [
+    {
+      "title": "安全事件趋势",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(security_events_total[5m])",
+          "legendFormat": "Events/sec"
+        }
+      ]
+    },
+    {
+      "title": "威胁检测统计",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "security_threats_detected_total",
+          "legendFormat": "Total Threats"
+        }
+      ]
+    },
+    {
+      "title": "设备在线状态",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "device_status{status=\"online\"}",
+          "legendFormat": "Online Devices"
+        }
+      ]
+    }
+  ]
+}

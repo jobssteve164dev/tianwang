@@ -1,0 +1,45 @@
+{
+  "title": "天网服务器监控",
+  "panels": [
+    {
+      "title": "CPU使用率",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"tianwang-server\"}[5m]) * 100",
+          "legendFormat": "CPU %"
+        }
+      ]
+    },
+    {
+      "title": "内存使用率",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "(process_resident_memory_bytes{job=\"tianwang-server\"} / container_memory_usage_bytes{job=\"tianwang-server\"}) * 100",
+          "legendFormat": "Memory %"
+        }
+      ]
+    },
+    {
+      "title": "API响应时间",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"tianwang-server\"}[5m]))",
+          "legendFormat": "95th percentile"
+        }
+      ]
+    },
+    {
+      "title": "请求速率",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"tianwang-server\"}[5m])",
+          "legendFormat": "Requests/sec"
+        }
+      ]
+    }
+  ]
+}

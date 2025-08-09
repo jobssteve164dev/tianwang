@@ -1,0 +1,38 @@
+groups:
+- name: tianwang-server
+  rules:
+  - alert: ServerDown
+    expr: up{job="tianwang-server"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "服务器 {{ $labels.instance }} 已下线"
+      description: "服务器 {{ $labels.instance }} 已停止响应超过1分钟"
+
+  - alert: HighCPUUsage
+    expr: rate(process_cpu_seconds_total{job="tianwang-server"}[5m]) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "服务器CPU使用率过高"
+      description: "服务器 {{ $labels.instance }} CPU使用率超过80%"
+
+  - alert: HighMemoryUsage
+    expr: (process_resident_memory_bytes{job="tianwang-server"} / container_memory_usage_bytes{job="tianwang-server"}) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "服务器内存使用率过高"
+      description: "服务器 {{ $labels.instance }} 内存使用率超过85%"
+
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="tianwang-server"}[5m])) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "API响应时间过长"
+      description: "服务器 {{ $labels.instance }} 95%响应时间超过2秒"

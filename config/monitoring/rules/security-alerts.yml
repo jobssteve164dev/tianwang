@@ -1,0 +1,38 @@
+groups:
+- name: security
+  rules:
+  - alert: HighFailedLogins
+    expr: rate(security_failed_logins_total[5m]) > 10
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "登录失败次数异常"
+      description: "5分钟内登录失败次数超过10次，可能存在暴力破解攻击"
+
+  - alert: HighSecurityEvents
+    expr: rate(security_events_total{severity="critical"}[5m]) > 5
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "严重安全事件激增"
+      description: "5分钟内严重安全事件超过5个"
+
+  - alert: UnauthorizedAccess
+    expr: rate(security_unauthorized_access_total[5m]) > 3
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "未授权访问尝试"
+      description: "检测到多次未授权访问尝试"
+
+  - alert: DataExfiltration
+    expr: rate(security_data_exfiltration_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "数据泄露检测"
+      description: "检测到可能的数据泄露行为"

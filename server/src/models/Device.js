@@ -120,14 +120,31 @@ module.exports = (sequelize) => {
   }, {
     tableName: 'devices',
     indexes: [
-      { fields: ['hostname'] },
-      { fields: ['ip_address'] },
-      { fields: ['mac_address'] },
-      { fields: ['platform'] },
-      { fields: ['status'] },
-      { fields: ['organization_id'] },
-      { fields: ['last_seen_at'] },
-      { fields: ['tags'], using: 'gin' }
+      // 复合索引：按组织和状态查询（最常用）
+      {
+        name: 'idx_devices_org_status',
+        fields: ['organization_id', 'status']
+      },
+      // 复合索引：按组织和平台查询
+      {
+        name: 'idx_devices_org_platform',
+        fields: ['organization_id', 'platform']
+      },
+      // 复合索引：按状态和最后在线时间查询
+      {
+        name: 'idx_devices_status_lastseen',
+        fields: ['status', 'last_seen_at']
+      },
+      // 单列索引
+      { name: 'idx_devices_hostname', fields: ['hostname'] },
+      { name: 'idx_devices_ip_address', fields: ['ip_address'] },
+      { name: 'idx_devices_mac_address', fields: ['mac_address'] },
+      { name: 'idx_devices_platform', fields: ['platform'] },
+      { name: 'idx_devices_status', fields: ['status'] },
+      { name: 'idx_devices_organization_id', fields: ['organization_id'] },
+      { name: 'idx_devices_last_seen_at', fields: ['last_seen_at'] },
+      // GIN索引用于数组字段
+      { name: 'idx_devices_tags_gin', fields: ['tags'], using: 'gin' }
     ]
   });
 
