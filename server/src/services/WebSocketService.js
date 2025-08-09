@@ -322,7 +322,7 @@ class WebSocketService {
 
     // 广播消息给所有在线代理
     broadcast(message) {
-        const successCount = 0;
+        let successCount = 0;
         for (const [agentId, ws] of this.clients.entries()) {
             if (this.sendToAgent(agentId, message)) {
                 successCount++;
@@ -335,6 +335,16 @@ class WebSocketService {
     // 获取在线代理列表
     getOnlineAgents() {
         return Array.from(this.clients.keys());
+    }
+
+    // 获取连接的客户端列表
+    getConnectedClients() {
+        return Array.from(this.clients.keys());
+    }
+
+    // 发送消息给特定客户端
+    sendToClient(agentId, message) {
+        return this.sendToAgent(agentId, message);
     }
 
     // 获取连接统计
