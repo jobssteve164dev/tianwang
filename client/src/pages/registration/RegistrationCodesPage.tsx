@@ -359,9 +359,9 @@ const RegistrationCodesPage: React.FC = () => {
 
       {/* 操作按钮 */}
       <Card 
-        bordered={false} 
+        variant="outlined"
         className="modern-card mb-16"
-        bodyStyle={{ padding: '16px' }}
+        styles={{ body: { padding: '16px' } }}
       >
         <Space>
           <Button 
@@ -386,9 +386,9 @@ const RegistrationCodesPage: React.FC = () => {
 
       {/* 注册码列表 */}
       <Card 
-        bordered={false}
+        variant="outlined"
         className="modern-card"
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         <Table
           columns={columns}

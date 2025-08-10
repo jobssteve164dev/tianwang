@@ -3,13 +3,23 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 export interface Device {
   id: string;
   name: string;
-  type: 'windows' | 'linux' | 'macos' | 'openwrt';
-  ip: string;
+  hostname?: string;
+  ip_address?: string;
+  ip?: string; // 兼容旧版本
+  platform?: string;
+  type?: 'windows' | 'linux' | 'macos' | 'openwrt'; // 兼容旧版本
   status: 'online' | 'offline' | 'warning';
-  lastSeen: string;
-  version: string;
-  organizationId: string;
+  last_seen_at?: string;
+  lastSeen?: string; // 兼容旧版本
+  agent_version?: string;
+  version?: string; // 兼容旧版本
+  organizationId?: string;
   metadata?: Record<string, any>;
+  capabilities?: {
+    log_collection: boolean;
+    network_monitoring: boolean;
+    process_monitoring: boolean;
+  };
 }
 
 export interface DeviceState {
@@ -59,7 +69,14 @@ export const fetchDevices = createAsyncThunk(
       }
 
       const data = await response.json();
-      return Array.isArray(data) ? data : data.devices || [];
+      // 处理新的API响应格式
+      if (data.success && data.data) {
+        return data.data;
+      } else if (Array.isArray(data)) {
+        return data;
+      } else {
+        return [];
+      }
     } catch (error: any) {
       return rejectWithValue(error.message || '获取设备列表失败');
     }

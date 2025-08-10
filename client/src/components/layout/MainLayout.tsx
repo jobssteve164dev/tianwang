@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ProLayout } from '@ant-design/pro-components';
 import {
@@ -24,6 +24,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { user } = useAppSelector((state) => state.auth);
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 监听窗口大小变化
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+      // 在移动端自动折叠侧边栏
+      if (window.innerWidth <= 768) {
+        setCollapsed(true);
+      }
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
 
   // 菜单配置
   const menuItems = [
@@ -75,6 +91,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleMenuItemClick = (path: string) => {
     navigate(path);
+    // 在移动端点击菜单后自动折叠侧边栏
+    if (isMobile) {
+      setCollapsed(true);
+    }
   };
 
   return (
@@ -90,6 +110,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         type: 'group',
         request: async () => menuItems,
       }}
+      // 响应式断点配置
+      breakpoint="lg"
+      collapsedButtonRender={false}
       avatarProps={{
         src: undefined,
         title: user?.username || '用户',
@@ -112,7 +135,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     border: '2px solid rgba(255, 255, 255, 0.3)'
                   }} 
                 />
-                <span style={{ color: '#fff', fontWeight: 500 }}>{user?.username || '用户'}</span>
+                <span style={{ 
+                  color: '#fff', 
+                  fontWeight: 500,
+                  display: isMobile ? 'none' : 'inline'
+                }}>
+                  {user?.username || '用户'}
+                </span>
               </Space>
             </Dropdown>
           );
@@ -123,11 +152,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           {logo}
           <span style={{ 
             fontWeight: 600, 
-            fontSize: 18, 
+            fontSize: isMobile ? 16 : 18, 
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
+            backgroundClip: 'text',
+            display: isMobile && collapsed ? 'none' : 'inline'
           }}>
             {title}
           </span>
@@ -137,7 +167,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       theme="dark"
       contentStyle={{
         margin: 0,
-        padding: 16,
+        padding: isMobile ? 12 : 16,
         minHeight: 'calc(100vh - 56px)',
         background: 'transparent',
       }}
@@ -147,7 +177,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       siderMenuType="group"
       menuHeaderRender={(logo, title) => (
         <div style={{ 
-          padding: '16px 12px', 
+          padding: isMobile ? '12px 8px' : '16px 12px', 
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           marginBottom: 8
         }}>
@@ -156,7 +186,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <span style={{ 
               color: '#fff', 
               fontWeight: 600, 
-              fontSize: 16,
+              fontSize: isMobile ? 14 : 16,
               opacity: collapsed ? 0 : 1,
               transition: 'opacity 0.3s'
             }}>
@@ -169,7 +199,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <div 
           onClick={() => handleMenuItemClick(item.path || '/')}
           style={{
-            margin: '4px 8px',
+            margin: isMobile ? '2px 4px' : '4px 8px',
             borderRadius: 8,
             transition: 'all 0.3s ease',
           }}

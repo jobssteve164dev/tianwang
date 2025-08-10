@@ -210,9 +210,9 @@ const AlertsPage: React.FC = () => {
 
       {/* 筛选器 */}
       <Card 
-        bordered={false} 
+        variant="outlined"
         className="modern-card mb-16"
-        bodyStyle={{ padding: '16px' }}
+        styles={{ body: { padding: '16px' } }}
       >
         <Space wrap size="small">
           <Input.Search
@@ -287,9 +287,9 @@ const AlertsPage: React.FC = () => {
 
       {/* 告警列表 */}
       <Card 
-        bordered={false}
+        variant="outlined"
         className="modern-card"
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         <Table
           columns={columns}

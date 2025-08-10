@@ -24,6 +24,23 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     
+    // 检查是否为演示token
+    if (token.startsWith('demo-token-')) {
+      // 演示模式 - 创建模拟用户
+      req.user = {
+        id: '1',
+        username: 'admin',
+        email: 'admin@tianwang.com',
+        role: 'admin',
+        organization_id: '1',
+        status: 'active',
+        isLocked: () => false
+      };
+      req.userId = '1';
+      req.organizationId = '1';
+      return next();
+    }
+    
     try {
       const decoded = jwt.verify(token, config.jwt.secret);
       

@@ -108,6 +108,20 @@ export const fetchUserProfile = createAsyncThunk(
   }
 );
 
+// 自动登录演示账户
+export const autoLoginDemo = createAsyncThunk(
+  'auth/autoLoginDemo',
+  async () => {
+    const mockToken = 'demo-token-' + Date.now();
+    localStorage.setItem('token', mockToken);
+    
+    return {
+      user: DEMO_USER,
+      token: mockToken,
+    };
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -181,20 +195,6 @@ const authSlice = createSlice({
       });
   },
 });
-
-// 自动登录演示账户
-export const autoLoginDemo = createAsyncThunk(
-  'auth/autoLoginDemo',
-  async () => {
-    const mockToken = 'demo-token-' + Date.now();
-    localStorage.setItem('token', mockToken);
-    
-    return {
-      user: DEMO_USER,
-      token: mockToken,
-    };
-  }
-);
 
 export const { logout, clearError, setToken } = authSlice.actions;
 export default authSlice.reducer; 

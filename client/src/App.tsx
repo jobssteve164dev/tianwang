@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Spin } from 'antd';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Spin, App as AntdApp } from 'antd';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { fetchUserProfile, autoLoginDemo } from './store/slices/authSlice';
-import AuthLayout from './components/layout/AuthLayout';
 import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -30,48 +29,31 @@ const App: React.FC = () => {
   // 全局加载状态
   if (loading && token) {
     return (
-      <div className="flex-center full-height">
-        <Spin size="large" />
-      </div>
+      <AntdApp>
+        <div className="flex-center full-height">
+          <Spin size="large" />
+        </div>
+      </AntdApp>
     );
   }
 
   return (
-    <Routes>
-      {/* 认证路由 */}
-      <Route
-        path="/login"
-        element={
-          isAuthenticated ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <AuthLayout>
-              <LoginPage />
-            </AuthLayout>
-          )
-        }
-      />
-      
-      {/* 主应用路由 */}
-      <Route
-        path="/*"
-        element={
-          isAuthenticated ? (
-            <MainLayout>
-              <Routes>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/alerts" element={<AlertsPage />} />
-                <Route path="/devices" element={<DevicesPage />} />
-                <Route path="/registration-codes" element={<RegistrationCodesPage />} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </MainLayout>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-    </Routes>
+    <AntdApp>
+      <Routes>
+        {!isAuthenticated ? (
+          <Route path="/login" element={<LoginPage />} />
+        ) : (
+          <Route path="/" element={<MainLayout><Outlet /></MainLayout>}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="devices" element={<DevicesPage />} />
+            <Route path="registration-codes" element={<RegistrationCodesPage />} />
+          </Route>
+        )}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+      </Routes>
+    </AntdApp>
   );
 };
 

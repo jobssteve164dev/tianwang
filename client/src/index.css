@@ -53,23 +53,25 @@ code {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-/* 紧凑布局样式 */
+/* 紧凑布局样式 - 优化PC端响应式 */
 .compact-layout {
-  padding: 16px;
-  max-width: 1400px;
+  padding: 20px;
+  max-width: 1600px;
   margin: 0 auto;
+  width: 100%;
 }
 
+/* 响应式网格系统 - 针对不同PC屏幕尺寸优化 */
 .compact-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 .compact-grid-lg {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
 }
 
 /* 现代化统计卡片 */
@@ -77,7 +79,7 @@ code {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
   backdrop-filter: blur(10px);
   border-radius: 12px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
@@ -213,8 +215,119 @@ code {
   margin-bottom: 24px;
 }
 
-/* 响应式工具类 */
-@media (max-width: 768px) {
+/* 响应式工具类 - 优化PC端断点 */
+/* 大屏幕 (1920px+) */
+@media (min-width: 1920px) {
+  .compact-layout {
+    padding: 24px;
+    max-width: 1800px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  
+  .stat-card {
+    padding: 28px;
+  }
+}
+
+/* 中等大屏幕 (1440px - 1919px) */
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .compact-layout {
+    padding: 20px;
+    max-width: 1400px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  
+  .stat-card {
+    padding: 24px;
+  }
+}
+
+/* 标准桌面 (1200px - 1439px) */
+@media (min-width: 1200px) and (max-width: 1439px) {
+  .compact-layout {
+    padding: 18px;
+    max-width: 1200px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  
+  .stat-card {
+    padding: 22px;
+  }
+}
+
+/* 小桌面 (992px - 1199px) */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .compact-layout {
+    padding: 16px;
+    max-width: 1000px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+}
+
+/* 平板 (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .compact-layout {
+    padding: 14px;
+    max-width: 800px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  
+  .stat-card {
+    padding: 18px;
+  }
+}
+
+/* 移动端 (768px以下) */
+@media (max-width: 767px) {
   .compact-layout {
     padding: 12px;
   }
@@ -231,6 +344,28 @@ code {
   
   .stat-card {
     padding: 16px;
+  }
+}
+
+/* ProLayout 响应式优化 */
+@media (max-width: 1200px) {
+  .ant-pro-layout .ant-pro-layout-content {
+    margin-left: 0 !important;
+  }
+  
+  .ant-pro-layout .ant-pro-sider {
+    position: fixed !important;
+    z-index: 1000;
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-pro-layout .ant-pro-layout-header {
+    padding: 0 12px !important;
+  }
+  
+  .ant-pro-layout .ant-pro-layout-content {
+    padding: 12px !important;
   }
 }
 
