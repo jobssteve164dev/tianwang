@@ -3,6 +3,9 @@ const SecurityEvent = require('../models/SecurityEvent');
 const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const keyManagementService = require('../services/KeyManagementService');
+const deviceFingerprintService = require('../services/DeviceFingerprintService');
+const registrationCodeService = require('../services/RegistrationCodeService');
 
 class AgentController {
   // 注册代理
@@ -15,7 +18,9 @@ class AgentController {
         arch,
         version,
         capabilities,
-        systemInfo
+        systemInfo,
+        registrationCode,
+        deviceFingerprint
       } = req.body;
 
       // 验证必需字段
@@ -24,6 +29,25 @@ class AgentController {
           success: false,
           message: '缺少必需字段: agentId, hostname, platform'
         });
+      }
+
+      // 验证注册码（如果提供）
+      if (registrationCode) {
+        const deviceInfo = {
+          agentId,
+          hostname,
+          platform,
+          fingerprint: deviceFingerprint
+        };
+
+        const codeValidation = await registrationCodeService.validateRegistrationCode(registrationCode, deviceInfo);
+        if (!codeValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            message: codeValidation.error,
+            code: codeValidation.code
+          });
+        }
       }
 
       // 检查代理是否已存在
@@ -37,6 +61,7 @@ class AgentController {
         agent.version = version;
         agent.capabilities = capabilities;
         agent.systemInfo = systemInfo;
+        agent.deviceFingerprint = deviceFingerprint;
         agent.lastSeen = new Date();
         agent.status = 'online';
                 
@@ -51,6 +76,18 @@ class AgentController {
         });
       }
 
+      // 生成设备指纹（如果未提供）
+      let fingerprint = deviceFingerprint;
+      if (!fingerprint && systemInfo) {
+        const fingerprintResult = deviceFingerprintService.generateFingerprint({
+          hostname,
+          platform,
+          arch,
+          ...systemInfo
+        });
+        fingerprint = fingerprintResult.fingerprint;
+      }
+
       // 创建新代理
       agent = new Agent({
         agentId,
@@ -60,6 +97,7 @@ class AgentController {
         version: version || '1.0.0',
         capabilities: capabilities || [],
         systemInfo: systemInfo || {},
+        deviceFingerprint: fingerprint,
         status: 'online',
         registeredAt: new Date(),
         lastSeen: new Date(),
@@ -68,12 +106,27 @@ class AgentController {
 
       await agent.save();
 
+      // 使用注册码（如果提供）
+      if (registrationCode) {
+        const deviceInfo = {
+          agentId,
+          hostname,
+          platform,
+          fingerprint
+        };
+        await registrationCodeService.useRegistrationCode(registrationCode, deviceInfo);
+      }
+
+      // 生成连接密钥
+      const connectionKey = keyManagementService.generateConnectionKey();
+
       // 生成JWT token
       const token = jwt.sign(
         { 
           agentId, 
           hostname,
-          type: 'agent'
+          type: 'agent',
+          connectionKey: connectionKey.key
         },
         process.env.JWT_SECRET || 'tianwang-secret',
         { expiresIn: '7d' }
@@ -89,9 +142,12 @@ class AgentController {
           hostname: agent.hostname,
           platform: agent.platform,
           status: agent.status,
-          registeredAt: agent.registeredAt
+          registeredAt: agent.registeredAt,
+          deviceFingerprint: fingerprint
         },
-        token
+        token,
+        connectionKey,
+        publicKey: keyManagementService.getPublicKey()
       });
 
     } catch (error) {
@@ -107,7 +163,7 @@ class AgentController {
   // 代理认证
   async authenticateAgent(req, res) {
     try {
-      const { agentId, hostname } = req.body;
+      const { agentId, hostname, deviceFingerprint } = req.body;
 
       if (!agentId || !hostname) {
         return res.status(400).json({
@@ -126,17 +182,39 @@ class AgentController {
         });
       }
 
+      // 验证设备指纹（如果提供）
+      if (deviceFingerprint && agent.deviceFingerprint) {
+        const fingerprintValidation = deviceFingerprintService.verifyFingerprint(
+          agent.deviceFingerprint, 
+          { hostname, platform: agent.platform, arch: agent.arch }
+        );
+        
+        if (!fingerprintValidation.isValid) {
+          logger.warn('设备指纹验证失败:', { agentId, hostname });
+          
+          // 记录安全事件
+          await this.recordSecurityEvent(agent, 'fingerprint_mismatch', 'high', {
+            expected: agent.deviceFingerprint,
+            actual: deviceFingerprint
+          });
+        }
+      }
+
       // 更新最后活跃时间
       agent.lastSeen = new Date();
       agent.status = 'online';
       await agent.save();
+
+      // 生成连接密钥
+      const connectionKey = keyManagementService.generateConnectionKey();
 
       // 生成新的JWT token
       const token = jwt.sign(
         { 
           agentId: agent.agentId, 
           hostname: agent.hostname,
-          type: 'agent'
+          type: 'agent',
+          connectionKey: connectionKey.key
         },
         process.env.JWT_SECRET || 'tianwang-secret',
         { expiresIn: '7d' }
@@ -152,9 +230,12 @@ class AgentController {
           hostname: agent.hostname,
           platform: agent.platform,
           status: agent.status,
-          lastSeen: agent.lastSeen
+          lastSeen: agent.lastSeen,
+          deviceFingerprint: agent.deviceFingerprint
         },
-        token
+        token,
+        connectionKey,
+        publicKey: keyManagementService.getPublicKey()
       });
 
     } catch (error) {
@@ -449,6 +530,203 @@ class AgentController {
       res.status(500).json({
         success: false,
         message: '获取代理列表失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 生成注册码
+  async generateRegistrationCode(req, res) {
+    try {
+      const {
+        count = 1,
+        expiry = 24 * 60 * 60 * 1000, // 24小时
+        maxUses = 1,
+        permissions = ['basic'],
+        description = ''
+      } = req.body;
+
+      const options = {
+        expiry,
+        maxUses,
+        permissions,
+        description,
+        createdBy: req.user?.username || 'system'
+      };
+
+      let codes;
+      if (count === 1) {
+        codes = [registrationCodeService.generateRegistrationCode(options)];
+      } else {
+        codes = registrationCodeService.generateBatchRegistrationCodes(count, options);
+      }
+
+      logger.info('注册码生成成功:', { 
+        count, 
+        createdBy: options.createdBy,
+        codes: codes.map(c => c.code)
+      });
+
+      res.json({
+        success: true,
+        message: '注册码生成成功',
+        data: {
+          codes: codes.map(code => ({
+            code: code.code,
+            expiry: code.expiry,
+            maxUses: code.maxUses,
+            permissions: code.permissions,
+            description: code.description
+          })),
+          count: codes.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('生成注册码失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '生成注册码失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 获取注册码列表
+  async getRegistrationCodes(req, res) {
+    try {
+      const { status, createdBy, limit = 100 } = req.query;
+
+      const filters = { status, createdBy, limit: parseInt(limit) };
+      const codes = registrationCodeService.getRegistrationCodes(filters);
+
+      res.json({
+        success: true,
+        data: {
+          codes,
+          count: codes.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('获取注册码列表失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取注册码列表失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 获取注册码统计
+  async getRegistrationCodeStats(req, res) {
+    try {
+      const stats = registrationCodeService.getRegistrationCodeStats();
+
+      res.json({
+        success: true,
+        data: stats
+      });
+
+    } catch (error) {
+      logger.error('获取注册码统计失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取注册码统计失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 停用注册码
+  async disableRegistrationCode(req, res) {
+    try {
+      const { code } = req.params;
+
+      const result = registrationCodeService.disableRegistrationCode(code);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: result.message
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.error,
+          code: result.code
+        });
+      }
+
+    } catch (error) {
+      logger.error('停用注册码失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '停用注册码失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 延长注册码有效期
+  async extendRegistrationCode(req, res) {
+    try {
+      const { code } = req.params;
+      const { additionalExpiry } = req.body;
+
+      if (!additionalExpiry) {
+        return res.status(400).json({
+          success: false,
+          message: '缺少必需字段: additionalExpiry'
+        });
+      }
+
+      const result = registrationCodeService.extendRegistrationCode(code, additionalExpiry);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          newExpiry: result.newExpiry
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.error,
+          code: result.code
+        });
+      }
+
+    } catch (error) {
+      logger.error('延长注册码有效期失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '延长注册码有效期失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 获取安全服务状态
+  async getSecurityStatus(req, res) {
+    try {
+      const keyStatus = keyManagementService.getStatus();
+      const fingerprintStatus = deviceFingerprintService.getStatus();
+      const registrationStatus = registrationCodeService.getStatus();
+
+      res.json({
+        success: true,
+        data: {
+          keyManagement: keyStatus,
+          deviceFingerprint: fingerprintStatus,
+          registrationCode: registrationStatus
+        }
+      });
+
+    } catch (error) {
+      logger.error('获取安全服务状态失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取安全服务状态失败',
         error: error.message
       });
     }

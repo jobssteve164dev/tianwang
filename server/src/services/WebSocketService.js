@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const url = require('url');
 const logger = require('../utils/logger');
 const Agent = require('../models/Agent');
+const keyManagementService = require('./KeyManagementService');
 
 class WebSocketService {
   constructor() {
@@ -31,6 +32,7 @@ class WebSocketService {
     try {
       const query = url.parse(info.req.url, true).query;
       const token = query.token;
+      const connectionKey = query.connectionKey;
 
       if (!token) {
         logger.warn('WebSocket连接缺少token');
@@ -43,6 +45,21 @@ class WebSocketService {
       if (decoded.type !== 'agent') {
         logger.warn('WebSocket连接token类型错误:', decoded.type);
         return false;
+      }
+
+      // 验证连接密钥（如果提供）
+      if (connectionKey && decoded.connectionKey) {
+        const keyValidation = keyManagementService.verifyConnectionKey({
+          key: decoded.connectionKey,
+          timestamp: Date.now(),
+          signature: connectionKey,
+          expiresAt: Date.now() + (60 * 60 * 1000) // 1小时有效期
+        });
+
+        if (!keyValidation) {
+          logger.warn('WebSocket连接密钥验证失败:', decoded.agentId);
+          return false;
+        }
       }
 
       // 验证代理是否存在
