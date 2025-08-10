@@ -42,7 +42,13 @@ async def lifespan(app: FastAPI):
     
     # 启动服务
     await ai_service.initialize()
-    await kafka_service.start()
+    
+    # 尝试启动Kafka服务，失败时继续运行
+    try:
+        await kafka_service.start()
+    except Exception as e:
+        logger.warning(f"Kafka服务启动失败，将在离线模式下运行: {e}")
+    
     await rule_engine.initialize()
     await external_api_service.initialize()
     
@@ -58,7 +64,7 @@ async def lifespan(app: FastAPI):
     
     # 关闭时清理
     logger.info("正在关闭AI分析引擎...")
-    if kafka_service:
+    if kafka_service and kafka_service.is_healthy():
         await kafka_service.stop()
     await ai_service.cleanup()
     await rule_engine.cleanup()

@@ -60,8 +60,12 @@ class KafkaService:
             logger.info("Kafka服务启动成功")
             
         except Exception as e:
-            logger.error(f"Kafka服务启动失败: {e}")
-            raise
+            logger.warning(f"Kafka服务启动失败，将使用离线模式: {e}")
+            # 不抛出异常，而是设置为离线模式
+            self.is_running = False
+            self.consumer = None
+            self.producer = None
+            logger.info("AI引擎将在离线模式下运行，Kafka功能将不可用")
     
     async def stop(self):
         """停止Kafka服务"""
@@ -156,7 +160,8 @@ class KafkaService:
         """发送分析结果"""
         try:
             if not self.producer:
-                raise RuntimeError("Kafka生产者未初始化")
+                logger.warning("Kafka生产者未初始化，跳过发送分析结果")
+                return
             
             # 添加时间戳
             result["timestamp"] = datetime.now().isoformat()
@@ -172,14 +177,15 @@ class KafkaService:
             logger.debug(f"已发送分析结果: {result.get('type', 'unknown')}")
             
         except Exception as e:
-            logger.error(f"发送分析结果失败: {e}")
-            raise
+            logger.warning(f"发送分析结果失败（离线模式）: {e}")
+            # 在离线模式下不抛出异常
     
     async def send_threat_alert(self, threat_info: Dict[str, Any]):
         """发送威胁告警"""
         try:
             if not self.producer:
-                raise RuntimeError("Kafka生产者未初始化")
+                logger.warning("Kafka生产者未初始化，跳过发送威胁告警")
+                return
             
             alert = {
                 "type": "threat_detected",
@@ -199,14 +205,15 @@ class KafkaService:
             logger.info(f"已发送威胁告警: {threat_info.get('threat_type', 'unknown')}")
             
         except Exception as e:
-            logger.error(f"发送威胁告警失败: {e}")
-            raise
+            logger.warning(f"发送威胁告警失败（离线模式）: {e}")
+            # 在离线模式下不抛出异常
     
     async def send_protection_action(self, action: Dict[str, Any]):
         """发送防护动作"""
         try:
             if not self.producer:
-                raise RuntimeError("Kafka生产者未初始化")
+                logger.warning("Kafka生产者未初始化，跳过发送防护动作")
+                return
             
             action_message = {
                 "type": "protection_action",
@@ -225,8 +232,8 @@ class KafkaService:
             logger.info(f"已发送防护动作: {action.get('action_type', 'unknown')}")
             
         except Exception as e:
-            logger.error(f"发送防护动作失败: {e}")
-            raise
+            logger.warning(f"发送防护动作失败（离线模式）: {e}")
+            # 在离线模式下不抛出异常
     
     def is_healthy(self) -> bool:
         """检查服务健康状态"""

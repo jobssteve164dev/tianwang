@@ -1,22 +1,19 @@
 """
-智能调度算法
-基于性能指标、成本预算和系统负载智能选择最优的推理方法
+智能调度服务
+根据系统负载、模型性能、成本等因素智能调度AI分析任务
 """
 
 import asyncio
-import logging
 import time
-import statistics
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 from enum import Enum
-import numpy as np
-from collections import deque, defaultdict
+import logging
 
-from ..config import get_settings
+from ..config import config
+from ..utils.feature_extractor import FeatureExtractor
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 class SystemLoad(Enum):
     """系统负载等级"""
@@ -35,7 +32,7 @@ class ModelMetrics:
     avg_latency: float
     cost_per_request: float
     success_rate: float = 1.0
-    last_updated: float = field(default_factory=time.time)
+    last_updated: float = time.time()
 
 @dataclass
 class SystemMetrics:
@@ -82,7 +79,7 @@ class IntelligentScheduler:
         }
         
         # 预算管理
-        self.daily_budget = settings.DAILY_API_BUDGET
+        self.daily_budget = config.cost_control.get("daily_budget", 10.0)
         self.current_cost = 0.0
         self.cost_reset_time = time.time()
         

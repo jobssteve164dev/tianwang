@@ -35,8 +35,8 @@ class AIEngineConfig(BaseSettings):
         "actions": "protection-actions"
     }
     
-    # AI模型配置
-    model_path: str = "./models"
+    # AI模型配置 - 重命名以避免与Pydantic受保护命名空间冲突
+    ai_model_path: str = "./models"  # 原 model_path
     confidence_threshold: float = 0.8
     batch_size: int = 32
     max_sequence_length: int = 512
@@ -214,6 +214,8 @@ class AIEngineConfig(BaseSettings):
     class Config:
         env_file = ".env"
         env_prefix = "AI_"
+        # 设置受保护的命名空间，避免与我们的字段冲突
+        protected_namespaces = ()
 
 # 全局配置实例
 config = AIEngineConfig()
@@ -221,8 +223,8 @@ config = AIEngineConfig()
 # 配置验证
 def validate_config() -> bool:
     """验证配置的有效性"""
-    if not os.path.exists(config.model_path):
-        os.makedirs(config.model_path, exist_ok=True)
+    if not os.path.exists(config.ai_model_path):
+        os.makedirs(config.ai_model_path, exist_ok=True)
     
     # 检查必需的API密钥
     api_keys = [

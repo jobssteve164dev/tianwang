@@ -1,25 +1,26 @@
 """
-混合推理引擎服务
-集成本地AI模型、开源规则库和外部大模型API的智能调度系统
+混合推理引擎
+结合本地模型和外部大模型API，提供高精度、低延迟的智能分析
 """
 
 import asyncio
-import logging
+import json
 import time
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
+import logging
 import numpy as np
-import json
+from concurrent.futures import ThreadPoolExecutor
 
 from .ai_service import AIService
 from .external_api_service import ExternalAPIService
 from .rule_engine import RuleEngine
 from ..utils.data_processor import DataProcessor
-from ..config import get_settings
+from ..utils.feature_extractor import FeatureExtractor
+from ..config import config
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 class ThreatLevel(Enum):
     """威胁等级枚举"""
@@ -261,7 +262,7 @@ class HybridInferenceEngine:
                 'model_used': api_result.get('model', 'unknown')
             },
             processing_time=0.0,
-            cost=settings.EXTERNAL_API_COST_PER_REQUEST
+            cost=0.001  # 默认API调用成本
         )
 
     async def _hybrid_inference(self, event: SecurityEvent) -> InferenceResult:
@@ -366,12 +367,14 @@ class HybridInferenceEngine:
 
     async def _is_obvious_threat(self, event: SecurityEvent) -> bool:
         """判断是否为明显威胁（可通过简单规则识别）"""
-        # 检查已知恶意IP
-        if event.source_ip in settings.KNOWN_MALICIOUS_IPS:
+        # 检查已知恶意IP（这里可以扩展为从威胁情报源获取）
+        known_malicious_ips = []  # 可以从配置文件或威胁情报源获取
+        if event.source_ip in known_malicious_ips:
             return True
             
         # 检查异常端口
-        if event.features.get('dest_port') in settings.SUSPICIOUS_PORTS:
+        suspicious_ports = [22, 23, 3389, 445, 1433, 3306]  # 常见攻击端口
+        if event.features.get('dest_port') in suspicious_ports:
             return True
             
         # 检查异常协议模式
@@ -411,7 +414,7 @@ class HybridInferenceEngine:
 
     def _check_api_budget(self) -> bool:
         """检查API预算是否充足"""
-        daily_budget = settings.DAILY_API_BUDGET
+        daily_budget = config.cost_control.get("daily_budget", 10.0)
         current_cost = self.stats['total_cost']
         
         # 简单的日预算检查

@@ -46,7 +46,7 @@ class AIService:
             logger.info("正在初始化AI服务...")
             
             # 创建模型目录
-            os.makedirs(config.model_path, exist_ok=True)
+            os.makedirs(config.ai_model_path, exist_ok=True)
             
             # 初始化各种AI模型
             await self._initialize_anomaly_detection_model()
@@ -328,7 +328,7 @@ class AIService:
     async def _initialize_anomaly_detection_model(self):
         """初始化异常检测模型"""
         model_name = "anomaly_detection"
-        model_path = os.path.join(config.model_path, f"{model_name}.joblib")
+        model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
         
         try:
             if os.path.exists(model_path):
@@ -382,7 +382,7 @@ class AIService:
     async def _initialize_user_behavior_model(self):
         """初始化用户行为分析模型"""
         model_name = "user_behavior"
-        model_path = os.path.join(config.model_path, f"{model_name}.joblib")
+        model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
         
         try:
             if os.path.exists(model_path):
@@ -416,7 +416,7 @@ class AIService:
             if scaler_name not in self.scalers:
                 self.scalers[scaler_name] = StandardScaler()
                 # 如果模型已训练，尝试加载对应的scaler
-                scaler_path = os.path.join(config.model_path, f"{scaler_name}_scaler.joblib")
+                scaler_path = os.path.join(config.ai_model_path, f"{scaler_name}_scaler.joblib")
                 if os.path.exists(scaler_path):
                     self.scalers[scaler_name] = joblib.load(scaler_path)
                 else:
@@ -547,7 +547,7 @@ class AIService:
             scaler_name = "user_behavior"
             if scaler_name not in self.scalers:
                 self.scalers[scaler_name] = StandardScaler()
-                scaler_path = os.path.join(config.model_path, f"{scaler_name}_scaler.joblib")
+                scaler_path = os.path.join(config.ai_model_path, f"{scaler_name}_scaler.joblib")
                 if os.path.exists(scaler_path):
                     self.scalers[scaler_name] = joblib.load(scaler_path)
                 else:
@@ -619,8 +619,8 @@ class AIService:
                 model.fit(X_train_scaled)
             
             # 保存模型和scaler
-            model_path = os.path.join(config.model_path, f"{model_name}.joblib")
-            scaler_path = os.path.join(config.model_path, f"{model_name}_scaler.joblib")
+            model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
+            scaler_path = os.path.join(config.ai_model_path, f"{model_name}_scaler.joblib")
             
             joblib.dump(model, model_path)
             joblib.dump(scaler, scaler_path)

@@ -15,11 +15,10 @@ from sklearn.preprocessing import StandardScaler
 import asyncio
 from pathlib import Path
 
-from ..config import get_settings
+from ..config import config
 from ..utils.feature_extractor import FeatureExtractor
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 class NetworkAnomalyAutoEncoder(nn.Module):
     """网络异常检测自编码器"""
@@ -150,8 +149,8 @@ class LocalModelService:
             
     def _load_autoencoder(self):
         """加载自编码器模型"""
-        model_path = Path(settings.MODEL_DIR) / "autoencoder_model.pth"
-        scaler_path = Path(settings.MODEL_DIR) / "autoencoder_scaler.pkl"
+        model_path = Path(config.ai_model_path) / "autoencoder_model.pth"
+        scaler_path = Path(config.ai_model_path) / "autoencoder_scaler.pkl"
         
         if model_path.exists():
             # 加载预训练模型
@@ -180,7 +179,7 @@ class LocalModelService:
 
     def _load_lstm_model(self):
         """加载LSTM模型"""
-        model_path = Path(settings.MODEL_DIR) / "lstm_model.pth"
+        model_path = Path(config.ai_model_path) / "lstm_model.pth"
         
         if model_path.exists():
             self.models['lstm'] = LSTMAnomalyDetector(
@@ -197,7 +196,7 @@ class LocalModelService:
 
     def _load_traditional_models(self):
         """加载传统机器学习模型"""
-        model_dir = Path(settings.MODEL_DIR)
+        model_dir = Path(config.ai_model_path)
         
         # Isolation Forest
         iso_forest_path = model_dir / "isolation_forest.pkl"
