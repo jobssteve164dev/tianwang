@@ -11,8 +11,6 @@ import {
   Badge,
   Tooltip,
   message,
-  Row,
-  Col,
   Statistic,
   Progress,
   Popconfirm

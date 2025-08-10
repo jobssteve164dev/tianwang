@@ -58,7 +58,8 @@ async def lifespan(app: FastAPI):
     
     # 关闭时清理
     logger.info("正在关闭AI分析引擎...")
-    await kafka_service.stop()
+    if kafka_service:
+        await kafka_service.stop()
     await ai_service.cleanup()
     await rule_engine.cleanup()
     await external_api_service.cleanup()

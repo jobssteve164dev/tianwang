@@ -9,7 +9,6 @@ import {
   Input, 
   Select, 
   InputNumber, 
-  DatePicker, 
   Tag, 
   Tooltip, 
   message, 
@@ -23,8 +22,7 @@ import {
 } from 'antd';
 import { 
   PlusOutlined, 
-  ReloadOutlined, 
-  DeleteOutlined,
+  ReloadOutlined,
   CopyOutlined,
   EyeOutlined,
   ClockCircleOutlined,
@@ -32,7 +30,6 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { registrationCodeApi } from '../../services/api';
 import dayjs from 'dayjs';
 
@@ -204,7 +201,7 @@ const RegistrationCodesPage: React.FC = () => {
       render: (permissions: string[]) => (
         <Space wrap>
           {permissions.map(perm => (
-            <Tag key={perm} color="blue" size="small">{perm}</Tag>
+            <Tag key={perm} color="blue">{perm}</Tag>
           ))}
         </Space>
       )

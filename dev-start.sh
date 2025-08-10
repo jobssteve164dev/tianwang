@@ -265,6 +265,52 @@ install_dependencies() {
     log_success "依赖安装完成"
 }
 
+# 启动 Kafka 服务
+start_kafka() {
+    log_step "启动 Kafka 服务..."
+    
+    # 确保在项目根目录
+    cd /Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang
+    
+    # 检查 Kafka 是否已安装
+    if ! command -v kafka-server-start &> /dev/null; then
+        log_error "Kafka 未安装，请先安装 Kafka"
+        log_info "安装命令: brew install kafka"
+        return 1
+    fi
+    
+    # 检查并清理端口 9092
+    if ! check_port 9092; then
+        log_info "尝试清理 Kafka 端口 9092..."
+        if cleanup_port 9092 "Kafka"; then
+            log_success "端口清理成功，继续启动"
+        else
+            log_error "端口清理失败，无法启动 Kafka"
+            return 1
+        fi
+    fi
+    
+    # 检查并清理端口 9093 (KRaft controller)
+    if ! check_port 9093; then
+        log_info "尝试清理 Kafka Controller 端口 9093..."
+        if cleanup_port 9093 "Kafka Controller"; then
+            log_success "端口清理成功，继续启动"
+        else
+            log_error "端口清理失败，无法启动 Kafka"
+            return 1
+        fi
+    fi
+    
+    # 启动 Kafka (KRaft 模式，不需要 Zookeeper)
+    log_info "启动 Kafka 服务 (KRaft 模式)..."
+    kafka-server-start /usr/local/etc/kafka/server.properties &
+    KAFKA_PID=$!
+    echo $KAFKA_PID > .kafka.pid
+    
+    # 等待 Kafka 启动
+    wait_for_service "localhost" "9092" "Kafka"
+}
+
 # 启动 AI 引擎
 start_ai_engine() {
     log_step "启动 AI 引擎..."
@@ -468,6 +514,18 @@ cleanup() {
         rm -f client/.client.pid
     fi
     
+    # 停止 Kafka
+    if [ -f ".kafka.pid" ]; then
+        KAFKA_PID=$(cat .kafka.pid)
+        if ps -p $KAFKA_PID > /dev/null; then
+            kill $KAFKA_PID
+            log_info "Kafka 已停止"
+        fi
+        rm -f .kafka.pid
+    fi
+    
+
+    
     log_success "所有服务已停止"
 }
 
@@ -509,6 +567,7 @@ main() {
     check_dependencies
     cleanup_all_ports
     install_dependencies
+    start_kafka
     start_ai_engine
     start_server
     start_client

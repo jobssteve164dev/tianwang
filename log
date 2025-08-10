@@ -2,8 +2,90 @@ Compiled with problems:
 ×
 ERROR
 [eslint] 
-src/store/slices/authSlice.ts
-  Line 188:10:  '_' is defined but never used         no-unused-vars
-  Line 188:15:  'dispatch' is defined but never used  no-unused-vars
+src/pages/dashboard/DashboardPage.tsx
+  Line 2:10:  'Row' is defined but never used  no-unused-vars
+  Line 2:15:  'Col' is defined but never used  no-unused-vars
 
-Search for the keywords to learn more about each error.image.png
+src/pages/devices/DevicesPage.tsx
+  Line 14:3:  'Row' is defined but never used  no-unused-vars
+  Line 15:3:  'Col' is defined but never used  no-unused-vars
+
+src/pages/registration/RegistrationCodesPage.tsx
+  Line 12:3:   'DatePicker' is defined but never used      no-unused-vars
+  Line 27:3:   'DeleteOutlined' is defined but never used  no-unused-vars
+  Line 35:10:  'useAppDispatch' is defined but never used  no-unused-vars
+  Line 35:26:  'useAppSelector' is defined but never used  no-unused-vars
+
+src/services/api.ts
+  Line 376:44:  'apiClient' is not defined  no-undef
+  Line 377:43:  'apiClient' is not defined  no-undef
+  Line 378:35:  'apiClient' is not defined  no-undef
+  Line 379:46:  'apiClient' is not defined  no-undef
+  Line 381:5:   'apiClient' is not defined  no-undef
+  Line 382:28:  'apiClient' is not defined  no-undef
+
+Search for the keywords to learn more about each error.
+ERROR in src/pages/registration/RegistrationCodesPage.tsx:207:42
+TS2322: Type '{ children: string; key: string; color: "blue"; size: string; }' is not assignable to type 'IntrinsicAttributes & TagProps & RefAttributes<HTMLSpanElement>'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & TagProps & RefAttributes<HTMLSpanElement>'.
+    205 |         <Space wrap>
+    206 |           {permissions.map(perm => (
+  > 207 |             <Tag key={perm} color="blue" size="small">{perm}</Tag>
+        |                                          ^^^^
+    208 |           ))}
+    209 |         </Space>
+    210 |       )
+ERROR in src/services/api.ts:376:44
+TS2304: Cannot find name 'apiClient'.
+    374 | // 注册码管理API
+    375 | export const registrationCodeApi = {
+  > 376 |   generateRegistrationCode: (data: any) => apiClient.post('/agents/registration-codes', data),
+        |                                            ^^^^^^^^^
+    377 |   getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
+    378 |   getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
+    379 |   disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+ERROR in src/services/api.ts:377:43
+TS2304: Cannot find name 'apiClient'.
+    375 | export const registrationCodeApi = {
+    376 |   generateRegistrationCode: (data: any) => apiClient.post('/agents/registration-codes', data),
+  > 377 |   getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
+        |                                           ^^^^^^^^^
+    378 |   getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
+    379 |   disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+    380 |   extendRegistrationCode: (code: string, additionalExpiry: number) => 
+ERROR in src/services/api.ts:378:35
+TS2304: Cannot find name 'apiClient'.
+    376 |   generateRegistrationCode: (data: any) => apiClient.post('/agents/registration-codes', data),
+    377 |   getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
+  > 378 |   getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
+        |                                   ^^^^^^^^^
+    379 |   disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+    380 |   extendRegistrationCode: (code: string, additionalExpiry: number) => 
+    381 |     apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
+ERROR in src/services/api.ts:379:46
+TS2304: Cannot find name 'apiClient'.
+    377 |   getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
+    378 |   getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
+  > 379 |   disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+        |                                              ^^^^^^^^^
+    380 |   extendRegistrationCode: (code: string, additionalExpiry: number) => 
+    381 |     apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
+    382 |   getSecurityStatus: () => apiClient.get('/agents/security-status'),
+ERROR in src/services/api.ts:381:5
+TS2304: Cannot find name 'apiClient'.
+    379 |   disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+    380 |   extendRegistrationCode: (code: string, additionalExpiry: number) => 
+  > 381 |     apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
+        |     ^^^^^^^^^
+    382 |   getSecurityStatus: () => apiClient.get('/agents/security-status'),
+    383 | };
+    384 |
+ERROR in src/services/api.ts:382:28
+TS2304: Cannot find name 'apiClient'.
+    380 |   extendRegistrationCode: (code: string, additionalExpiry: number) => 
+    381 |     apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
+  > 382 |   getSecurityStatus: () => apiClient.get('/agents/security-status'),
+        |                            ^^^^^^^^^
+    383 | };
+    384 |
+    385 | // 默认导出所有API

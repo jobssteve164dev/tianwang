@@ -57,13 +57,17 @@ class ExternalAPIService:
             
             # 初始化Redis客户端（用于缓存）
             if config.api_cache.get("enabled", False) and config.api_cache.get("backend") == "redis":
-                self.redis_client = redis.Redis(
-                    host=config.redis_host,
-                    port=config.redis_port,
-                    password=config.redis_password,
-                    db=config.redis_db,
-                    decode_responses=True
-                )
+                redis_kwargs = {
+                    "host": config.redis_host,
+                    "port": config.redis_port,
+                    "db": config.redis_db,
+                    "decode_responses": True
+                }
+                # 只有在配置了密码时才添加密码参数
+                if config.redis_password:
+                    redis_kwargs["password"] = config.redis_password
+                
+                self.redis_client = redis.Redis(**redis_kwargs)
                 await self.redis_client.ping()
                 logger.info("Redis缓存连接成功")
             

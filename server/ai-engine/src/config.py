@@ -23,7 +23,7 @@ class AIEngineConfig(BaseSettings):
     
     redis_host: str = "localhost"
     redis_port: int = 6379
-    redis_password: str = "tianwang123"
+    redis_password: str = ""  # 开发环境不使用密码
     redis_db: int = 0
     
     # Kafka配置

@@ -373,13 +373,31 @@ export const wsManager = new WebSocketManager();
 
 // 注册码管理API
 export const registrationCodeApi = {
-  generateRegistrationCode: (data: any) => apiClient.post('/agents/registration-codes', data),
-  getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
-  getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
-  disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+  generateRegistrationCode: (data: any) => request('/agents/registration-codes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getRegistrationCodes: (params?: any) => {
+    const queryString = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryString.append(key, String(value));
+        }
+      });
+    }
+    return request(`/agents/registration-codes?${queryString.toString()}`);
+  },
+  getRegistrationCodeStats: () => request('/agents/registration-codes/stats'),
+  disableRegistrationCode: (code: string) => request(`/agents/registration-codes/${code}`, {
+    method: 'DELETE',
+  }),
   extendRegistrationCode: (code: string, additionalExpiry: number) => 
-    apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
-  getSecurityStatus: () => apiClient.get('/agents/security-status'),
+    request(`/agents/registration-codes/${code}/extend`, {
+      method: 'PATCH',
+      body: JSON.stringify({ additionalExpiry }),
+    }),
+  getSecurityStatus: () => request('/agents/security-status'),
 };
 
 // 默认导出所有API
