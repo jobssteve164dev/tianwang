@@ -371,6 +371,17 @@ export class WebSocketManager {
 // 导出WebSocket实例
 export const wsManager = new WebSocketManager();
 
+// 注册码管理API
+export const registrationCodeApi = {
+  generateRegistrationCode: (data: any) => apiClient.post('/agents/registration-codes', data),
+  getRegistrationCodes: (params?: any) => apiClient.get('/agents/registration-codes', { params }),
+  getRegistrationCodeStats: () => apiClient.get('/agents/registration-codes/stats'),
+  disableRegistrationCode: (code: string) => apiClient.delete(`/agents/registration-codes/${code}`),
+  extendRegistrationCode: (code: string, additionalExpiry: number) => 
+    apiClient.patch(`/agents/registration-codes/${code}/extend`, { additionalExpiry }),
+  getSecurityStatus: () => apiClient.get('/agents/security-status'),
+};
+
 // 默认导出所有API
 export default {
   auth: authAPI,
@@ -379,4 +390,5 @@ export default {
   device: deviceAPI,
   user: userAPI,
   system: systemAPI,
+  registrationCode: registrationCodeApi,
 }; 

@@ -8,6 +8,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { Avatar, Dropdown, Space } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -40,6 +41,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/devices',
       name: '设备管理',
       icon: <DesktopOutlined />,
+    },
+    {
+      path: '/registration-codes',
+      name: '注册码管理',
+      icon: <KeyOutlined />,
     },
   ];
 
@@ -84,11 +90,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         type: 'group',
         request: async () => menuItems,
       }}
-      menuItemRender={(item, dom) => (
-        <div onClick={() => handleMenuItemClick(item.path || '/')}>
-          {dom}
-        </div>
-      )}
       avatarProps={{
         src: undefined,
         title: user?.username || '用户',

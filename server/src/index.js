@@ -25,6 +25,9 @@ const { setupSwagger } = require('./config/swagger');
 const WebSocketService = require('./services/WebSocketService');
 const NotificationService = require('./services/NotificationService');
 const ReportService = require('./services/ReportService');
+const keyManagementService = require('./services/KeyManagementService');
+const deviceFingerprintService = require('./services/DeviceFingerprintService');
+const registrationCodeService = require('./services/RegistrationCodeService');
 
 // 创建Express应用
 const app = express();
@@ -169,6 +172,13 @@ async function initialize() {
     reportService = new ReportService();
     await reportService.initialize();
     logger.info('✅ Report service initialized successfully');
+
+    // 初始化安全服务
+    logger.info('🔐 Initializing security services...');
+    await keyManagementService.initialize();
+    logger.info('✅ Key management service initialized successfully');
+    logger.info('✅ Device fingerprint service initialized successfully');
+    logger.info('✅ Registration code service initialized successfully');
 
     // 设置路由服务实例
     setRouteServices(notificationService, reportService);

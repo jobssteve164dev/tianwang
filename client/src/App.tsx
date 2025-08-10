@@ -9,6 +9,7 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import AlertsPage from './pages/alerts/AlertsPage';
 import DevicesPage from './pages/devices/DevicesPage';
+import RegistrationCodesPage from './pages/registration/RegistrationCodesPage';
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -61,6 +62,7 @@ const App: React.FC = () => {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/alerts" element={<AlertsPage />} />
                 <Route path="/devices" element={<DevicesPage />} />
+                <Route path="/registration-codes" element={<RegistrationCodesPage />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </MainLayout>
