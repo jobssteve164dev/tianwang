@@ -63,39 +63,13 @@ const htmlContent = `<!DOCTYPE html>
             border-bottom: 1px solid #333333;
         }
 
-        .titlebar-controls {
-            display: flex;
-            gap: 8px;
-            margin-right: 12px;
-            -webkit-app-region: no-drag;
-        }
 
-        .titlebar-button {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            -webkit-app-region: no-drag;
-        }
-
-        .titlebar-button.close {
-            background: #ff5f57;
-        }
-
-        .titlebar-button.minimize {
-            background: #febc2e;
-        }
-
-        .titlebar-button.maximize {
-            background: #28c940;
-        }
 
         .titlebar-title {
             font-size: 12px;
             color: #888888;
             font-weight: 500;
-            flex: 1;
+            margin-left: 80px; /* 为系统交通灯按钮留出空间 */
         }
 
         .sidebar {
@@ -463,15 +437,10 @@ const htmlContent = `<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <!-- 可拖动的标题栏 -->
-    <div class="titlebar">
-        <div class="titlebar-controls">
-            <button class="titlebar-button close" onclick="window.electronAPI.closeWindow()"></button>
-            <button class="titlebar-button minimize" onclick="window.electronAPI.minimizeWindow()"></button>
-            <button class="titlebar-button maximize" onclick="window.electronAPI.maximizeWindow()"></button>
-        </div>
-        <div class="titlebar-title">TianWang Agent</div>
-    </div>
+                <!-- 标题栏占位区域 -->
+            <div class="titlebar">
+                <div class="titlebar-title">TianWang Agent</div>
+            </div>
     
     <div class="app-container">
         <div class="sidebar">

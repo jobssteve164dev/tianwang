@@ -58,9 +58,8 @@ function createMainWindow() {
         },
         icon: path.join(__dirname, '../assets/icon.png'),
         show: false,
-        titleBarStyle: 'hidden',
-        // 完全隐藏系统标题栏，使用自定义标题栏
-        frame: false
+        titleBarStyle: 'hiddenInset',
+        frame: true
     });
 
     // 加载应用界面
@@ -119,22 +118,7 @@ function createMainWindow() {
         return { action: 'deny' };
     });
 
-    // 窗口控制IPC处理器
-    ipcMain.handle('window-close', () => {
-        mainWindow.close();
-    });
 
-    ipcMain.handle('window-minimize', () => {
-        mainWindow.minimize();
-    });
-
-    ipcMain.handle('window-maximize', () => {
-        if (mainWindow.isMaximized()) {
-            mainWindow.unmaximize();
-        } else {
-            mainWindow.maximize();
-        }
-    });
 }
 
 // 创建设置窗口
