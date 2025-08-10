@@ -60,13 +60,15 @@ const htmlContent = `<!DOCTYPE html>
             z-index: 1000;
             display: flex;
             align-items: center;
-            padding: 0 20px;
+            justify-content: flex-start;
+            padding: 0;
         }
 
         .titlebar-title {
             font-size: 12px;
             color: #888888;
             font-weight: 500;
+            margin-left: 80px; /* 为操作按钮预留空间 */
         }
 
         .sidebar {
