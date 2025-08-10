@@ -46,10 +46,10 @@ if (!gotTheLock) {
 // 创建主窗口
 function createMainWindow() {
     mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        minWidth: 800,
-        minHeight: 600,
+        width: 900,
+        height: 700,
+        minWidth: 700,
+        minHeight: 500,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
