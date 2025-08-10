@@ -319,6 +319,14 @@ async function initializeServices() {
         // 初始化代理服务（使用try-catch避免循环引用错误）
         try {
             agentService = new AgentService();
+            
+            // 从持久化存储中恢复注册码
+            const savedRegistrationCode = store.get('registrationCode');
+            if (savedRegistrationCode) {
+                agentService.setRegistrationCode(savedRegistrationCode);
+                logger.info('从存储中恢复注册码:', savedRegistrationCode.substring(0, 8) + '...');
+            }
+            
             await agentService.initialize();
         } catch (agentError) {
             logger.error('代理服务初始化失败:', agentError.message);
@@ -611,8 +619,12 @@ ipcMain.handle('set-registration-code', async (event, code) => {
 
 ipcMain.handle('get-registration-code', async () => {
     try {
+        // 优先从AgentService获取，如果为空则从store获取
         if (agentService) {
-            return agentService.getRegistrationCode();
+            const code = agentService.getRegistrationCode();
+            if (code) {
+                return code;
+            }
         }
         return store.get('registrationCode', '');
     } catch (error) {
