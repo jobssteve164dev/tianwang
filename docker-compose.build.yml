@@ -1,0 +1,81 @@
+# 优化的Docker Compose构建配置
+# Optimized Docker Compose Build Configuration
+
+version: '3.8'
+
+services:
+  # 后端服务构建
+  server:
+    build:
+      context: ./server
+      dockerfile: ../docker/server/Dockerfile
+      target: production
+      cache_from:
+        - tianwang-server:latest
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+        NODE_ENV: production
+    image: tianwang-server:latest
+    container_name: tianwang-server-build
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server/logs:/app/logs
+      - ./server/uploads:/app/uploads
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+  # 前端服务构建
+  client:
+    build:
+      context: ./client
+      dockerfile: ../docker/client/Dockerfile
+      target: production
+      cache_from:
+        - tianwang-client:latest
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+        NODE_ENV: production
+        CI: "true"
+    image: tianwang-client:latest
+    container_name: tianwang-client-build
+    ports:
+      - "3000:80"
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+  # AI引擎构建
+  ai-engine:
+    build:
+      context: ./server/ai-engine
+      dockerfile: ../../docker/ai-engine/Dockerfile
+      target: production
+      cache_from:
+        - tianwang-ai-engine:latest
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+        PYTHONPATH: /app
+    image: tianwang-ai-engine:latest
+    container_name: tianwang-ai-engine-build
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BROKERS: kafka:9092
+      INFLUXDB_URL: http://influxdb:8086
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data/models:/app/models
+    networks:
+      - tianwang-network
+    restart: unless-stopped
+
+networks:
+  tianwang-network:
+    driver: bridge

@@ -32,7 +32,13 @@
     "agents:build:windows": "cd agents/windows && npm run build",
     "agents:build:linux": "cd agents/linux && make build",
     "agents:build:macos": "cd agents/macos && make build",
-    "agents:build:openwrt": "cd agents/openwrt && make build"
+    "agents:build:openwrt": "cd agents/openwrt && make build",
+    "build:fast": "node scripts/build-with-cache.js",
+    "build:quick": "./scripts/quick-build.sh",
+    "build:clean": "node scripts/build-with-cache.js --clean-cache",
+    "build:no-cache": "node scripts/build-with-cache.js --no-cache",
+    "docker:build:fast": "docker-compose -f docker-compose.build.yml build",
+    "docker:build:parallel": "docker-compose -f docker-compose.build.yml build --parallel"
   },
   "keywords": [
     "security",
