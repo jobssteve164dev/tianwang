@@ -1,0 +1,502 @@
+#!/bin/bash
+
+# Kafka 调试和诊断脚本
+# Kafka Debug and Diagnostic Script
+
+set -e
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# 日志函数
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_step() {
+    echo -e "${PURPLE}[STEP]${NC} $1"
+}
+
+# 检查命令是否存在
+check_command() {
+    if ! command -v $1 &> /dev/null; then
+        log_error "$1 未安装"
+        return 1
+    fi
+    return 0
+}
+
+# 清理端口占用
+cleanup_port() {
+    local port=$1
+    local service_name=$2
+    
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+        log_warning "端口 $port 被占用，正在清理..."
+        
+        local pids=$(lsof -ti:$port)
+        if [ -n "$pids" ]; then
+            for pid in $pids; do
+                log_info "正在终止进程 $pid (端口 $port)"
+                kill $pid 2>/dev/null
+            done
+            
+            sleep 2
+            
+            if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+                log_warning "优雅终止失败，强制终止进程..."
+                for pid in $pids; do
+                    kill -9 $pid 2>/dev/null
+                done
+                sleep 1
+            fi
+            
+            if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null ; then
+                log_error "无法清理端口 $port"
+                return 1
+            else
+                log_success "端口 $port 清理完成"
+                return 0
+            fi
+        else
+            log_error "无法获取占用端口 $port 的进程信息"
+            return 1
+        fi
+    else
+        log_success "端口 $port 可用"
+        return 0
+    fi
+}
+
+# 等待服务启动
+wait_for_service() {
+    local host=$1
+    local port=$2
+    local service_name=$3
+    local max_attempts=30
+    local attempt=1
+    
+    log_info "等待 $service_name 启动..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z $host $port 2>/dev/null; then
+            log_success "$service_name 已启动 (${host}:${port})"
+            return 0
+        fi
+        
+        echo -n "."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    log_error "$service_name 启动超时"
+    return 1
+}
+
+# Kafka 安装检查
+check_kafka_installation() {
+    log_step "检查 Kafka 安装状态..."
+    
+    if check_command "kafka-server-start"; then
+        log_success "Kafka 已安装"
+        echo -e "安装路径: ${CYAN}$(which kafka-server-start)${NC}"
+        
+        # 获取版本信息
+        local version=$(kafka-server-start --version 2>/dev/null | head -n1 || echo "未知版本")
+        echo -e "版本信息: ${CYAN}$version${NC}"
+        return 0
+    else
+        log_error "Kafka 未安装"
+        log_info "安装命令: brew install kafka"
+        return 1
+    fi
+}
+
+# Kafka 配置检查
+check_kafka_config() {
+    log_step "检查 Kafka 配置..."
+    
+    local config_file="/usr/local/etc/kafka/server.properties"
+    
+    if [ ! -f "$config_file" ]; then
+        log_error "Kafka 配置文件不存在: $config_file"
+        return 1
+    fi
+    
+    log_success "配置文件存在: $config_file"
+    
+    # 检查关键配置项
+    echo ""
+    echo "=========================================="
+    echo "           Kafka 配置检查"
+    echo "=========================================="
+    
+    local listeners=$(grep -E "^listeners=" "$config_file" 2>/dev/null || echo "未配置")
+    local advertised_listeners=$(grep -E "^advertised.listeners=" "$config_file" 2>/dev/null || echo "未配置")
+    local log_dirs=$(grep -E "^log.dirs=" "$config_file" 2>/dev/null || echo "未配置")
+    local broker_id=$(grep -E "^broker.id=" "$config_file" 2>/dev/null || echo "未配置")
+    
+    echo -e "监听器配置: ${CYAN}$listeners${NC}"
+    echo -e "广播监听器: ${CYAN}$advertised_listeners${NC}"
+    echo -e "日志目录: ${CYAN}$log_dirs${NC}"
+    echo -e "Broker ID: ${CYAN}$broker_id${NC}"
+    
+    # 检查配置问题
+    local issues=0
+    
+    if [[ "$listeners" == "未配置" ]]; then
+        log_warning "缺少 listeners 配置"
+        issues=$((issues + 1))
+    fi
+    
+    if [[ "$advertised_listeners" == "未配置" ]]; then
+        log_warning "缺少 advertised.listeners 配置"
+        issues=$((issues + 1))
+    fi
+    
+    if [[ "$log_dirs" == "未配置" ]]; then
+        log_warning "缺少 log.dirs 配置"
+        issues=$((issues + 1))
+    fi
+    
+    if [ $issues -eq 0 ]; then
+        log_success "配置文件检查通过"
+        return 0
+    else
+        log_warning "发现 $issues 个配置问题"
+        return 1
+    fi
+}
+
+# 修复 Kafka 配置
+fix_kafka_config() {
+    log_step "修复 Kafka 配置..."
+    
+    local config_file="/usr/local/etc/kafka/server.properties"
+    local backup_file="/usr/local/etc/kafka/server.properties.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # 备份原配置
+    if [ -f "$config_file" ]; then
+        cp "$config_file" "$backup_file"
+        log_info "已备份原配置文件到: $backup_file"
+    fi
+    
+    # 创建修复后的配置
+    cat > "$config_file" << 'EOF'
+# Kafka 服务器配置 - 开发环境优化版 (KRaft模式)
+# Generated by TianWang Kafka Debug Script
+
+# KRaft模式配置
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@localhost:9093
+
+# 基础配置
+delete.topic.enable=true
+
+# 网络配置
+listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+advertised.listeners=PLAINTEXT://localhost:9092
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+inter.broker.listener.name=PLAINTEXT
+controller.listener.names=CONTROLLER
+
+# 日志配置
+log.dirs=/tmp/kafka-logs
+log.retention.hours=168
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+
+# 主题配置
+num.partitions=1
+default.replication.factor=1
+min.insync.replicas=1
+
+# 性能配置
+num.network.threads=3
+num.io.threads=8
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+
+# 消费者配置
+group.initial.rebalance.delay.ms=0
+
+# 生产者配置
+compression.type=producer
+
+# 安全配置（开发环境禁用）
+authorizer.class.name=
+EOF
+    
+    log_success "Kafka 配置已修复"
+    log_info "配置文件: $config_file"
+}
+
+# 端口状态检查
+check_port_status() {
+    log_step "检查端口状态..."
+    
+    if lsof -Pi :9092 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        local kafka_pid=$(lsof -ti:9092)
+        log_warning "端口 9092 被占用 (PID: $kafka_pid)"
+        
+        # 检查是否是 Kafka 进程
+        if ps -p $kafka_pid -o comm= | grep -q kafka; then
+            log_success "Kafka 进程正在运行"
+            return 0
+        else
+            log_warning "端口被其他进程占用"
+            return 1
+        fi
+    else
+        log_success "端口 9092 空闲"
+        return 0
+    fi
+}
+
+# 测试 Kafka 连接
+test_kafka_connection() {
+    log_step "测试 Kafka 连接..."
+    
+    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        log_success "Kafka 连接成功"
+        
+        # 获取主题列表
+        local topics=$(kafka-topics --bootstrap-server localhost:9092 --list 2>/dev/null)
+        local topic_count=$(echo "$topics" | wc -l)
+        
+        echo -e "主题数量: ${CYAN}$topic_count${NC}"
+        if [ -n "$topics" ]; then
+            echo "主题列表:"
+            echo "$topics" | sed 's/^/  - /'
+        fi
+        
+        return 0
+    else
+        log_error "Kafka 连接失败"
+        
+        # 详细错误诊断
+        echo ""
+        echo "详细连接测试..."
+        kafka-topics --bootstrap-server localhost:9092 --list 2>&1 | head -n 10
+        
+        return 1
+    fi
+}
+
+# 启动 Kafka
+start_kafka() {
+    log_step "启动 Kafka 服务..."
+    
+    # 检查并清理端口
+    if ! check_port_status; then
+        log_info "尝试清理端口 9092..."
+        if ! cleanup_port 9092 "Kafka"; then
+            log_error "端口清理失败，无法启动 Kafka"
+            return 1
+        fi
+    fi
+    
+    # 创建日志目录
+    mkdir -p /tmp/kafka-logs
+    
+    # 格式化日志目录（KRaft模式需要）
+    log_info "格式化 Kafka 日志目录..."
+    if [ ! -f "/tmp/kafka-logs/meta.properties" ]; then
+        kafka-storage format -t $(kafka-storage random-uuid) -c /usr/local/etc/kafka/server.properties > /tmp/kafka-format.log 2>&1
+        if [ $? -eq 0 ]; then
+            log_success "日志目录格式化成功"
+        else
+            log_warning "日志目录格式化失败，查看日志: /tmp/kafka-format.log"
+        fi
+    else
+        log_info "日志目录已格式化"
+    fi
+    
+    # 启动 Kafka
+    log_info "启动 Kafka 服务..."
+    kafka-server-start /usr/local/etc/kafka/server.properties > /tmp/kafka-debug.log 2>&1 &
+    local kafka_pid=$!
+    
+    log_info "Kafka 启动中 (PID: $kafka_pid)..."
+    log_info "Kafka 日志: /tmp/kafka-debug.log"
+    
+    # 等待 Kafka 启动
+    if wait_for_service "localhost" "9092" "Kafka"; then
+        log_success "Kafka 启动成功"
+        
+        # 创建必要的主题
+        create_kafka_topics
+        
+        # 最终连接测试
+        if test_kafka_connection; then
+            log_success "Kafka 服务完全就绪"
+            return 0
+        else
+            log_warning "Kafka 启动但连接测试失败"
+            return 1
+        fi
+    else
+        log_error "Kafka 启动失败"
+        log_info "查看详细日志: tail -f /tmp/kafka-debug.log"
+        return 1
+    fi
+}
+
+# 创建 Kafka 主题
+create_kafka_topics() {
+    log_step "创建必要的 Kafka 主题..."
+    
+    local topics=("security-logs-dev" "security-alerts-dev" "protection-actions-dev")
+    
+    # 首先创建 __consumer_offsets 主题（KRaft模式需要）
+    if ! kafka-topics --bootstrap-server localhost:9092 --topic "__consumer_offsets" --describe >/dev/null 2>&1; then
+        log_info "创建 __consumer_offsets 主题..."
+        if kafka-topics --bootstrap-server localhost:9092 --create --topic "__consumer_offsets" --partitions 50 --replication-factor 1 --config cleanup.policy=compact --config retention.ms=604800000 >/dev/null 2>&1; then
+            log_success "__consumer_offsets 主题创建成功"
+        else
+            log_warning "__consumer_offsets 主题创建失败"
+        fi
+    else
+        log_info "__consumer_offsets 主题已存在"
+    fi
+    
+    for topic in "${topics[@]}"; do
+        if ! kafka-topics --bootstrap-server localhost:9092 --topic "$topic" --describe >/dev/null 2>&1; then
+            log_info "创建主题: $topic"
+            if kafka-topics --bootstrap-server localhost:9092 --create --topic "$topic" --partitions 1 --replication-factor 1 >/dev/null 2>&1; then
+                log_success "主题创建成功: $topic"
+            else
+                log_warning "主题创建失败: $topic"
+            fi
+        else
+            log_info "主题已存在: $topic"
+        fi
+    done
+}
+
+# 显示诊断报告
+show_diagnostic_report() {
+    echo ""
+    echo "=========================================="
+    echo "           Kafka 诊断报告"
+    echo "=========================================="
+    
+    # 安装状态
+    if check_command "kafka-server-start"; then
+        echo -e "安装状态: ${GREEN}已安装${NC}"
+    else
+        echo -e "安装状态: ${RED}未安装${NC}"
+    fi
+    
+    # 配置状态
+    if [ -f "/usr/local/etc/kafka/server.properties" ]; then
+        echo -e "配置状态: ${GREEN}配置文件存在${NC}"
+    else
+        echo -e "配置状态: ${RED}配置文件不存在${NC}"
+    fi
+    
+    # 端口状态
+    if lsof -Pi :9092 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "端口状态: ${GREEN}9092端口被占用${NC}"
+    else
+        echo -e "端口状态: ${YELLOW}9092端口空闲${NC}"
+    fi
+    
+    # 连接状态
+    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        echo -e "连接状态: ${GREEN}连接正常${NC}"
+    else
+        echo -e "连接状态: ${RED}连接失败${NC}"
+    fi
+    
+    echo ""
+}
+
+# 主函数
+main() {
+    echo -e "${CYAN}"
+    echo "=========================================="
+    echo "        Kafka 调试和诊断工具"
+    echo "    Kafka Debug and Diagnostic Tool"
+    echo "=========================================="
+    echo -e "${NC}"
+    
+    # 检查命令行参数
+    local action="diagnose"
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --fix|-f)
+                action="fix"
+                shift
+                ;;
+            --start|-s)
+                action="start"
+                shift
+                ;;
+            --help|-h)
+                echo "用法: $0 [选项]"
+                echo "选项:"
+                echo "  -f, --fix      修复 Kafka 配置"
+                echo "  -s, --start    启动 Kafka 服务"
+                echo "  -h, --help     显示此帮助信息"
+                echo ""
+                echo "默认行为: 诊断 Kafka 问题"
+                exit 0
+                ;;
+            *)
+                log_error "未知参数: $1"
+                echo "使用 --help 查看帮助信息"
+                exit 1
+                ;;
+        esac
+    done
+    
+    case $action in
+        "diagnose")
+            show_diagnostic_report
+            check_kafka_installation
+            check_kafka_config
+            check_port_status
+            test_kafka_connection
+            ;;
+        "fix")
+            check_kafka_installation || exit 1
+            fix_kafka_config
+            ;;
+        "start")
+            check_kafka_installation || exit 1
+            check_kafka_config || fix_kafka_config
+            start_kafka
+            ;;
+    esac
+    
+    echo ""
+    log_info "诊断完成"
+    log_info "如需修复配置，请运行: $0 --fix"
+    log_info "如需启动服务，请运行: $0 --start"
+}
+
+# 脚本入口
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

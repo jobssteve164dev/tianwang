@@ -193,33 +193,50 @@ check_dependencies() {
 # 检查依赖是否已安装
 check_dependencies_installed() {
     local missing_deps=()
+    local need_install=false
     
     # 检查根目录依赖
     if [ ! -d "node_modules" ]; then
         missing_deps+=("根目录依赖")
+        need_install=true
+    elif [ "package.json" -nt "node_modules" ]; then
+        missing_deps+=("根目录依赖(package.json已更新)")
+        need_install=true
     fi
     
     # 检查服务端依赖
     if [ ! -d "server/node_modules" ]; then
         missing_deps+=("服务端依赖")
+        need_install=true
+    elif [ "server/package.json" -nt "server/node_modules" ]; then
+        missing_deps+=("服务端依赖(package.json已更新)")
+        need_install=true
     fi
     
     # 检查客户端依赖
     if [ ! -d "client/node_modules" ]; then
         missing_deps+=("客户端依赖")
+        need_install=true
+    elif [ "client/package.json" -nt "client/node_modules" ]; then
+        missing_deps+=("客户端依赖(package.json已更新)")
+        need_install=true
     fi
     
     # 检查 AI 引擎依赖
-    if [ ! -d "server/ai-engine/venv" ] && [ ! -f "server/ai-engine/requirements.txt" ]; then
+    if [ -f "server/ai-engine/requirements.txt" ] && [ ! -d "server/ai-engine/venv" ]; then
         missing_deps+=("AI引擎依赖")
+        need_install=true
+    elif [ -d "server/ai-engine/venv" ] && [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv" ]; then
+        missing_deps+=("AI引擎依赖(requirements.txt已更新)")
+        need_install=true
     fi
     
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        log_warning "发现缺失的依赖: ${missing_deps[*]}"
+    if [ "$need_install" = true ]; then
+        log_warning "发现需要安装的依赖: ${missing_deps[*]}"
         return 1
     fi
     
-    log_success "所有依赖已安装"
+    log_success "所有依赖已安装且为最新版本"
     return 0
 }
 
@@ -228,67 +245,318 @@ install_dependencies() {
     log_step "安装依赖..."
     
     # 安装根目录依赖
-    if [ ! -d "node_modules" ]; then
-        log_info "安装根目录依赖..."
+    if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules" ]; then
+        if [ ! -d "node_modules" ]; then
+            log_info "安装根目录依赖..."
+        else
+            log_info "根目录package.json已更新，重新安装依赖..."
+        fi
         npm install
+    else
+        log_info "根目录依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装服务端依赖
-    if [ ! -d "server/node_modules" ]; then
-        log_info "安装服务端依赖..."
+    if [ ! -d "server/node_modules" ] || [ "server/package.json" -nt "server/node_modules" ]; then
+        if [ ! -d "server/node_modules" ]; then
+            log_info "安装服务端依赖..."
+        else
+            log_info "服务端package.json已更新，重新安装依赖..."
+        fi
         cd server
         npm install
         cd ..
+    else
+        log_info "服务端依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装客户端依赖
-    if [ ! -d "client/node_modules" ]; then
-        log_info "安装客户端依赖..."
+    if [ ! -d "client/node_modules" ] || [ "client/package.json" -nt "client/node_modules" ]; then
+        if [ ! -d "client/node_modules" ]; then
+            log_info "安装客户端依赖..."
+        else
+            log_info "客户端package.json已更新，重新安装依赖..."
+        fi
         cd client
         npm install
         cd ..
+    else
+        log_info "客户端依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装 AI 引擎依赖
     if [ -f "server/ai-engine/requirements.txt" ]; then
-        cd server/ai-engine
-        if [ ! -d "venv" ]; then
+        if [ ! -d "server/ai-engine/venv" ]; then
+            cd server/ai-engine
             log_info "创建 AI 引擎虚拟环境..."
             python3 -m venv venv
+            
+            log_info "安装 AI 引擎依赖..."
+            source venv/bin/activate
+            pip install -r requirements.txt
+            deactivate
+            cd ../..
+        elif [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv" ]; then
+            cd server/ai-engine
+            log_info "AI引擎requirements.txt已更新，重新安装依赖..."
+            source venv/bin/activate
+            pip install -r requirements.txt
+            deactivate
+            cd ../..
+        else
+            log_info "AI 引擎依赖已存在且为最新版本，跳过安装"
         fi
-        
-        log_info "安装 AI 引擎依赖..."
-        source venv/bin/activate
-        pip install -r requirements.txt
-        deactivate
-        cd ../..
     fi
     
     log_success "依赖安装完成"
 }
 
+# Kafka 调试和诊断函数
+debug_kafka_connection() {
+    log_step "Kafka 连接诊断..."
+    
+    echo ""
+    echo "=========================================="
+    echo "           Kafka 诊断信息"
+    echo "=========================================="
+    
+    # 检查 Kafka 安装
+    if command -v kafka-server-start &> /dev/null; then
+        echo -e "Kafka 安装: ${GREEN}已安装${NC} ($(which kafka-server-start))"
+        echo -e "Kafka 版本: ${CYAN}$(kafka-server-start --version 2>/dev/null | head -n1 || echo '未知')${NC}"
+    else
+        echo -e "Kafka 安装: ${RED}未安装${NC}"
+        log_error "请先安装 Kafka: brew install kafka"
+        return 1
+    fi
+    
+    # 检查配置文件
+    if [ -f "/usr/local/etc/kafka/server.properties" ]; then
+        echo -e "配置文件: ${GREEN}存在${NC} (/usr/local/etc/kafka/server.properties)"
+        
+        # 检查关键配置
+        local listeners=$(grep -E "^listeners=" /usr/local/etc/kafka/server.properties 2>/dev/null || echo "未配置")
+        local advertised_listeners=$(grep -E "^advertised.listeners=" /usr/local/etc/kafka/server.properties 2>/dev/null || echo "未配置")
+        
+        echo -e "监听器配置: ${CYAN}$listeners${NC}"
+        echo -e "广播监听器: ${CYAN}$advertised_listeners${NC}"
+    else
+        echo -e "配置文件: ${RED}不存在${NC}"
+        log_error "Kafka 配置文件不存在，请检查安装"
+        return 1
+    fi
+    
+    # 检查端口状态
+    if lsof -Pi :9092 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        local kafka_pid=$(lsof -ti:9092)
+        echo -e "端口 9092: ${GREEN}被占用${NC} (PID: $kafka_pid)"
+        
+        # 检查是否是 Kafka 进程
+        if ps -p $kafka_pid -o comm= | grep -q kafka; then
+            echo -e "Kafka 进程: ${GREEN}正在运行${NC}"
+        else
+            echo -e "Kafka 进程: ${YELLOW}端口被其他进程占用${NC}"
+        fi
+    else
+        echo -e "端口 9092: ${YELLOW}空闲${NC}"
+    fi
+    
+    # 测试连接
+    echo ""
+    echo "测试 Kafka 连接..."
+    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        echo -e "Kafka 连接: ${GREEN}成功${NC}"
+        local topics=$(kafka-topics --bootstrap-server localhost:9092 --list 2>/dev/null | wc -l)
+        echo -e "主题数量: ${CYAN}$topics${NC}"
+        return 0
+    else
+        echo -e "Kafka 连接: ${RED}失败${NC}"
+        
+        # 详细错误诊断
+        echo ""
+        echo "详细连接测试..."
+        kafka-topics --bootstrap-server localhost:9092 --list 2>&1 | head -n 5
+        
+        return 1
+    fi
+}
+
+# 修复 Kafka 配置
+fix_kafka_config() {
+    log_step "修复 Kafka 配置..."
+    
+    local config_file="/usr/local/etc/kafka/server.properties"
+    local backup_file="/usr/local/etc/kafka/server.properties.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # 备份原配置
+    if [ -f "$config_file" ]; then
+        cp "$config_file" "$backup_file"
+        log_info "已备份原配置文件到: $backup_file"
+    fi
+    
+    # 创建修复后的配置
+    cat > "$config_file" << 'EOF'
+# Kafka 服务器配置 - 开发环境优化版 (KRaft模式)
+# Generated by TianWang Dev Script
+
+# KRaft模式配置
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@localhost:9093
+
+# 基础配置
+delete.topic.enable=true
+
+# 网络配置
+listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+advertised.listeners=PLAINTEXT://localhost:9092
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+inter.broker.listener.name=PLAINTEXT
+controller.listener.names=CONTROLLER
+
+# 日志配置
+log.dirs=/tmp/kafka-logs
+log.retention.hours=168
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+
+# 主题配置
+num.partitions=1
+default.replication.factor=1
+min.insync.replicas=1
+
+# 性能配置
+num.network.threads=3
+num.io.threads=8
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+
+# 消费者配置
+group.initial.rebalance.delay.ms=0
+
+# 生产者配置
+compression.type=producer
+
+# 安全配置（开发环境禁用）
+authorizer.class.name=
+EOF
+    
+    log_success "Kafka 配置已修复"
+    log_info "配置文件: $config_file"
+}
+
 # 启动 Kafka
 start_kafka() {
-    log_step "启动 Kafka..."
+    log_step "启动 Kafka 服务..."
     
-    # 检查 Kafka 是否已运行
-    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
-        log_success "Kafka 已在运行"
+    # 首先进行诊断
+    if debug_kafka_connection; then
+        log_success "Kafka 已在运行且连接正常"
         return 0
     fi
     
-    # 检查是否有 Kafka 启动脚本
-    if [ -f "scripts/start-kafka.sh" ]; then
-        log_info "使用脚本启动 Kafka..."
-        ./scripts/start-kafka.sh &
-        KAFKA_PID=$!
-        echo $KAFKA_PID > .kafka.pid
-        
-        # 等待 Kafka 启动
-        wait_for_service "localhost" "9092" "Kafka"
-    else
-        log_warning "未找到 Kafka 启动脚本，请手动启动 Kafka"
+    # 检查 Kafka 是否已安装
+    if ! command -v kafka-server-start &> /dev/null; then
+        log_error "Kafka 未安装，请先安装 Kafka"
+        log_info "安装命令: brew install kafka"
+        log_warning "AI 引擎将在离线模式下运行，Kafka 功能将不可用"
+        return 1
     fi
+    
+    # 检查并清理端口
+    if ! check_port 9092; then
+        log_info "尝试清理 Kafka 端口 9092..."
+        if cleanup_port 9092 "Kafka"; then
+            log_success "端口清理成功，继续启动"
+        else
+            log_error "端口清理失败，无法启动 Kafka"
+            log_warning "AI 引擎将在离线模式下运行，Kafka 功能将不可用"
+            return 1
+        fi
+    fi
+    
+    # 检查配置文件
+    if [ ! -f "/usr/local/etc/kafka/server.properties" ]; then
+        log_error "Kafka 配置文件不存在"
+        log_warning "AI 引擎将在离线模式下运行，Kafka 功能将不可用"
+        return 1
+    fi
+    
+    # 尝试修复配置
+    log_info "检查并修复 Kafka 配置..."
+    fix_kafka_config
+    
+    # 创建日志目录
+    mkdir -p /tmp/kafka-logs
+    
+    # 格式化日志目录（KRaft模式需要）
+    log_info "格式化 Kafka 日志目录..."
+    if [ ! -f "/tmp/kafka-logs/meta.properties" ]; then
+        kafka-storage format -t $(kafka-storage random-uuid) -c /usr/local/etc/kafka/server.properties > logs/dev/kafka-format.log 2>&1
+        if [ $? -eq 0 ]; then
+            log_success "日志目录格式化成功"
+        else
+            log_warning "日志目录格式化失败，查看日志: logs/dev/kafka-format.log"
+        fi
+    else
+        log_info "日志目录已格式化"
+    fi
+    
+    # 启动 Kafka
+    log_info "启动 Kafka 服务..."
+    kafka-server-start /usr/local/etc/kafka/server.properties > logs/dev/kafka.log 2>&1 &
+    KAFKA_PID=$!
+    echo $KAFKA_PID > .kafka.pid
+    
+    log_info "Kafka 启动中 (PID: $KAFKA_PID)..."
+    log_info "Kafka 日志: logs/dev/kafka.log"
+    
+    # 等待 Kafka 启动
+    if wait_for_service "localhost" "9092" "Kafka"; then
+        log_success "Kafka 启动成功"
+        
+        # 创建必要的主题
+        log_info "创建必要的 Kafka 主题..."
+        create_kafka_topics
+        
+        # 最终连接测试
+        if debug_kafka_connection; then
+            log_success "Kafka 服务完全就绪"
+            return 0
+        else
+            log_warning "Kafka 启动但连接测试失败"
+            log_warning "AI 引擎将在离线模式下运行，Kafka 功能将不可用"
+            return 1
+        fi
+    else
+        log_error "Kafka 启动失败"
+        log_info "查看详细日志: tail -f logs/dev/kafka.log"
+        log_warning "AI 引擎将在离线模式下运行，Kafka 功能将不可用"
+        return 1
+    fi
+}
+
+# 创建 Kafka 主题
+create_kafka_topics() {
+    local topics=("security-logs-dev" "security-alerts-dev" "protection-actions-dev")
+    
+    # 首先创建 __consumer_offsets 主题（KRaft模式需要）
+    if ! kafka-topics --bootstrap-server localhost:9092 --topic "__consumer_offsets" --describe >/dev/null 2>&1; then
+        log_info "创建 __consumer_offsets 主题..."
+        kafka-topics --bootstrap-server localhost:9092 --create --topic "__consumer_offsets" --partitions 50 --replication-factor 1 --config cleanup.policy=compact --config retention.ms=604800000 >/dev/null 2>&1
+    else
+        log_info "__consumer_offsets 主题已存在"
+    fi
+    
+    for topic in "${topics[@]}"; do
+        if ! kafka-topics --bootstrap-server localhost:9092 --topic "$topic" --describe >/dev/null 2>&1; then
+            log_info "创建主题: $topic"
+            kafka-topics --bootstrap-server localhost:9092 --create --topic "$topic" --partitions 1 --replication-factor 1 >/dev/null 2>&1
+        else
+            log_info "主题已存在: $topic"
+        fi
+    done
 }
 
 # 启动增强版日志收集器
@@ -480,6 +748,29 @@ main() {
     echo "=========================================="
     echo -e "${NC}"
     
+    # 检查命令行参数
+    local force_install=false
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force-install|-f)
+                force_install=true
+                shift
+                ;;
+            --help|-h)
+                echo "用法: $0 [选项]"
+                echo "选项:"
+                echo "  -f, --force-install    强制重新安装所有依赖"
+                echo "  -h, --help             显示此帮助信息"
+                exit 0
+                ;;
+            *)
+                log_error "未知参数: $1"
+                echo "使用 --help 查看帮助信息"
+                exit 1
+                ;;
+        esac
+    done
+    
     # 设置信号处理
     trap cleanup EXIT INT TERM
     
@@ -488,7 +779,18 @@ main() {
     check_env_file
     check_dependencies
     cleanup_all_ports
-    install_dependencies
+    
+    # 智能依赖检查和安装
+    if [ "$force_install" = true ]; then
+        log_step "强制重新安装所有依赖..."
+        install_dependencies
+    elif ! check_dependencies_installed; then
+        log_step "检测到缺失依赖，开始安装..."
+        install_dependencies
+    else
+        log_step "所有依赖已就绪，跳过安装步骤"
+    fi
+    
     start_kafka
     start_enhanced_logger
     show_status
@@ -497,6 +799,7 @@ main() {
     log_info "按 Ctrl+C 停止所有服务"
     log_info "查看实时日志: node scripts/dev-log-tail.js watch"
     log_info "浏览器日志已自动收集到统一日志文件"
+    log_info "如需强制重新安装依赖，请使用: $0 --force-install"
     
     # 等待用户中断
     wait

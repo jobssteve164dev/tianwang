@@ -30,9 +30,9 @@ class AIEngineConfig(BaseSettings):
     kafka_brokers: str = "localhost:9092"
     kafka_group_id: str = "ai-engine-consumer"
     kafka_topics: Dict[str, str] = {
-        "logs": "security-logs",
-        "alerts": "security-alerts",
-        "actions": "protection-actions"
+        "logs": "security-logs-dev",
+        "alerts": "security-alerts-dev",
+        "actions": "protection-actions-dev"
     }
     
     # AI模型配置 - 重命名以避免与Pydantic受保护命名空间冲突

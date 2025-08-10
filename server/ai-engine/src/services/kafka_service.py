@@ -31,7 +31,31 @@ class KafkaService:
         try:
             logger.info("正在启动Kafka服务...")
             
+            # 详细的连接诊断
+            logger.info(f"Kafka配置信息:")
+            logger.info(f"  - Brokers: {config.kafka_brokers}")
+            logger.info(f"  - Group ID: {config.kafka_group_id}")
+            logger.info(f"  - Topics: {config.kafka_topics}")
+            
+            # 测试网络连接
+            import socket
+            try:
+                for broker in config.kafka_brokers.split(','):
+                    host, port = broker.strip().split(':')
+                    logger.info(f"测试连接到 {host}:{port}...")
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(5)
+                    result = sock.connect_ex((host, int(port)))
+                    sock.close()
+                    if result == 0:
+                        logger.info(f"✅ 网络连接到 {host}:{port} 成功")
+                    else:
+                        logger.warning(f"❌ 网络连接到 {host}:{port} 失败 (错误码: {result})")
+            except Exception as net_error:
+                logger.warning(f"网络连接测试失败: {net_error}")
+            
             # 初始化消费者
+            logger.info("初始化Kafka消费者...")
             self.consumer = AIOKafkaConsumer(
                 config.kafka_topics["logs"],
                 config.kafka_topics["alerts"],
@@ -39,33 +63,81 @@ class KafkaService:
                 group_id=config.kafka_group_id,
                 value_deserializer=lambda m: json.loads(m.decode('utf-8')),
                 enable_auto_commit=True,
-                auto_offset_reset='latest'
+                auto_offset_reset='latest',
+                session_timeout_ms=60000,  # 增加会话超时时间
+                heartbeat_interval_ms=10000,  # 增加心跳间隔
+                request_timeout_ms=60000,  # 增加请求超时时间
+                max_poll_interval_ms=300000,  # 增加轮询间隔
+                rebalance_timeout_ms=60000  # 增加重平衡超时
             )
             
             # 初始化生产者
+            logger.info("初始化Kafka生产者...")
             self.producer = AIOKafkaProducer(
                 bootstrap_servers=config.kafka_brokers,
-                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                acks='all',
+                request_timeout_ms=30000
             )
             
             # 启动连接
-            await self.consumer.start()
-            await self.producer.start()
+            logger.info("启动Kafka消费者连接...")
+            try:
+                await self.consumer.start()
+                logger.info("✅ Kafka消费者连接成功")
+            except Exception as consumer_error:
+                logger.error(f"❌ Kafka消费者连接失败: {consumer_error}")
+                raise
+            
+            logger.info("启动Kafka生产者连接...")
+            try:
+                await self.producer.start()
+                logger.info("✅ Kafka生产者连接成功")
+            except Exception as producer_error:
+                logger.error(f"❌ Kafka生产者连接失败: {producer_error}")
+                # 如果生产者失败，也要停止消费者
+                await self.consumer.stop()
+                raise
             
             self.is_running = True
             
             # 启动消息处理循环
             asyncio.create_task(self._message_processing_loop())
             
-            logger.info("Kafka服务启动成功")
+            logger.info("🎉 Kafka服务启动成功")
             
         except Exception as e:
-            logger.warning(f"Kafka服务启动失败，将使用离线模式: {e}")
+            logger.error(f"❌ Kafka服务启动失败: {e}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.error(f"错误详情: {str(e)}")
+            
+            # 提供具体的错误诊断
+            if "Connect call failed" in str(e):
+                logger.error("🔍 诊断: 网络连接失败")
+                logger.error("   可能原因:")
+                logger.error("   1. Kafka服务未启动")
+                logger.error("   2. 端口9092被占用或防火墙阻止")
+                logger.error("   3. Kafka配置错误")
+                logger.error("   建议: 运行 ./dev.sh 启动Kafka服务")
+            elif "Authentication failed" in str(e):
+                logger.error("🔍 诊断: 认证失败")
+                logger.error("   可能原因: Kafka配置了认证但未提供凭据")
+            elif "Topic not found" in str(e):
+                logger.error("🔍 诊断: 主题不存在")
+                logger.error("   可能原因: 必要的Kafka主题未创建")
+            else:
+                logger.error("🔍 诊断: 未知错误，请检查Kafka服务状态")
+            
             # 不抛出异常，而是设置为离线模式
             self.is_running = False
             self.consumer = None
             self.producer = None
-            logger.info("AI引擎将在离线模式下运行，Kafka功能将不可用")
+            logger.info("📝 AI引擎将在离线模式下运行，Kafka功能将不可用")
+            logger.info("📝 离线模式下的限制:")
+            logger.info("   - 无法接收实时安全日志")
+            logger.info("   - 无法发送分析结果")
+            logger.info("   - 无法发送威胁告警")
+            logger.info("   - 无法发送防护动作")
     
     async def stop(self):
         """停止Kafka服务"""
