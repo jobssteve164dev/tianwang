@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * 天网安全监控系统 - 开发环境日志收集器
- * TianWang Security System - Development Environment Log Collector
+ * 天网安全监控系统 - 增强版开发环境日志收集器
+ * TianWang Security System - Enhanced Development Environment Log Collector
  * 
  * 功能：
  * - 流式收集客户端、AI引擎、服务端的所有console日志
+ * - 通过WebSocket收集浏览器控制台日志
  * - 限制最大100000行，超出自动覆盖
  * - 随系统启动和关闭
  * - 每次启动时清理并生成新文件
@@ -15,8 +16,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
+const WebSocket = require('ws');
 
-class DevLogger {
+class EnhancedDevLogger {
     constructor() {
         this.logDir = path.join(__dirname, '..', 'logs', 'dev');
         this.logFile = path.join(this.logDir, 'dev-console.log');
@@ -25,6 +27,8 @@ class DevLogger {
         this.writeStream = null;
         this.processes = new Map();
         this.isShuttingDown = false;
+        this.wsServer = null;
+        this.browserClients = new Set();
         
         // 确保日志目录存在
         this.ensureLogDirectory();
@@ -34,6 +38,9 @@ class DevLogger {
         
         // 设置进程退出处理
         this.setupProcessHandlers();
+        
+        // 启动WebSocket服务器收集浏览器日志
+        this.startWebSocketServer();
     }
     
     /**
@@ -62,9 +69,10 @@ class DevLogger {
         
         // 写入启动标记
         const startTime = new Date().toISOString();
-        this.writeLog('SYSTEM', `=== 开发环境日志收集器启动 ${startTime} ===`);
+        this.writeLog('SYSTEM', `=== 增强版开发环境日志收集器启动 ${startTime} ===`);
         this.writeLog('SYSTEM', `日志文件: ${this.logFile}`);
         this.writeLog('SYSTEM', `最大行数限制: ${this.maxLines.toLocaleString()}`);
+        this.writeLog('SYSTEM', `WebSocket服务器: ws://localhost:8889`);
         this.writeLog('SYSTEM', '');
     }
     
@@ -76,11 +84,16 @@ class DevLogger {
             if (this.isShuttingDown) return;
             this.isShuttingDown = true;
             
-            console.log('\n正在关闭日志收集器...');
-            this.writeLog('SYSTEM', '=== 开发环境日志收集器关闭 ===');
+            console.log('\n正在关闭增强版日志收集器...');
+            this.writeLog('SYSTEM', '=== 增强版开发环境日志收集器关闭 ===');
             
             // 停止所有监控的进程
             this.stopAllProcesses();
+            
+            // 关闭WebSocket服务器
+            if (this.wsServer) {
+                this.wsServer.close();
+            }
             
             // 关闭写入流
             if (this.writeStream) {
@@ -93,6 +106,50 @@ class DevLogger {
         process.on('SIGINT', cleanup);
         process.on('SIGTERM', cleanup);
         process.on('exit', cleanup);
+    }
+    
+    /**
+     * 启动WebSocket服务器收集浏览器日志
+     */
+    startWebSocketServer() {
+        const port = 8889;
+        
+        this.wsServer = new WebSocket.Server({ port });
+        
+        this.wsServer.on('connection', (ws, req) => {
+            const clientId = req.headers['x-client-id'] || 'unknown';
+            this.browserClients.add(ws);
+            
+            this.writeLog('SYSTEM', `浏览器客户端连接: ${clientId}`);
+            
+            ws.on('message', (message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    this.writeLog('BROWSER', `${data.level || 'INFO'}: ${data.message}`);
+                    
+                    if (data.stack) {
+                        this.writeLog('BROWSER-STACK', data.stack);
+                    }
+                } catch (error) {
+                    this.writeLog('BROWSER-RAW', message.toString());
+                }
+            });
+            
+            ws.on('close', () => {
+                this.browserClients.delete(ws);
+                this.writeLog('SYSTEM', `浏览器客户端断开连接: ${clientId}`);
+            });
+            
+            ws.on('error', (error) => {
+                this.writeLog('SYSTEM-ERROR', `WebSocket错误: ${error.message}`);
+            });
+        });
+        
+        this.wsServer.on('error', (error) => {
+            this.writeLog('SYSTEM-ERROR', `WebSocket服务器错误: ${error.message}`);
+        });
+        
+        this.writeLog('SYSTEM', `WebSocket服务器已启动 (端口: ${port})`);
     }
     
     /**
@@ -284,7 +341,7 @@ class DevLogger {
      * 启动所有日志收集
      */
     startAllLoggers() {
-        console.log('启动开发环境日志收集器...');
+        console.log('启动增强版开发环境日志收集器...');
         
         // 启动各个服务的日志收集
         this.startAIEngineLogger();
@@ -293,6 +350,7 @@ class DevLogger {
         
         console.log('所有日志收集器已启动');
         console.log(`日志文件: ${this.logFile}`);
+        console.log('WebSocket服务器: ws://localhost:8889');
         console.log('按 Ctrl+C 停止所有服务');
     }
     
@@ -325,14 +383,15 @@ class DevLogger {
             currentLines: this.currentLines,
             maxLines: this.maxLines,
             logFile: this.logFile,
-            activeProcesses: this.processes.size
+            activeProcesses: this.processes.size,
+            browserClients: this.browserClients.size
         };
     }
 }
 
 // 主函数
 function main() {
-    const logger = new DevLogger();
+    const logger = new EnhancedDevLogger();
     
     // 启动所有日志收集
     logger.startAllLoggers();
@@ -340,7 +399,7 @@ function main() {
     // 定期输出统计信息
     setInterval(() => {
         const stats = logger.getLogStats();
-        console.log(`\r日志统计: ${stats.currentLines.toLocaleString()}/${stats.maxLines.toLocaleString()} 行 | 活跃进程: ${stats.activeProcesses} | 文件: ${path.basename(stats.logFile)}`, '');
+        console.log(`\r日志统计: ${stats.currentLines.toLocaleString()}/${stats.maxLines.toLocaleString()} 行 | 活跃进程: ${stats.activeProcesses} | 浏览器客户端: ${stats.browserClients} | 文件: ${path.basename(stats.logFile)}`, '');
     }, 30000); // 每30秒更新一次
 }
 
@@ -349,4 +408,4 @@ if (require.main === module) {
     main();
 }
 
-module.exports = DevLogger;
+module.exports = EnhancedDevLogger;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 天网安全监控系统 - 本地开发环境启动脚本
-# TianWang Security System - Local Development Environment Startup Script
+# 天网安全监控系统 - 本地开发环境启动脚本（集成日志收集器）
+# TianWang Security System - Local Development Environment Startup Script (with Logger)
 
 set -e
 
@@ -136,6 +136,7 @@ create_directories() {
     mkdir -p server/ssl
     mkdir -p server/models
     mkdir -p client/build
+    mkdir -p logs/dev
     
     log_success "目录创建完成"
 }
@@ -209,32 +210,22 @@ check_dependencies_installed() {
     fi
     
     # 检查 AI 引擎依赖
-    if [ -f "server/ai-engine/requirements.txt" ]; then
-        # 检查关键Python包是否已安装
-        if ! python3 -c "import fastapi, uvicorn, pydantic_settings" 2>/dev/null; then
-            missing_deps+=("AI引擎依赖")
-        fi
+    if [ ! -d "server/ai-engine/venv" ] && [ ! -f "server/ai-engine/requirements.txt" ]; then
+        missing_deps+=("AI引擎依赖")
     fi
     
-    if [ ${#missing_deps[@]} -eq 0 ]; then
-        log_success "所有依赖已安装"
-        return 0
-    else
-        log_warning "发现缺失依赖: ${missing_deps[*]}"
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        log_warning "发现缺失的依赖: ${missing_deps[*]}"
         return 1
     fi
+    
+    log_success "所有依赖已安装"
+    return 0
 }
 
 # 安装依赖
 install_dependencies() {
-    log_step "检查项目依赖..."
-    
-    if check_dependencies_installed; then
-        log_success "依赖检查完成，无需安装"
-        return
-    fi
-    
-    log_step "安装缺失的依赖..."
+    log_step "安装依赖..."
     
     # 安装根目录依赖
     if [ ! -d "node_modules" ]; then
@@ -245,183 +236,78 @@ install_dependencies() {
     # 安装服务端依赖
     if [ ! -d "server/node_modules" ]; then
         log_info "安装服务端依赖..."
-        cd server && npm install && cd ..
+        cd server
+        npm install
+        cd ..
     fi
     
     # 安装客户端依赖
     if [ ! -d "client/node_modules" ]; then
         log_info "安装客户端依赖..."
-        cd client && npm install && cd ..
+        cd client
+        npm install
+        cd ..
     fi
     
     # 安装 AI 引擎依赖
     if [ -f "server/ai-engine/requirements.txt" ]; then
-        if ! python3 -c "import fastapi, uvicorn, pydantic_settings" 2>/dev/null; then
-            log_info "安装 AI 引擎依赖..."
-            cd server/ai-engine && pip3 install -r requirements.txt && cd ../..
+        cd server/ai-engine
+        if [ ! -d "venv" ]; then
+            log_info "创建 AI 引擎虚拟环境..."
+            python3 -m venv venv
         fi
+        
+        log_info "安装 AI 引擎依赖..."
+        source venv/bin/activate
+        pip install -r requirements.txt
+        deactivate
+        cd ../..
     fi
     
     log_success "依赖安装完成"
 }
 
-# 启动 Kafka 服务
+# 启动 Kafka
 start_kafka() {
-    log_step "启动 Kafka 服务..."
+    log_step "启动 Kafka..."
     
-    # 确保在项目根目录
-    cd /Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang
-    
-    # 检查 Kafka 是否已安装
-    if ! command -v kafka-server-start &> /dev/null; then
-        log_error "Kafka 未安装，请先安装 Kafka"
-        log_info "安装命令: brew install kafka"
-        return 1
+    # 检查 Kafka 是否已运行
+    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        log_success "Kafka 已在运行"
+        return 0
     fi
     
-    # 检查并清理端口 9092
-    if ! check_port 9092; then
-        log_info "尝试清理 Kafka 端口 9092..."
-        if cleanup_port 9092 "Kafka"; then
-            log_success "端口清理成功，继续启动"
-        else
-            log_error "端口清理失败，无法启动 Kafka"
-            return 1
-        fi
-    fi
-    
-    # 检查并清理端口 9093 (KRaft controller)
-    if ! check_port 9093; then
-        log_info "尝试清理 Kafka Controller 端口 9093..."
-        if cleanup_port 9093 "Kafka Controller"; then
-            log_success "端口清理成功，继续启动"
-        else
-            log_error "端口清理失败，无法启动 Kafka"
-            return 1
-        fi
-    fi
-    
-    # 启动 Kafka (KRaft 模式，不需要 Zookeeper)
-    log_info "启动 Kafka 服务 (KRaft 模式)..."
-    kafka-server-start /usr/local/etc/kafka/server.properties &
-    KAFKA_PID=$!
-    echo $KAFKA_PID > .kafka.pid
-    
-    # 等待 Kafka 启动
-    wait_for_service "localhost" "9092" "Kafka"
-}
-
-# 启动 AI 引擎
-start_ai_engine() {
-    log_step "启动 AI 引擎..."
-    
-    # 确保在项目根目录
-    cd /Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang
-    
-    if [ -f "server/ai-engine/src/main.py" ]; then
-        cd server/ai-engine
+    # 检查是否有 Kafka 启动脚本
+    if [ -f "scripts/start-kafka.sh" ]; then
+        log_info "使用脚本启动 Kafka..."
+        ./scripts/start-kafka.sh &
+        KAFKA_PID=$!
+        echo $KAFKA_PID > .kafka.pid
         
-        # 检查并清理端口 8888
-        if ! check_port 8888; then
-            log_info "尝试清理 AI 引擎端口 8888..."
-            if cleanup_port 8888 "AI 引擎"; then
-                log_success "端口清理成功，继续启动"
-            else
-                log_error "端口清理失败，跳过 AI 引擎启动"
-                cd ../..
-                return
-            fi
-        fi
-        
-        log_info "启动 AI 引擎服务..."
-        # 设置AI引擎环境变量
-        export AI_PORT=8888
-        export AI_HOST=0.0.0.0
-        export AI_DEBUG=true
-        
-        # 使用模块方式启动，避免相对导入问题
-        python3 -m src.main &
-        AI_ENGINE_PID=$!
-        echo $AI_ENGINE_PID > .ai_engine.pid
-        
-        # 等待 AI 引擎启动
-        wait_for_service "localhost" "8888" "AI 引擎"
-        
-        cd ../..
+        # 等待 Kafka 启动
+        wait_for_service "localhost" "9092" "Kafka"
     else
-        log_warning "AI 引擎文件不存在，跳过启动"
-
+        log_warning "未找到 Kafka 启动脚本，请手动启动 Kafka"
     fi
 }
 
-# 启动服务端
-start_server() {
-    log_step "启动服务端..."
+# 启动日志收集器
+start_logger() {
+    log_step "启动开发环境日志收集器..."
     
-    # 确保在项目根目录
-    cd /Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang
-    cd server
-    
-    # 检查并清理端口 5555
-    if ! check_port 5555; then
-        log_info "尝试清理服务端端口 5555..."
-        if cleanup_port 5555 "服务端"; then
-            log_success "端口清理成功，继续启动"
-        else
-            log_error "端口清理失败，无法启动服务端"
-            exit 1
-        fi
+    # 检查日志收集器脚本是否存在
+    if [ ! -f "scripts/dev-logger.js" ]; then
+        log_error "日志收集器脚本不存在: scripts/dev-logger.js"
+        exit 1
     fi
     
-    log_info "启动服务端服务..."
+    # 启动日志收集器
+    node scripts/dev-logger.js &
+    LOGGER_PID=$!
+    echo $LOGGER_PID > .logger.pid
     
-    # 设置环境变量
-    export $(cat ../../dev.local | xargs)
-    
-    # 启动服务
-    npm run dev &
-    SERVER_PID=$!
-    echo $SERVER_PID > .server.pid
-    
-    # 等待服务端启动
-    wait_for_service "localhost" "5555" "服务端"
-    
-    cd ..
-}
-
-# 启动客户端
-start_client() {
-    log_step "启动客户端..."
-    
-    # 确保在项目根目录
-    cd /Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang
-    cd client
-    
-    # 检查并清理端口 3333
-    if ! check_port 3333; then
-        log_info "尝试清理客户端端口 3333..."
-        if cleanup_port 3333 "客户端"; then
-            log_success "端口清理成功，继续启动"
-        else
-            log_error "端口清理失败，无法启动客户端"
-            exit 1
-        fi
-    fi
-    
-    log_info "启动客户端服务..."
-    
-    # 设置环境变量
-    export $(cat ../../dev.local | grep REACT_APP_ | xargs)
-    
-    # 启动服务
-    PORT=3333 npm start &
-    CLIENT_PID=$!
-    echo $CLIENT_PID > .client.pid
-    
-    # 等待客户端启动
-    wait_for_service "localhost" "3333" "客户端"
-    
-    cd ..
+    log_success "日志收集器已启动 (PID: $LOGGER_PID)"
+    log_info "日志文件: logs/dev/dev-console.log"
 }
 
 # 显示服务状态
@@ -432,6 +318,18 @@ show_status() {
     echo "=========================================="
     echo "           服务启动状态"
     echo "=========================================="
+    
+    # 检查日志收集器
+    if [ -f ".logger.pid" ]; then
+        LOGGER_PID=$(cat .logger.pid)
+        if ps -p $LOGGER_PID > /dev/null; then
+            echo -e "日志收集器: ${GREEN}运行中${NC} (PID: $LOGGER_PID)"
+        else
+            echo -e "日志收集器: ${RED}已停止${NC}"
+        fi
+    else
+        echo -e "日志收集器: ${YELLOW}未启动${NC}"
+    fi
     
     # 检查 AI 引擎
     if [ -f "server/ai-engine/.ai_engine.pid" ]; then
@@ -478,11 +376,27 @@ show_status() {
     echo -e "API 文档:   ${CYAN}http://localhost:5555/api-docs${NC}"
     echo -e "AI 引擎:    ${CYAN}http://localhost:8888${NC}"
     echo ""
+    echo "=========================================="
+    echo "           日志信息"
+    echo "=========================================="
+    echo -e "日志文件:   ${CYAN}logs/dev/dev-console.log${NC}"
+    echo -e "实时查看:   ${CYAN}tail -f logs/dev/dev-console.log${NC}"
+    echo ""
 }
 
 # 清理函数
 cleanup() {
     log_info "正在停止所有服务..."
+    
+    # 停止日志收集器
+    if [ -f ".logger.pid" ]; then
+        LOGGER_PID=$(cat .logger.pid)
+        if ps -p $LOGGER_PID > /dev/null; then
+            kill $LOGGER_PID
+            log_info "日志收集器已停止"
+        fi
+        rm -f .logger.pid
+    fi
     
     # 停止 AI 引擎
     if [ -f "server/ai-engine/.ai_engine.pid" ]; then
@@ -524,8 +438,6 @@ cleanup() {
         rm -f .kafka.pid
     fi
     
-
-    
     log_success "所有服务已停止"
 }
 
@@ -555,6 +467,7 @@ main() {
     echo "=========================================="
     echo "    天网安全监控系统 - 开发环境启动"
     echo "    TianWang Security System - Dev Start"
+    echo "    集成日志收集器版本"
     echo "=========================================="
     echo -e "${NC}"
     
@@ -568,13 +481,12 @@ main() {
     cleanup_all_ports
     install_dependencies
     start_kafka
-    start_ai_engine
-    start_server
-    start_client
+    start_logger
     show_status
     
     log_success "开发环境启动完成！"
     log_info "按 Ctrl+C 停止所有服务"
+    log_info "查看实时日志: tail -f logs/dev/dev-console.log"
     
     # 等待用户中断
     wait
