@@ -25,8 +25,6 @@ import {
   WindowsOutlined,
   AppleOutlined,
   WifiOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
   DeleteOutlined
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -42,7 +40,7 @@ const DevicesPage: React.FC = () => {
   const { devices, loading, error, selectedDevice, filters } = useAppSelector((state) => state.device as any);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const { isMobile, isTablet, isDesktop } = useResponsive();
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     dispatch(fetchDevices({}) as any);
@@ -72,7 +70,7 @@ const DevicesPage: React.FC = () => {
     setDetailModalVisible(true);
   };
 
-  const handleDelete = (deviceId: string) => {
+  const handleDelete = () => {
     // 实现删除逻辑
     message.success('设备删除成功');
   };
@@ -174,7 +172,7 @@ const DevicesPage: React.FC = () => {
           <Tooltip title="删除设备">
             <Popconfirm
               title="确定要删除这个设备吗？"
-              onConfirm={() => handleDelete(record.id)}
+              onConfirm={handleDelete}
               okText="确定"
               cancelText="取消"
             >

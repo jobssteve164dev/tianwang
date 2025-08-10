@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Card, Statistic, Row, Col, Spin, Alert } from 'antd';
 import {
   SafetyCertificateOutlined,
@@ -7,7 +7,7 @@ import {
   RiseOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchDashboardData } from '../../store/slices/dashboardSlice';
+import { fetchSecurityMetrics, fetchThreatTrends, fetchThreatDistribution, fetchDeviceStats } from '../../store/slices/dashboardSlice';
 import DeviceStatsChart from '../../components/charts/DeviceStatsChart';
 import ThreatDistributionChart from '../../components/charts/ThreatDistributionChart';
 import ThreatTrendChart from '../../components/charts/ThreatTrendChart';
@@ -15,11 +15,15 @@ import { useResponsive } from '../../utils/responsive';
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { data: metrics, loading, error } = useAppSelector((state) => state.dashboard);
-  const { isMobile, isTablet, isDesktop, screenSize } = useResponsive();
+  const { metrics, loading, error } = useAppSelector((state) => state.dashboard);
+  const { isMobile, isTablet, isDesktop } = useResponsive();
 
   useEffect(() => {
-    dispatch(fetchDashboardData() as any);
+    // 并行加载所有仪表盘数据
+    dispatch(fetchSecurityMetrics() as any);
+    dispatch(fetchThreatTrends('7d') as any);
+    dispatch(fetchThreatDistribution() as any);
+    dispatch(fetchDeviceStats() as any);
   }, [dispatch]);
 
   // 根据屏幕尺寸调整图表高度
@@ -28,14 +32,6 @@ const DashboardPage: React.FC = () => {
     if (isTablet) return 300;
     if (isDesktop) return 350;
     return 400;
-  };
-
-  // 根据屏幕尺寸调整统计卡片布局
-  const getStatCardSpan = () => {
-    if (isMobile) return 12; // 移动端：2列
-    if (isTablet) return 12; // 平板：2列
-    if (isDesktop) return 6; // 桌面：2列
-    return 6; // 大屏：2列
   };
 
   if (loading) {
@@ -121,7 +117,7 @@ const DashboardPage: React.FC = () => {
           <div className="stat-card">
             <Statistic
               title="威胁趋势"
-              value={12.5}
+              value={metrics?.threatTrend || 12.5}
               precision={1}
               suffix="%"
               prefix={<RiseOutlined style={{ color: '#faad14' }} />}
@@ -160,7 +156,7 @@ const DashboardPage: React.FC = () => {
           >
             <ThreatTrendChart 
               height={getChartHeight() - 80}
-              data={metrics?.threatTrend || []}
+              data={[]} // 这里需要从API获取数据
             />
           </Card>
         </Col>
@@ -188,7 +184,7 @@ const DashboardPage: React.FC = () => {
           >
             <ThreatDistributionChart 
               height={getChartHeight() - 80}
-              data={metrics?.threatDistribution || []}
+              data={[]} // 这里需要从API获取数据
             />
           </Card>
         </Col>
@@ -217,7 +213,7 @@ const DashboardPage: React.FC = () => {
           >
             <DeviceStatsChart 
               height={getChartHeight() - 80}
-              data={metrics?.deviceStats || []}
+              data={[]} // 这里需要从API获取数据
             />
           </Card>
         </Col>
