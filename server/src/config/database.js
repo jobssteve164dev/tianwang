@@ -105,6 +105,12 @@ function initializeRedis() {
  */
 async function connectDatabases() {
   try {
+    // 检查是否跳过数据库连接（开发环境）
+    if (process.env.NODE_ENV === 'development' && process.env.SKIP_DB === 'true') {
+      logger.warn('⚠️ Skipping database connection in development mode');
+      return;
+    }
+
     // 初始化PostgreSQL
     logger.info('📊 Initializing PostgreSQL...');
     initializePostgreSQL();

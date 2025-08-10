@@ -144,7 +144,11 @@ const dashboardSlice = createSlice({
       })
       .addCase(fetchSecurityMetrics.fulfilled, (state, action) => {
         state.loading = false;
-        state.metrics = action.payload;
+        if (action.payload.success && action.payload.data) {
+          state.metrics = action.payload.data;
+        } else {
+          state.metrics = action.payload;
+        }
         state.lastUpdated = new Date().toISOString();
       })
       .addCase(fetchSecurityMetrics.rejected, (state, action) => {

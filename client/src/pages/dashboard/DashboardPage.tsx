@@ -146,7 +146,7 @@ const DashboardPage: React.FC = () => {
   }
 
   // 最近告警数据（取前5条）
-  const recentAlerts = alerts?.slice(0, 5) || [];
+  const recentAlerts = Array.isArray(alerts) ? alerts.slice(0, 5) : [];
 
   return (
     <div className="fade-in-up">

@@ -185,13 +185,25 @@ const alertSlice = createSlice({
       })
       .addCase(fetchAlerts.fulfilled, (state, action) => {
         state.loading = false;
-        if (action.payload.data) {
-          state.alerts = action.payload.data;
-          state.pagination.total = action.payload.total || action.payload.data.length;
+        if (action.payload.success && action.payload.data) {
+          // 处理新的API响应格式
+          state.alerts = action.payload.data.alerts || [];
+          if (action.payload.data.pagination) {
+            state.pagination = {
+              ...state.pagination,
+              current: action.payload.data.pagination.page || 1,
+              pageSize: action.payload.data.pagination.pageSize || 20,
+              total: action.payload.data.pagination.total || 0
+            };
+          }
+        } else if (Array.isArray(action.payload)) {
+          // 兼容旧的数组格式
+          state.alerts = action.payload;
+          state.pagination.total = action.payload.length;
         } else {
-          // 如果返回的是数组格式
-          state.alerts = Array.isArray(action.payload) ? action.payload : [];
-          state.pagination.total = state.alerts.length;
+          // 默认情况
+          state.alerts = [];
+          state.pagination.total = 0;
         }
       })
       .addCase(fetchAlerts.rejected, (state, action) => {

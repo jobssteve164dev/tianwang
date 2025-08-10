@@ -69,6 +69,9 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// 设置trust proxy以支持X-Forwarded-For header
+app.set('trust proxy', 1);
+
 // API限流
 const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
@@ -77,7 +80,9 @@ const limiter = rateLimit({
   message: {
     error: 'Too many requests, please try again later.',
     retryAfter: Math.ceil(config.rateLimit.windowMs / 1000)
-  }
+  },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 app.use('/api', limiter);

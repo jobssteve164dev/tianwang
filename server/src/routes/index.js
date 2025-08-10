@@ -13,6 +13,8 @@ const deviceRoutes = require('./devices');
 const agentRoutes = require('./agents');
 const securityRoutes = require('./security');
 const systemRoutes = require('./system');
+const dashboardRoutes = require('./dashboard');
+const alertRoutes = require('./alerts');
 const { router: notificationRoutes, setServices: setNotificationServices } = require('./notifications');
 const { router: reportRoutes, setServices: setReportServices } = require('./reports');
 
@@ -29,6 +31,8 @@ router.get('/', (req, res) => {
       agents: '/api/agents',
       security: '/api/security',
       system: '/api/system',
+      dashboard: '/api/dashboard',
+      alerts: '/api/alerts',
       notifications: '/api/notifications',
       reports: '/api/reports'
     },
@@ -44,6 +48,8 @@ router.use('/devices', deviceRoutes);
 router.use('/agents', agentRoutes);
 router.use('/security', securityRoutes);
 router.use('/system', systemRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/alerts', alertRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
 
