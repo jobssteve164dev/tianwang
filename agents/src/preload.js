@@ -49,6 +49,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettings: () => ipcRenderer.invoke('get-settings'),
     saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
     
+    // 服务器配置管理
+    getServerConfig: () => ipcRenderer.invoke('get-server-config'),
+    updateServerConfig: (config) => ipcRenderer.invoke('update-server-config', config),
+    testServerConnection: () => ipcRenderer.invoke('test-server-connection'),
+    
+    // 设置窗口管理
+    openSettingsWindow: () => ipcRenderer.invoke('open-settings-window'),
+    
     // 注册码管理
     setRegistrationCode: (code) => ipcRenderer.invoke('set-registration-code', code),
     getRegistrationCode: () => ipcRenderer.invoke('get-registration-code'),

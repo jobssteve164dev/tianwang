@@ -149,11 +149,7 @@ function createSettingsWindow() {
     if (isDev) {
         settingsWindow.loadURL('http://localhost:3000/settings');
     } else {
-        settingsWindow.loadFile(path.join(__dirname, '../build/index.html'));
-        // 发送消息到渲染进程，显示设置界面
-        settingsWindow.webContents.on('did-finish-load', () => {
-            settingsWindow.webContents.send('show-settings');
-        });
+        settingsWindow.loadFile(path.join(__dirname, '../build/settings.html'));
     }
 
     settingsWindow.on('closed', () => {
@@ -597,6 +593,62 @@ ipcMain.handle('save-settings', async (event, settings) => {
         return { success: true };
     } catch (error) {
         logger.error('保存设置失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// 服务器配置相关IPC处理
+ipcMain.handle('get-server-config', async () => {
+    try {
+        if (agentService) {
+            return agentService.getServerConfig();
+        }
+        return {
+            serverUrl: store.get('serverUrl', 'ws://localhost:5555'),
+            apiUrl: store.get('apiUrl', 'http://localhost:5555/api'),
+            reconnectInterval: store.get('reconnectInterval', 5000),
+            maxReconnectAttempts: store.get('maxReconnectAttempts', 10),
+            heartbeatInterval: store.get('heartbeatInterval', 30000)
+        };
+    } catch (error) {
+        logger.error('获取服务器配置失败:', error);
+        return null;
+    }
+});
+
+ipcMain.handle('update-server-config', async (event, serverConfig) => {
+    try {
+        if (agentService) {
+            const result = agentService.updateServerConfig(serverConfig);
+            return { success: true, message: '服务器配置已更新' };
+        }
+        return { success: false, error: '代理服务未初始化' };
+    } catch (error) {
+        logger.error('更新服务器配置失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('test-server-connection', async () => {
+    try {
+        if (agentService) {
+            const result = await agentService.testServerConnection();
+            return result;
+        }
+        return { success: false, error: '代理服务未初始化' };
+    } catch (error) {
+        logger.error('测试服务器连接失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// 打开设置窗口
+ipcMain.handle('open-settings-window', async () => {
+    try {
+        createSettingsWindow();
+        return { success: true };
+    } catch (error) {
+        logger.error('打开设置窗口失败:', error);
         return { success: false, error: error.message };
     }
 });

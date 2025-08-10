@@ -706,14 +706,59 @@ const htmlContent = `<!DOCTYPE html>
                 'background: #111111;' +
                 'border-radius: 12px;' +
                 'padding: 30px;' +
-                'max-width: 500px;' +
+                'max-width: 600px;' +
                 'width: 90%;' +
                 'color: white;' +
-                'border: 1px solid #333333;';
+                'border: 1px solid #333333;' +
+                'max-height: 80vh;' +
+                'overflow-y: auto;' +
+                'scrollbar-width: thin;' +
+                'scrollbar-color: #333333 #111111;';
+            
+            // 添加自定义滚动条样式
+            const style = document.createElement('style');
+            style.textContent = 
+                '.settings-dialog::-webkit-scrollbar {' +
+                '    width: 6px;' +
+                '}' +
+                '.settings-dialog::-webkit-scrollbar-track {' +
+                '    background: #111111;' +
+                '    border-radius: 3px;' +
+                '}' +
+                '.settings-dialog::-webkit-scrollbar-thumb {' +
+                '    background: #333333;' +
+                '    border-radius: 3px;' +
+                '}' +
+                '.settings-dialog::-webkit-scrollbar-thumb:hover {' +
+                '    background: #444444;' +
+                '}';
+            document.head.appendChild(style);
+            settingsContent.classList.add('settings-dialog');
             
             settingsContent.innerHTML = 
                 '<h2 style="margin-top: 0; text-align: center; margin-bottom: 30px; font-size: 18px;">⚙️ 设置</h2>' +
                 
+                // 服务器配置部分
+                '<div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #333333;">' +
+                    '<h3 style="margin-bottom: 15px; font-size: 16px; color: #007AFF;">🌐 服务器配置</h3>' +
+                    '<div style="margin-bottom: 15px;">' +
+                        '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">WebSocket服务器地址:</label>' +
+                        '<input type="text" id="server-url" placeholder="ws://localhost:5555" ' +
+                        'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
+                    '</div>' +
+                    '<div style="margin-bottom: 15px;">' +
+                        '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">API服务器地址:</label>' +
+                        '<input type="text" id="api-url" placeholder="http://localhost:5555/api" ' +
+                        'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
+                    '</div>' +
+                    '<div style="display: flex; gap: 10px; margin-bottom: 15px;">' +
+                        '<button onclick="testServerConnection()" style="flex: 1; padding: 8px; background: #333333; border: none; border-radius: 6px; color: white; cursor: pointer;">测试连接</button>' +
+                        '<button onclick="resetServerConfig()" style="flex: 1; padding: 8px; background: #333333; border: none; border-radius: 6px; color: white; cursor: pointer;">重置默认</button>' +
+                    '</div>' +
+                    '<div id="server-status" style="display: none; padding: 8px; border-radius: 4px; font-size: 12px; margin-top: 10px;"></div>' +
+                '</div>' +
+                
+                // 原有设置部分
                 '<div style="margin-bottom: 20px;">' +
                     '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">监控间隔 (秒):</label>' +
                     '<input type="number" id="monitor-interval" value="30" min="10" max="300" ' +
@@ -820,6 +865,16 @@ const htmlContent = `<!DOCTYPE html>
                 // 保存常规设置
                 await window.electronAPI.saveSettings(settings);
                 
+                // 保存服务器配置
+                const serverConfig = {
+                    serverUrl: document.getElementById('server-url').value.trim(),
+                    apiUrl: document.getElementById('api-url').value.trim()
+                };
+                
+                if (serverConfig.serverUrl && serverConfig.apiUrl) {
+                    await window.electronAPI.updateServerConfig(serverConfig);
+                }
+                
                 // 保存注册码
                 const registrationCode = document.getElementById('registration-code').value.trim();
                 if (registrationCode) {
@@ -852,6 +907,13 @@ const htmlContent = `<!DOCTYPE html>
                     document.getElementById('auto-block').checked = settings.autoBlock || false;
                 }
                 
+                // 加载服务器配置
+                const serverConfig = await window.electronAPI.getServerConfig();
+                if (serverConfig) {
+                    document.getElementById('server-url').value = serverConfig.serverUrl || '';
+                    document.getElementById('api-url').value = serverConfig.apiUrl || '';
+                }
+                
                 // 加载注册码
                 const registrationCode = await window.electronAPI.getRegistrationCode();
                 if (registrationCode) {
@@ -860,6 +922,46 @@ const htmlContent = `<!DOCTYPE html>
             } catch (error) {
                 addLog('加载设置失败: ' + error.message, 'error');
             }
+        }
+
+        // 测试服务器连接
+        async function testServerConnection() {
+            const statusDiv = document.getElementById('server-status');
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#1a1a3a';
+            statusDiv.style.border = '1px solid #4444ff';
+            statusDiv.style.color = '#4444ff';
+            statusDiv.textContent = '正在测试连接...';
+            
+            try {
+                const result = await window.electronAPI.testServerConnection();
+                if (result.success) {
+                    statusDiv.style.background = '#1a3a1a';
+                    statusDiv.style.border = '1px solid #00ff88';
+                    statusDiv.style.color = '#00ff88';
+                    statusDiv.textContent = '连接成功: ' + result.message;
+                } else {
+                    statusDiv.style.background = '#3a1a1a';
+                    statusDiv.style.border = '1px solid #ff4444';
+                    statusDiv.style.color = '#ff4444';
+                    statusDiv.textContent = '连接失败: ' + result.message;
+                }
+            } catch (error) {
+                statusDiv.style.background = '#3a1a1a';
+                statusDiv.style.border = '1px solid #ff4444';
+                statusDiv.style.color = '#ff4444';
+                statusDiv.textContent = '连接测试失败: ' + error.message;
+            }
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 重置服务器配置
+        function resetServerConfig() {
+            document.getElementById('server-url').value = 'ws://localhost:5555';
+            document.getElementById('api-url').value = 'http://localhost:5555/api';
         }
         
         // 验证注册码
@@ -993,6 +1095,381 @@ const htmlContent = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(path.join(buildDir, 'index.html'), htmlContent);
+
+// 创建设置页面
+const settingsHtmlContent = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TianWang Agent - 设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            padding: 0;
+            margin-top: 28px;
+        }
+
+        .titlebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 28px;
+            background: #000000;
+            -webkit-app-region: drag;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            border-bottom: 1px solid #333333;
+        }
+
+        .titlebar-title {
+            font-size: 12px;
+            color: #888888;
+            font-weight: 500;
+            margin-left: 80px;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #111111;
+            border-right: 1px solid #333333;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            -webkit-app-region: no-drag;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000000;
+            -webkit-app-region: no-drag;
+            overflow-y: auto;
+        }
+
+        .header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #333333;
+            background: #0a0a0a;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #ffffff;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #888888;
+            font-weight: 400;
+        }
+
+        .settings-container {
+            padding: 30px;
+            max-width: 800px;
+        }
+
+        .settings-section {
+            background: #111111;
+            border: 1px solid #333333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .settings-section-header {
+            padding: 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333333;
+        }
+
+        .settings-section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .settings-section-description {
+            font-size: 14px;
+            color: #888888;
+        }
+
+        .settings-section-content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .button-primary {
+            background: #007AFF;
+            color: #ffffff;
+        }
+
+        .button-primary:hover {
+            background: #0056CC;
+        }
+
+        .button-secondary {
+            background: #333333;
+            color: #ffffff;
+        }
+
+        .button-secondary:hover {
+            background: #444444;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status-message.success {
+            background: #1C3A1C;
+            border: 1px solid #2D5A2D;
+            color: #4CAF50;
+        }
+
+        .status-message.error {
+            background: #3A1C1C;
+            border: 1px solid #5A2D2D;
+            color: #FF3B30;
+        }
+
+        .status-message.info {
+            background: #1C1C3A;
+            border: 1px solid #2D2D5A;
+            color: #007AFF;
+        }
+
+        .back-button {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #888888;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            color: #ffffff;
+            background: #1a1a1a;
+        }
+
+        .back-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="titlebar-title">TianWang Agent - 设置</div>
+    </div>
+
+    <div class="app-container">
+        <div class="sidebar">
+            <a href="#" class="back-button" onclick="goBack()">
+                <svg class="back-icon" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"></path>
+                </svg>
+                返回主界面
+            </a>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <h1>服务器配置</h1>
+                <p>配置代理端连接的服务器地址和端口</p>
+            </div>
+
+            <div class="settings-container">
+                <div id="statusMessage" class="status-message" style="display: none;"></div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <div class="settings-section-title">连接设置</div>
+                        <div class="settings-section-description">配置代理端连接的服务器地址和端口</div>
+                    </div>
+                    <div class="settings-section-content">
+                        <div class="form-group">
+                            <label class="form-label">WebSocket服务器地址</label>
+                            <input type="text" id="serverUrl" class="form-input" placeholder="ws://localhost:5555">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API服务器地址</label>
+                            <input type="text" id="apiUrl" class="form-input" placeholder="http://localhost:5555/api">
+                        </div>
+                        <div class="button-group">
+                            <button class="button button-primary" onclick="saveServerConfig()">保存配置</button>
+                            <button class="button button-secondary" onclick="testConnection()">测试连接</button>
+                            <button class="button button-secondary" onclick="resetServerConfig()">重置默认</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadServerConfig();
+        });
+
+        // 加载服务器配置
+        async function loadServerConfig() {
+            try {
+                const config = await window.electronAPI.getServerConfig();
+                if (config) {
+                    document.getElementById('serverUrl').value = config.serverUrl || '';
+                    document.getElementById('apiUrl').value = config.apiUrl || '';
+                }
+            } catch (error) {
+                showStatusMessage('加载配置失败: ' + error.message, 'error');
+            }
+        }
+
+        // 保存服务器配置
+        async function saveServerConfig() {
+            try {
+                const config = {
+                    serverUrl: document.getElementById('serverUrl').value.trim(),
+                    apiUrl: document.getElementById('apiUrl').value.trim()
+                };
+
+                if (!config.serverUrl || !config.apiUrl) {
+                    showStatusMessage('服务器地址不能为空', 'error');
+                    return;
+                }
+
+                const result = await window.electronAPI.updateServerConfig(config);
+                if (result.success) {
+                    showStatusMessage('服务器配置已保存', 'success');
+                } else {
+                    showStatusMessage('保存失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatusMessage('保存配置失败: ' + error.message, 'error');
+            }
+        }
+
+        // 重置服务器配置
+        function resetServerConfig() {
+            document.getElementById('serverUrl').value = 'ws://localhost:5555';
+            document.getElementById('apiUrl').value = 'http://localhost:5555/api';
+        }
+
+        // 测试连接
+        async function testConnection() {
+            try {
+                showStatusMessage('正在测试连接...', 'info');
+                const result = await window.electronAPI.testServerConnection();
+                if (result.success) {
+                    showStatusMessage('连接成功: ' + result.message, 'success');
+                } else {
+                    showStatusMessage('连接失败: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showStatusMessage('连接测试失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示状态消息
+        function showStatusMessage(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = \`status-message \${type}\`;
+            statusDiv.style.display = 'block';
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 返回主界面
+        function goBack() {
+            window.close();
+        }
+    </script>
+</body>
+</html>`;
+
+fs.writeFileSync(path.join(buildDir, 'settings.html'), settingsHtmlContent);
 
 // 创建基本的图标文件（占位符）
 const iconSvg = `<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">

@@ -4,18 +4,23 @@ const axios = require('axios');
 const crypto = require('crypto');
 const os = require('os');
 const logger = require('../utils/logger');
+const Store = require('electron-store');
 
 class AgentService extends EventEmitter {
     constructor() {
         super();
         this.ws = null;
+        this.store = new Store();
+        
+        // 从持久化存储加载配置，如果没有则使用默认值
         this.config = {
-            serverUrl: 'ws://localhost:3001',
-            apiUrl: 'http://localhost:3001/api',
-            reconnectInterval: 5000,
-            maxReconnectAttempts: 10,
-            heartbeatInterval: 30000
+            serverUrl: this.store.get('serverUrl', 'ws://localhost:5555'),
+            apiUrl: this.store.get('apiUrl', 'http://localhost:5555/api'),
+            reconnectInterval: this.store.get('reconnectInterval', 5000),
+            maxReconnectAttempts: this.store.get('maxReconnectAttempts', 10),
+            heartbeatInterval: this.store.get('heartbeatInterval', 30000)
         };
+        
         this.reconnectAttempts = 0;
         this.isConnected = false;
         this.heartbeatTimer = null;
@@ -27,6 +32,95 @@ class AgentService extends EventEmitter {
         this.publicKey = null; // 服务器公钥
         this.dataBuffer = [];
         this.maxBufferSize = 1000;
+    }
+
+    // 更新服务器配置
+    updateServerConfig(serverConfig) {
+        logger.info('更新服务器配置:', serverConfig);
+        
+        // 验证配置
+        if (!serverConfig.serverUrl || !serverConfig.apiUrl) {
+            throw new Error('服务器URL和API URL不能为空');
+        }
+        
+        // 更新配置
+        this.config.serverUrl = serverConfig.serverUrl;
+        this.config.apiUrl = serverConfig.apiUrl;
+        
+        // 保存到持久化存储
+        this.store.set('serverUrl', this.config.serverUrl);
+        this.store.set('apiUrl', this.config.apiUrl);
+        
+        // 如果配置了其他参数，也保存
+        if (serverConfig.reconnectInterval) {
+            this.config.reconnectInterval = serverConfig.reconnectInterval;
+            this.store.set('reconnectInterval', this.config.reconnectInterval);
+        }
+        
+        if (serverConfig.maxReconnectAttempts) {
+            this.config.maxReconnectAttempts = serverConfig.maxReconnectAttempts;
+            this.store.set('maxReconnectAttempts', this.config.maxReconnectAttempts);
+        }
+        
+        if (serverConfig.heartbeatInterval) {
+            this.config.heartbeatInterval = serverConfig.heartbeatInterval;
+            this.store.set('heartbeatInterval', this.config.heartbeatInterval);
+        }
+        
+        logger.info('服务器配置已更新并保存');
+        
+        // 如果当前已连接，需要重新连接
+        if (this.isConnected) {
+            logger.info('检测到配置变更，重新连接服务器...');
+            this.disconnect().then(() => {
+                this.connect().catch(error => {
+                    logger.error('重新连接失败:', error);
+                });
+            });
+        }
+        
+        return true;
+    }
+
+    // 获取当前服务器配置
+    getServerConfig() {
+        return {
+            serverUrl: this.config.serverUrl,
+            apiUrl: this.config.apiUrl,
+            reconnectInterval: this.config.reconnectInterval,
+            maxReconnectAttempts: this.config.maxReconnectAttempts,
+            heartbeatInterval: this.config.heartbeatInterval
+        };
+    }
+
+    // 测试服务器连接
+    async testServerConnection() {
+        try {
+            logger.info('测试服务器连接...', { apiUrl: this.config.apiUrl });
+            
+            // 测试API连接
+            const response = await axios.get(`${this.config.apiUrl}/health`, {
+                timeout: 10000
+            });
+            
+            if (response.status === 200) {
+                logger.info('服务器连接测试成功');
+                return {
+                    success: true,
+                    message: '连接成功',
+                    serverInfo: response.data
+                };
+            } else {
+                throw new Error(`服务器响应异常: ${response.status}`);
+            }
+        } catch (error) {
+            logger.error('服务器连接测试失败:', error.message);
+            return {
+                success: false,
+                message: error.message,
+                error: error.code || 'UNKNOWN_ERROR'
+            };
+        }
     }
 
     // 生成唯一的代理ID
