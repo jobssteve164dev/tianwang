@@ -741,6 +741,43 @@ const htmlContent = `<!DOCTYPE html>
                     '</label>' +
                 '</div>' +
                 
+                '<div style="margin-bottom: 20px;">' +
+                    '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">注册码:</label>' +
+                    '<input type="text" id="registration-code" placeholder="请输入注册码" ' +
+                           'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
+                '</div>' +
+                
+                '<div style="margin-bottom: 20px;">' +
+                    '<div style="display: flex; gap: 10px;">' +
+                        '<button onclick="validateRegistrationCode()" style="' +
+                            'flex: 1;' +
+                            'padding: 8px 12px;' +
+                            'border: 1px solid #333333;' +
+                            'border-radius: 6px;' +
+                            'background: #111111;' +
+                            'color: white;' +
+                            'cursor: pointer;' +
+                            'font-size: 12px;' +
+                            'font-weight: 500;' +
+                        '">验证注册码</button>' +
+                        '<button onclick="generateRegistrationCode()" style="' +
+                            'flex: 1;' +
+                            'padding: 8px 12px;' +
+                            'border: 1px solid #333333;' +
+                            'border-radius: 6px;' +
+                            'background: #111111;' +
+                            'color: white;' +
+                            'cursor: pointer;' +
+                            'font-size: 12px;' +
+                            'font-weight: 500;' +
+                        '">生成注册码</button>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div id="registration-status" style="margin-bottom: 20px; padding: 10px; border-radius: 6px; display: none;">' +
+                    '<div id="status-message" style="font-size: 12px;"></div>' +
+                '</div>' +
+                
                 '<div style="text-align: center; margin-top: 30px;">' +
                     '<button onclick="saveSettings()" style="' +
                         'padding: 10px 20px;' +
@@ -806,9 +843,71 @@ const htmlContent = `<!DOCTYPE html>
                     document.getElementById('minimize-to-tray').checked = settings.minimizeToTray || false;
                     document.getElementById('auto-block').checked = settings.autoBlock || false;
                 }
+                
+                // 加载注册码
+                const registrationCode = await window.electronAPI.getRegistrationCode();
+                if (registrationCode) {
+                    document.getElementById('registration-code').value = registrationCode;
+                }
             } catch (error) {
                 addLog('加载设置失败: ' + error.message, 'error');
             }
+        }
+        
+        // 验证注册码
+        async function validateRegistrationCode() {
+            const code = document.getElementById('registration-code').value.trim();
+            if (!code) {
+                showRegistrationStatus('请输入注册码', 'error');
+                return;
+            }
+            
+            try {
+                await window.electronAPI.setRegistrationCode(code);
+                showRegistrationStatus('注册码验证成功', 'success');
+                addLog('注册码验证成功', 'success');
+            } catch (error) {
+                showRegistrationStatus('注册码验证失败: ' + error.message, 'error');
+                addLog('注册码验证失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 生成注册码
+        async function generateRegistrationCode() {
+            try {
+                const connectionInfo = await window.electronAPI.getConnectionInfo();
+                const hostname = connectionInfo.hostname || 'unknown';
+                const timestamp = Date.now();
+                const code = 'TW-' + hostname.substring(0, 8).toUpperCase() + '-' + timestamp.toString(36).toUpperCase();
+                
+                document.getElementById('registration-code').value = code;
+                showRegistrationStatus('已生成注册码，请复制并保存', 'info');
+                addLog('已生成注册码: ' + code, 'info');
+            } catch (error) {
+                showRegistrationStatus('生成注册码失败: ' + error.message, 'error');
+                addLog('生成注册码失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示注册状态
+        function showRegistrationStatus(message, type) {
+            const statusDiv = document.getElementById('registration-status');
+            const messageDiv = document.getElementById('status-message');
+            
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = type === 'success' ? '#1a3a1a' : 
+                                       type === 'error' ? '#3a1a1a' : '#1a1a3a';
+            statusDiv.style.border = type === 'success' ? '1px solid #00ff88' : 
+                                   type === 'error' ? '1px solid #ff4444' : '1px solid #4444ff';
+            
+            messageDiv.style.color = type === 'success' ? '#00ff88' : 
+                                   type === 'error' ? '#ff4444' : '#4444ff';
+            messageDiv.textContent = message;
+            
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
         }
 
         // 运行网络诊断
