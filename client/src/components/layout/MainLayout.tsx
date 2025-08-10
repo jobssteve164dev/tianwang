@@ -149,13 +149,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       }}
       headerTitleRender={(logo, title) => (
         <Space>
+          {logo}
           <span style={{ 
             fontWeight: 600, 
             fontSize: isMobile ? 16 : 18, 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: '#333',
             display: isMobile && collapsed ? 'none' : 'inline'
           }}>
             {title}
@@ -174,26 +172,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         background: 'transparent',
       }}
       siderMenuType="group"
-      menuHeaderRender={(logo, title) => (
-        <div style={{ 
-          padding: isMobile ? '12px 8px' : '16px 12px', 
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          marginBottom: 8
-        }}>
-          <Space>
-            {logo}
-            <span style={{ 
-              color: '#667eea', 
-              fontWeight: 600, 
-              fontSize: isMobile ? 14 : 16,
-              opacity: collapsed ? 0 : 1,
-              transition: 'opacity 0.3s'
-            }}>
-              {title}
-            </span>
-          </Space>
-        </div>
-      )}
+      menuHeaderRender={false}
       menuItemRender={(item, dom) => (
         <div 
           onClick={() => handleMenuItemClick(item.path || '/')}
