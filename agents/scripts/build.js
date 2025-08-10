@@ -24,174 +24,496 @@ const htmlContent = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TianWang Agent</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        * {
             margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            min-height: 100vh;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            padding: 0;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #111111;
+            border-right: 1px solid #333333;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+        }
+
+        .main-content {
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000000;
         }
+
         .header {
-            text-align: center;
-            margin-bottom: 40px;
+            padding: 20px 30px;
+            border-bottom: 1px solid #333333;
+            background: #0a0a0a;
         }
+
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #ffffff;
         }
+
         .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
+            font-size: 14px;
+            color: #888888;
+            font-weight: 400;
         }
+
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            background: #333333;
+            margin: 20px 30px;
+            border-radius: 8px;
+            overflow: hidden;
         }
+
         .status-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
+            background: #111111;
             padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: none;
+            position: relative;
         }
+
         .status-card h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.3em;
+            font-size: 12px;
+            font-weight: 500;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
         }
+
         .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             margin-right: 8px;
+            flex-shrink: 0;
         }
-        .status-online { background-color: #4CAF50; }
-        .status-offline { background-color: #f44336; }
-        .status-warning { background-color: #FF9800; }
-        .controls {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
+
+        .status-online { background-color: #00ff88; box-shadow: 0 0 8px rgba(0, 255, 136, 0.5); }
+        .status-offline { background-color: #ff4444; box-shadow: 0 0 8px rgba(255, 68, 68, 0.5); }
+        .status-warning { background-color: #ffaa00; box-shadow: 0 0 8px rgba(255, 170, 0, 0.5); }
+
+        .status-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
         }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-        .btn-primary {
-            background: #4CAF50;
-            border-color: #4CAF50;
-        }
-        .btn-danger {
-            background: #f44336;
-            border-color: #f44336;
-        }
-        .logs {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 12px;
+
+        .status-detail {
+            font-size: 11px;
+            color: #888888;
             line-height: 1.4;
         }
-        .log-entry {
-            margin-bottom: 5px;
-            padding: 2px 0;
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            padding: 0 30px 20px;
+            flex-wrap: wrap;
         }
-        .log-timestamp {
-            color: #888;
-            margin-right: 10px;
-        }
-        .footer {
+
+        .btn {
+            padding: 10px 16px;
+            border: 1px solid #333333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            background: #111111;
+            color: #ffffff;
+            min-width: 80px;
             text-align: center;
-            padding: 20px 0;
-            opacity: 0.7;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            margin-top: 40px;
+        }
+
+        .btn:hover {
+            background: #222222;
+            border-color: #555555;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary {
+            background: #00ff88;
+            border-color: #00ff88;
+            color: #000000;
+        }
+
+        .btn-primary:hover {
+            background: #00cc6a;
+            border-color: #00cc6a;
+        }
+
+        .btn-danger {
+            background: #ff4444;
+            border-color: #ff4444;
+            color: #ffffff;
+        }
+
+        .btn-danger:hover {
+            background: #cc3333;
+            border-color: #cc3333;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn:disabled:hover {
+            background: #111111;
+            border-color: #333333;
+        }
+
+        .logs-section {
+            flex: 1;
+            margin: 0 30px 20px;
+            background: #111111;
+            border-radius: 8px;
+            border: 1px solid #333333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .logs-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid #333333;
+            background: #0a0a0a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .logs-count {
+            font-size: 11px;
+            color: #888888;
+        }
+
+        .logs-container {
+            flex: 1;
+            padding: 16px 20px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            background: #000000;
+        }
+
+        .logs-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .logs-container::-webkit-scrollbar-track {
+            background: #111111;
+        }
+
+        .logs-container::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 3px;
+        }
+
+        .logs-container::-webkit-scrollbar-thumb:hover {
+            background: #555555;
+        }
+
+        .log-entry {
+            margin-bottom: 6px;
+            padding: 2px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .log-timestamp {
+            color: #666666;
+            margin-right: 12px;
+            flex-shrink: 0;
+            font-size: 10px;
+            min-width: 60px;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .log-error { color: #ff4444; }
+        .log-warning { color: #ffaa00; }
+        .log-success { color: #00ff88; }
+        .log-info { color: #ffffff; }
+
+        .footer {
+            padding: 12px 30px;
+            border-top: 1px solid #333333;
+            background: #0a0a0a;
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 11px;
+            color: #666666;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: #333333;
+            margin: 0 30px 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .metric-card {
+            background: #111111;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-section {
+            padding: 0 20px 20px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .sidebar-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #222222;
+        }
+
+        .sidebar-item:last-child {
+            border-bottom: none;
+        }
+
+        .sidebar-label {
+            font-size: 12px;
+            color: #cccccc;
+        }
+
+        .sidebar-value {
+            font-size: 12px;
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            border-radius: 8px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #000000;
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #333333;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metric-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🛡️ TianWang Agent</h1>
-            <p>AI驱动的网络安全监控系统</p>
-        </div>
-        
-        <div class="status-grid">
-            <div class="status-card">
-                <h3><span class="status-indicator status-offline" id="connection-status"></span>连接状态</h3>
-                <p id="connection-text">正在连接到服务器...</p>
-                <p><strong>代理ID:</strong> <span id="agent-id">加载中...</span></p>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🛡️</div>
+                <div class="logo-text">TianWang</div>
             </div>
             
-            <div class="status-card">
-                <h3><span class="status-indicator status-offline" id="monitor-status"></span>监控状态</h3>
-                <p id="monitor-text">监控已停止</p>
-                <p><strong>上次更新:</strong> <span id="last-update">--</span></p>
+            <div class="sidebar-section">
+                <div class="sidebar-title">系统信息</div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">平台</span>
+                    <span class="sidebar-value" id="platform">--</span>
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">主机名</span>
+                    <span class="sidebar-value" id="hostname">--</span>
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">代理ID</span>
+                    <span class="sidebar-value" id="agent-id">--</span>
+                </div>
             </div>
             
-            <div class="status-card">
-                <h3><span class="status-indicator status-online" id="system-status"></span>系统状态</h3>
-                <p><strong>平台:</strong> <span id="platform">--</span></p>
-                <p><strong>主机名:</strong> <span id="hostname">--</span></p>
-                <p><strong>CPU:</strong> <span id="cpu-usage">0%</span></p>
-                <p><strong>内存:</strong> <span id="memory-usage">0%</span></p>
+            <div class="sidebar-section">
+                <div class="sidebar-title">资源使用</div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">CPU</span>
+                    <span class="sidebar-value" id="cpu-usage">0%</span>
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">内存</span>
+                    <span class="sidebar-value" id="memory-usage">0%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="header">
+                <h1>网络安全监控</h1>
+                <p>AI驱动的实时威胁检测与防护系统</p>
             </div>
             
-            <div class="status-card">
-                <h3>🔒 安全状态</h3>
-                <p><strong>检测到威胁:</strong> <span id="threat-count">0</span></p>
-                <p><strong>阻止IP:</strong> <span id="blocked-ips">0</span></p>
-                <p><strong>防火墙规则:</strong> <span id="firewall-rules">0</span></p>
+            <div class="status-grid">
+                <div class="status-card">
+                    <h3><span class="status-indicator status-offline" id="connection-status"></span>连接状态</h3>
+                    <div class="status-value" id="connection-text">离线</div>
+                    <div class="status-detail">与服务器连接状态</div>
+                </div>
+                
+                <div class="status-card">
+                    <h3><span class="status-indicator status-offline" id="monitor-status"></span>监控状态</h3>
+                    <div class="status-value" id="monitor-text">已停止</div>
+                    <div class="status-detail">系统监控运行状态</div>
+                </div>
+                
+                <div class="status-card">
+                    <h3><span class="status-indicator status-online" id="system-status"></span>系统状态</h3>
+                    <div class="status-value">正常</div>
+                    <div class="status-detail">系统运行状态</div>
+                </div>
+                
+                <div class="status-card">
+                    <h3>🔒 安全状态</h3>
+                    <div class="status-value" id="security-status">安全</div>
+                    <div class="status-detail">威胁检测状态</div>
+                </div>
             </div>
-        </div>
-        
-        <div class="controls">
-            <button class="btn btn-primary" id="start-btn" onclick="startMonitoring()">开始监控</button>
-            <button class="btn btn-danger" id="stop-btn" onclick="stopMonitoring()" disabled>停止监控</button>
-            <button class="btn" onclick="showSettings()">设置</button>
-            <button class="btn" onclick="showLogs()">查看日志</button>
-            <button class="btn" onclick="runDiagnostics()">网络诊断</button>
-        </div>
-        
-        <div class="logs" id="logs-container">
-            <div class="log-entry">
-                <span class="log-timestamp">[${new Date().toLocaleTimeString()}]</span>
-                <span>TianWang Agent 已启动</span>
+            
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="threat-count">0</div>
+                    <div class="metric-label">检测威胁</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="blocked-ips">0</div>
+                    <div class="metric-label">阻止IP</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="firewall-rules">0</div>
+                    <div class="metric-label">防火墙规则</div>
+                </div>
             </div>
-        </div>
-        
-        <div class="footer">
-            <p>TianWang AI Security Monitoring System v1.0.0</p>
+            
+            <div class="controls">
+                <button class="btn btn-primary" id="start-btn" onclick="startMonitoring()">开始监控</button>
+                <button class="btn btn-danger" id="stop-btn" onclick="stopMonitoring()" disabled>停止监控</button>
+                <button class="btn" onclick="showSettings()">设置</button>
+                <button class="btn" onclick="runDiagnostics()">诊断</button>
+            </div>
+            
+            <div class="logs-section">
+                <div class="logs-header">
+                    <span class="logs-title">系统日志</span>
+                    <span class="logs-count" id="logs-count">0 条</span>
+                </div>
+                <div class="logs-container" id="logs-container">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[启动]</span>
+                        <span class="log-message log-info">TianWang Agent 已启动</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>TianWang AI Security Monitoring System v1.0.0</p>
+            </div>
         </div>
     </div>
 
@@ -200,6 +522,7 @@ const htmlContent = `<!DOCTYPE html>
         let isMonitoring = false;
         let systemInfo = null;
         let connectionStatus = false;
+        let logCount = 1;
 
         // 初始化
         async function initialize() {
@@ -215,7 +538,7 @@ const htmlContent = `<!DOCTYPE html>
                 // 设置事件监听
                 setupEventListeners();
                 
-                addLog('系统初始化完成');
+                addLog('系统初始化完成', 'success');
             } catch (error) {
                 addLog('初始化失败: ' + error.message, 'error');
             }
@@ -240,30 +563,28 @@ const htmlContent = `<!DOCTYPE html>
             // 连接状态
             if (status.connected) {
                 connectionIndicator.className = 'status-indicator status-online';
-                connectionText.textContent = '已连接到服务器';
+                connectionText.textContent = '已连接';
                 connectionStatus = true;
             } else {
                 connectionIndicator.className = 'status-indicator status-offline';
-                connectionText.textContent = '未连接到服务器';
+                connectionText.textContent = '离线';
                 connectionStatus = false;
             }
             
             // 监控状态
             if (status.system || status.network) {
                 monitorIndicator.className = 'status-indicator status-online';
-                monitorText.textContent = '监控运行中';
+                monitorText.textContent = '运行中';
                 isMonitoring = true;
                 document.getElementById('start-btn').disabled = true;
                 document.getElementById('stop-btn').disabled = false;
             } else {
                 monitorIndicator.className = 'status-indicator status-offline';
-                monitorText.textContent = '监控已停止';
+                monitorText.textContent = '已停止';
                 isMonitoring = false;
                 document.getElementById('start-btn').disabled = false;
                 document.getElementById('stop-btn').disabled = true;
             }
-            
-            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
         }
 
         // 设置事件监听
@@ -276,12 +597,11 @@ const htmlContent = `<!DOCTYPE html>
                     document.getElementById('memory-usage').textContent = 
                         (data.system.memory?.usage || 0) + '%';
                 }
-                addLog('收到系统数据: CPU ' + (data.system?.cpu?.load || 0).toFixed(1) + '%');
             });
             
             // 网络数据监听
             window.electronAPI.onNetworkData((data) => {
-                addLog('收到网络数据: ' + (data.interfaces?.length || 0) + ' 个网络接口');
+                addLog('收到网络数据: ' + (data.interfaces?.length || 0) + ' 个接口', 'info');
             });
             
             // 安全威胁监听
@@ -296,10 +616,10 @@ const htmlContent = `<!DOCTYPE html>
         // 开始监控
         async function startMonitoring() {
             try {
-                addLog('正在启动监控...');
+                addLog('正在启动监控...', 'info');
                 const result = await window.electronAPI.startMonitoring();
                 if (result.success) {
-                    addLog('监控已启动');
+                    addLog('监控已启动', 'success');
                     // 更新状态
                     const status = await window.electronAPI.getMonitoringStatus();
                     updateMonitoringStatus(status);
@@ -314,10 +634,10 @@ const htmlContent = `<!DOCTYPE html>
         // 停止监控
         async function stopMonitoring() {
             try {
-                addLog('正在停止监控...');
+                addLog('正在停止监控...', 'info');
                 const result = await window.electronAPI.stopMonitoring();
                 if (result.success) {
-                    addLog('监控已停止');
+                    addLog('监控已停止', 'success');
                     // 更新状态
                     const status = await window.electronAPI.getMonitoringStatus();
                     updateMonitoringStatus(status);
@@ -331,7 +651,7 @@ const htmlContent = `<!DOCTYPE html>
 
         // 显示设置
         function showSettings() {
-            addLog('打开设置界面...');
+            addLog('打开设置界面...', 'info');
             
             // 创建设置对话框
             const settingsDialog = document.createElement('div');
@@ -341,7 +661,7 @@ const htmlContent = `<!DOCTYPE html>
                 'left: 0;' +
                 'width: 100%;' +
                 'height: 100%;' +
-                'background: rgba(0, 0, 0, 0.8);' +
+                'background: rgba(0, 0, 0, 0.9);' +
                 'display: flex;' +
                 'justify-content: center;' +
                 'align-items: center;' +
@@ -349,40 +669,40 @@ const htmlContent = `<!DOCTYPE html>
             
             const settingsContent = document.createElement('div');
             settingsContent.style.cssText = 
-                'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
+                'background: #111111;' +
                 'border-radius: 12px;' +
                 'padding: 30px;' +
                 'max-width: 500px;' +
                 'width: 90%;' +
                 'color: white;' +
-                'border: 1px solid rgba(255, 255, 255, 0.2);';
+                'border: 1px solid #333333;';
             
             settingsContent.innerHTML = 
-                '<h2 style="margin-top: 0; text-align: center;">⚙️ 设置</h2>' +
+                '<h2 style="margin-top: 0; text-align: center; margin-bottom: 30px; font-size: 18px;">⚙️ 设置</h2>' +
                 
                 '<div style="margin-bottom: 20px;">' +
-                    '<label style="display: block; margin-bottom: 5px;">监控间隔 (秒):</label>' +
+                    '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">监控间隔 (秒):</label>' +
                     '<input type="number" id="monitor-interval" value="30" min="10" max="300" ' +
-                           'style="width: 100%; padding: 8px; border-radius: 4px; border: none; background: rgba(255,255,255,0.2); color: white;">' +
+                           'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
                 '</div>' +
                 
                 '<div style="margin-bottom: 20px;">' +
-                    '<label style="display: block; margin-bottom: 5px;">' +
-                        '<input type="checkbox" id="auto-start" style="margin-right: 8px;">' +
+                    '<label style="display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; color: #cccccc;">' +
+                        '<input type="checkbox" id="auto-start" style="margin-right: 10px;">' +
                         '开机自动启动' +
                     '</label>' +
                 '</div>' +
                 
                 '<div style="margin-bottom: 20px;">' +
-                    '<label style="display: block; margin-bottom: 5px;">' +
-                        '<input type="checkbox" id="minimize-to-tray" style="margin-right: 8px;">' +
+                    '<label style="display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; color: #cccccc;">' +
+                        '<input type="checkbox" id="minimize-to-tray" style="margin-right: 10px;">' +
                         '最小化到托盘' +
                     '</label>' +
                 '</div>' +
                 
                 '<div style="margin-bottom: 20px;">' +
-                    '<label style="display: block; margin-bottom: 5px;">' +
-                        '<input type="checkbox" id="auto-block" style="margin-right: 8px;">' +
+                    '<label style="display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; color: #cccccc;">' +
+                        '<input type="checkbox" id="auto-block" style="margin-right: 10px;">' +
                         '自动阻止威胁IP' +
                     '</label>' +
                 '</div>' +
@@ -393,17 +713,19 @@ const htmlContent = `<!DOCTYPE html>
                         'margin-right: 10px;' +
                         'border: none;' +
                         'border-radius: 6px;' +
-                        'background: #4CAF50;' +
-                        'color: white;' +
+                        'background: #00ff88;' +
+                        'color: #000000;' +
                         'cursor: pointer;' +
+                        'font-weight: 500;' +
                     '">保存</button>' +
                     '<button onclick="closeSettings()" style="' +
                         'padding: 10px 20px;' +
-                        'border: none;' +
+                        'border: 1px solid #333333;' +
                         'border-radius: 6px;' +
-                        'background: rgba(255,255,255,0.2);' +
+                        'background: #111111;' +
                         'color: white;' +
                         'cursor: pointer;' +
+                        'font-weight: 500;' +
                     '">取消</button>' +
                 '</div>';
             
@@ -455,15 +777,9 @@ const htmlContent = `<!DOCTYPE html>
             }
         }
 
-        // 显示日志
-        function showLogs() {
-            addLog('打开日志查看器...');
-            // TODO: 实现日志查看器
-        }
-
         // 运行网络诊断
         function runDiagnostics() {
-            addLog('正在运行网络诊断...');
+            addLog('正在运行网络诊断...', 'info');
             // TODO: 实现网络诊断
         }
 
@@ -473,35 +789,45 @@ const htmlContent = `<!DOCTYPE html>
             const logEntry = document.createElement('div');
             logEntry.className = 'log-entry';
             
-            const timestamp = new Date().toLocaleTimeString();
+            const timestamp = new Date().toLocaleTimeString('zh-CN', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            
             let icon = '';
-            let color = '';
+            let className = 'log-info';
             
             switch (type) {
                 case 'error':
                     icon = '❌';
-                    color = '#f44336';
+                    className = 'log-error';
                     break;
                 case 'warning':
                     icon = '⚠️';
-                    color = '#FF9800';
+                    className = 'log-warning';
                     break;
                 case 'success':
                     icon = '✅';
-                    color = '#4CAF50';
+                    className = 'log-success';
                     break;
                 default:
                     icon = 'ℹ️';
-                    color = '#fff';
+                    className = 'log-info';
             }
             
             logEntry.innerHTML = \`
                 <span class="log-timestamp">[\${timestamp}]</span>
-                <span style="color: \${color}">\${icon} \${message}</span>
+                <span class="log-message \${className}">\${icon} \${message}</span>
             \`;
             
             logsContainer.appendChild(logEntry);
             logsContainer.scrollTop = logsContainer.scrollHeight;
+            
+            // 更新日志计数
+            logCount++;
+            document.getElementById('logs-count').textContent = logCount + ' 条';
             
             // 限制日志数量
             if (logsContainer.children.length > 100) {
