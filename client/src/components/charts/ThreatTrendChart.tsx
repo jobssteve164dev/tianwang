@@ -3,13 +3,17 @@ import * as echarts from 'echarts';
 import { Spin } from 'antd';
 
 interface ThreatTrendData {
-  time: string;
-  count: number;
-  type?: string;
+  labels: string[];
+  datasets: Array<{
+    label: string;
+    data: number[];
+    borderColor: string;
+    backgroundColor: string;
+  }>;
 }
 
 interface ThreatTrendChartProps {
-  data: ThreatTrendData[];
+  data: ThreatTrendData | null;
   loading?: boolean;
   height?: number;
   title?: string;
@@ -25,15 +29,34 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
   useEffect(() => {
-    if (chartRef.current && !loading) {
+    if (chartRef.current && !loading && data) {
       // 初始化图表
       if (!chartInstance.current) {
         chartInstance.current = echarts.init(chartRef.current);
       }
 
       // 处理数据
-      const times = data.map(item => item.time);
-      const counts = data.map(item => item.count);
+      if (!data.labels || !data.datasets) {
+        return;
+      }
+      
+      const times = data.labels;
+      const series = data.datasets.map(dataset => ({
+        name: dataset.label,
+        type: 'line' as const,
+        smooth: true,
+        data: dataset.data,
+        lineStyle: {
+          width: 2,
+          color: dataset.borderColor
+        },
+        areaStyle: {
+          color: dataset.backgroundColor
+        },
+        emphasis: {
+          focus: 'series' as const
+        }
+      }));
 
       // 配置选项
       const option: echarts.EChartsOption = {
@@ -53,19 +76,17 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
             label: {
               backgroundColor: '#6a7985'
             }
-          },
-          formatter: (params: any) => {
-            const param = Array.isArray(params) ? params[0] : params;
-            return `${param.name}<br/>威胁数量: ${param.value}`;
           }
         },
         legend: {
-          show: false
+          data: data.datasets.map(dataset => dataset.label),
+          top: 30
         },
         grid: {
           left: '3%',
           right: '4%',
           bottom: '3%',
+          top: '15%',
           containLabel: true
         },
         xAxis: {
@@ -74,9 +95,9 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
           data: times,
           axisLabel: {
             formatter: (value: string) => {
-              // 格式化时间显示
+              // 格式化日期显示
               const date = new Date(value);
-              return date.getHours() + ':' + date.getMinutes().toString().padStart(2, '0');
+              return `${date.getMonth() + 1}/${date.getDate()}`;
             }
           }
         },
@@ -92,34 +113,7 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
             }
           }
         },
-        series: [
-          {
-            name: '威胁数量',
-            type: 'line',
-            stack: 'Total',
-            smooth: true,
-            lineStyle: {
-              width: 2,
-              color: '#ff4d4f'
-            },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                {
-                  offset: 0,
-                  color: 'rgba(255, 77, 79, 0.3)'
-                },
-                {
-                  offset: 1,
-                  color: 'rgba(255, 77, 79, 0.05)'
-                }
-              ])
-            },
-            emphasis: {
-              focus: 'series'
-            },
-            data: counts
-          }
-        ]
+        series: series
       };
 
       // 设置配置
@@ -163,7 +157,7 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!data || !data.labels || !data.datasets) {
     return (
       <div style={{ 
         height, 

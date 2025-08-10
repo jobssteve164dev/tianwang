@@ -61,11 +61,11 @@ export const authAPI = {
 // 仪表盘相关API
 export const dashboardAPI = {
   getSecurityMetrics: async () => {
-    return request('/dashboard/metrics');
+    return request('/dashboard/security-metrics');
   },
 
   getThreatTrends: async (timeRange: string = '7d') => {
-    return request(`/dashboard/trends?range=${timeRange}`);
+    return request(`/dashboard/threat-trends?range=${timeRange}`);
   },
 
   getThreatDistribution: async () => {

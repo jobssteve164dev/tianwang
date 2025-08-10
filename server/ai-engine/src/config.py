@@ -12,7 +12,7 @@ class AIEngineConfig(BaseSettings):
     app_name: str = "tianwang-ai-engine"
     app_version: str = "1.0.0-alpha.1"
     host: str = "0.0.0.0"
-    port: int = 8001
+    port: int = 8888
     debug: bool = True
     
     # 数据库配置
@@ -216,6 +216,8 @@ class AIEngineConfig(BaseSettings):
         env_prefix = "AI_"
         # 设置受保护的命名空间，避免与我们的字段冲突
         protected_namespaces = ()
+        # 禁用受保护命名空间检查，避免与我们的字段冲突
+        validate_assignment = True
 
 # 全局配置实例
 config = AIEngineConfig()

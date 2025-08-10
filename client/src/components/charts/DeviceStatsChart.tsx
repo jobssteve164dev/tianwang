@@ -3,14 +3,22 @@ import * as echarts from 'echarts';
 import { Spin } from 'antd';
 
 interface DeviceStatsData {
-  name: string;
-  online: number;
-  offline: number;
-  warning: number;
+  totalDevices: number;
+  onlineDevices: number;
+  offlineDevices: number;
+  protectedDevices: number;
+  unprotectedDevices: number;
+  deviceTypes: {
+    servers: number;
+    workstations: number;
+    mobileDevices: number;
+    networkDevices: number;
+  };
+  lastUpdated: string;
 }
 
 interface DeviceStatsChartProps {
-  data: DeviceStatsData[];
+  data: DeviceStatsData | null;
   loading?: boolean;
   height?: number;
   title?: string;
@@ -26,17 +34,20 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
   useEffect(() => {
-    if (chartRef.current && !loading) {
+    if (chartRef.current && !loading && data) {
       // 初始化图表
       if (!chartInstance.current) {
         chartInstance.current = echarts.init(chartRef.current);
       }
 
       // 处理数据
-      const categories = data.map(item => item.name);
-      const onlineData = data.map(item => item.online);
-      const offlineData = data.map(item => item.offline);
-      const warningData = data.map(item => item.warning);
+      const categories = ['服务器', '工作站', '移动设备', '网络设备'];
+      const onlineData = [
+        data.deviceTypes.servers,
+        data.deviceTypes.workstations,
+        data.deviceTypes.mobileDevices,
+        data.deviceTypes.networkDevices
+      ];
 
       // 配置选项
       const option: echarts.EChartsOption = {
@@ -102,40 +113,15 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         },
         series: [
           {
-            name: '在线',
-            type: 'bar',
-            stack: 'total',
+            name: '设备数量',
+            type: 'bar' as const,
             emphasis: {
-              focus: 'series'
+              focus: 'series' as const
             },
             itemStyle: {
-              color: '#52c41a'
+              color: '#1890ff'
             },
             data: onlineData
-          },
-          {
-            name: '离线',
-            type: 'bar',
-            stack: 'total',
-            emphasis: {
-              focus: 'series'
-            },
-            itemStyle: {
-              color: '#8c8c8c'
-            },
-            data: offlineData
-          },
-          {
-            name: '异常',
-            type: 'bar',
-            stack: 'total',
-            emphasis: {
-              focus: 'series'
-            },
-            itemStyle: {
-              color: '#faad14'
-            },
-            data: warningData
           }
         ]
       };
@@ -181,7 +167,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!data) {
     return (
       <div style={{ 
         height, 

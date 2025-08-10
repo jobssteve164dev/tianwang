@@ -15,7 +15,7 @@ import { useResponsive } from '../../utils/responsive';
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { metrics, loading, error } = useAppSelector((state) => state.dashboard);
+  const { metrics, threatTrends, threatDistribution, deviceStats, loading, error } = useAppSelector((state) => state.dashboard);
   const { isMobile, isTablet, isDesktop } = useResponsive();
 
   useEffect(() => {
@@ -156,7 +156,7 @@ const DashboardPage: React.FC = () => {
           >
             <ThreatTrendChart 
               height={getChartHeight() - 80}
-              data={[]} // 这里需要从API获取数据
+              data={threatTrends}
             />
           </Card>
         </Col>
@@ -184,7 +184,7 @@ const DashboardPage: React.FC = () => {
           >
             <ThreatDistributionChart 
               height={getChartHeight() - 80}
-              data={[]} // 这里需要从API获取数据
+              data={threatDistribution}
             />
           </Card>
         </Col>
@@ -213,7 +213,7 @@ const DashboardPage: React.FC = () => {
           >
             <DeviceStatsChart 
               height={getChartHeight() - 80}
-              data={[]} // 这里需要从API获取数据
+              data={deviceStats}
             />
           </Card>
         </Col>

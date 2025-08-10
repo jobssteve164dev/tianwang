@@ -3,13 +3,17 @@ import * as echarts from 'echarts';
 import { Spin } from 'antd';
 
 interface ThreatDistributionData {
-  name: string;
-  value: number;
-  type?: string;
+  categories: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
+  total: number;
+  lastUpdated: string;
 }
 
 interface ThreatDistributionChartProps {
-  data: ThreatDistributionData[];
+  data: ThreatDistributionData | null;
   loading?: boolean;
   height?: number;
   title?: string;
@@ -25,22 +29,15 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
   useEffect(() => {
-    if (chartRef.current && !loading) {
+    if (chartRef.current && !loading && data) {
       // 初始化图表
       if (!chartInstance.current) {
         chartInstance.current = echarts.init(chartRef.current);
       }
 
-      // 威胁类型颜色映射
-      const colorMap: { [key: string]: string } = {
-        '恶意软件': '#ff4d4f',
-        '网络入侵': '#faad14', 
-        '异常行为': '#52c41a',
-        '数据泄露': '#1890ff',
-        '钓鱼攻击': '#722ed1',
-        '暴力破解': '#eb2f96',
-        '其他': '#8c8c8c'
-      };
+      if (!data.categories) {
+        return;
+      }
 
       // 配置选项
       const option: echarts.EChartsOption = {
@@ -68,17 +65,24 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
             fontSize: 12
           },
           formatter: (name: string) => {
-            const item = data.find(d => d.name === name);
+            const item = data.categories.find(d => d.name === name);
             return item ? `${name} (${item.value})` : name;
           }
         },
         series: [
           {
             name: '威胁类型',
-            type: 'pie',
+            type: 'pie' as const,
             radius: ['40%', '70%'],
             center: ['60%', '50%'],
             avoidLabelOverlap: false,
+            data: data.categories.map(category => ({
+              name: category.name,
+              value: category.value,
+              itemStyle: {
+                color: category.color
+              }
+            })),
             itemStyle: {
               borderRadius: 4,
               borderColor: '#fff',
@@ -103,13 +107,7 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
             },
             labelLine: {
               show: false
-            },
-            data: data.map(item => ({
-              ...item,
-              itemStyle: {
-                color: colorMap[item.name] || colorMap['其他']
-              }
-            }))
+            }
           }
         ]
       };
@@ -155,7 +153,7 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!data || !data.categories) {
     return (
       <div style={{ 
         height, 

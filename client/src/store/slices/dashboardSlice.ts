@@ -11,6 +11,9 @@ export interface SecurityMetrics {
 
 export interface DashboardState {
   metrics: SecurityMetrics | null;
+  threatTrends: any | null;
+  threatDistribution: any | null;
+  deviceStats: any | null;
   loading: boolean;
   error: string | null;
   lastUpdated: string | null;
@@ -18,6 +21,9 @@ export interface DashboardState {
 
 const initialState: DashboardState = {
   metrics: null,
+  threatTrends: null,
+  threatDistribution: null,
+  deviceStats: null,
   loading: false,
   error: null,
   lastUpdated: null,
@@ -159,9 +165,13 @@ const dashboardSlice = createSlice({
       .addCase(fetchThreatTrends.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchThreatTrends.fulfilled, (state) => {
+      .addCase(fetchThreatTrends.fulfilled, (state, action) => {
         state.loading = false;
-        // 可以在这里处理威胁趋势数据
+        if (action.payload.success && action.payload.data) {
+          state.threatTrends = action.payload.data;
+        } else {
+          state.threatTrends = action.payload;
+        }
       })
       .addCase(fetchThreatTrends.rejected, (state, action) => {
         state.loading = false;
@@ -171,9 +181,13 @@ const dashboardSlice = createSlice({
       .addCase(fetchThreatDistribution.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchThreatDistribution.fulfilled, (state) => {
+      .addCase(fetchThreatDistribution.fulfilled, (state, action) => {
         state.loading = false;
-        // 可以在这里处理威胁分布数据
+        if (action.payload.success && action.payload.data) {
+          state.threatDistribution = action.payload.data;
+        } else {
+          state.threatDistribution = action.payload;
+        }
       })
       .addCase(fetchThreatDistribution.rejected, (state, action) => {
         state.loading = false;
@@ -183,9 +197,13 @@ const dashboardSlice = createSlice({
       .addCase(fetchDeviceStats.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchDeviceStats.fulfilled, (state) => {
+      .addCase(fetchDeviceStats.fulfilled, (state, action) => {
         state.loading = false;
-        // 可以在这里处理设备统计数据
+        if (action.payload.success && action.payload.data) {
+          state.deviceStats = action.payload.data;
+        } else {
+          state.deviceStats = action.payload;
+        }
       })
       .addCase(fetchDeviceStats.rejected, (state, action) => {
         state.loading = false;
