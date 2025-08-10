@@ -154,6 +154,7 @@ const DevicesPage: React.FC = () => {
         <Badge 
           status={getStatusColor(status) as any} 
           text={getStatusText(status)}
+          className="modern-badge"
         />
       ),
     },
@@ -189,6 +190,7 @@ const DevicesPage: React.FC = () => {
               size="small" 
               icon={<EyeOutlined />}
               onClick={() => handleViewDetail(record)}
+              className="modern-button"
             />
           </Tooltip>
           
@@ -200,6 +202,7 @@ const DevicesPage: React.FC = () => {
                 icon={<PauseCircleOutlined />}
                 style={{ color: '#faad14' }}
                 onClick={() => handleDeviceControl(record.id, 'stop')}
+                className="modern-button"
               />
             </Tooltip>
           ) : (
@@ -210,24 +213,26 @@ const DevicesPage: React.FC = () => {
                 icon={<PlayCircleOutlined />}
                 style={{ color: '#52c41a' }}
                 onClick={() => handleDeviceControl(record.id, 'start')}
+                className="modern-button"
               />
             </Tooltip>
           )}
           
-                      <Popconfirm
-              title="确定删除此设备？"
-              description="删除后将无法恢复设备的历史数据"
-              onConfirm={() => handleDeleteDevice()}
-              okText="删除"
-              cancelText="取消"
-              okType="danger"
-            >
+          <Popconfirm
+            title="确定删除此设备？"
+            description="删除后将无法恢复设备的历史数据"
+            onConfirm={() => handleDeleteDevice()}
+            okText="删除"
+            cancelText="取消"
+            okType="danger"
+          >
             <Tooltip title="删除设备">
               <Button 
                 type="text" 
                 size="small" 
                 icon={<DeleteOutlined />}
                 danger
+                className="modern-button"
               />
             </Tooltip>
           </Popconfirm>
@@ -237,64 +242,67 @@ const DevicesPage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+    <div className="fade-in-up">
+      <h1 style={{ 
+        marginBottom: 20, 
+        fontSize: 24, 
+        fontWeight: 600,
+        color: '#fff',
+        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+      }}>
         设备管理
       </h1>
 
       {/* 统计卡片 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="总设备数"
-              value={stats.total}
-              prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff', fontSize: 24 }}
-            />
-          </Card>
-        </Col>
+      <div className="compact-grid mb-20">
+        <div className="stat-card">
+          <Statistic
+            title="总设备数"
+            value={stats.total}
+            prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
+            valueStyle={{ color: '#1890ff', fontSize: 24, fontWeight: 600 }}
+          />
+        </div>
         
-        <Col xs={24} sm={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="在线设备"
-              value={stats.online}
-              valueStyle={{ color: '#52c41a', fontSize: 24 }}
-            />
-            <Progress 
-              percent={stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0} 
-              strokeColor="#52c41a" 
-              size="small" 
-              style={{ marginTop: 8 }}
-            />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <Statistic
+            title="在线设备"
+            value={stats.online}
+            valueStyle={{ color: '#52c41a', fontSize: 24, fontWeight: 600 }}
+          />
+          <Progress 
+            percent={stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0} 
+            strokeColor="#52c41a" 
+            size="small" 
+            style={{ marginTop: 8 }}
+            showInfo={false}
+          />
+        </div>
         
-        <Col xs={24} sm={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="离线设备"
-              value={stats.offline}
-              valueStyle={{ color: '#8c8c8c', fontSize: 24 }}
-            />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <Statistic
+            title="离线设备"
+            value={stats.offline}
+            valueStyle={{ color: '#8c8c8c', fontSize: 24, fontWeight: 600 }}
+          />
+        </div>
         
-        <Col xs={24} sm={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="异常设备"
-              value={stats.warning}
-              valueStyle={{ color: '#faad14', fontSize: 24 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+        <div className="stat-card">
+          <Statistic
+            title="异常设备"
+            value={stats.warning}
+            valueStyle={{ color: '#faad14', fontSize: 24, fontWeight: 600 }}
+          />
+        </div>
+      </div>
 
       {/* 筛选器 */}
-      <Card bordered={false} style={{ marginBottom: 16 }}>
-        <Space wrap>
+      <Card 
+        bordered={false} 
+        className="modern-card mb-16"
+        bodyStyle={{ padding: '16px' }}
+      >
+        <Space wrap size="small">
           <Input.Search
             placeholder="搜索设备名称或IP"
             allowClear
@@ -303,6 +311,7 @@ const DevicesPage: React.FC = () => {
             onSearch={handleSearch}
             style={{ width: 250 }}
             prefix={<SearchOutlined />}
+            className="modern-input"
           />
           
           <Select
@@ -311,6 +320,7 @@ const DevicesPage: React.FC = () => {
             style={{ width: 120 }}
             value={filters.type}
             onChange={(value) => handleFilterChange('type', value)}
+            className="modern-select"
           >
             <Option value="windows">Windows</Option>
             <Option value="linux">Linux</Option>
@@ -324,6 +334,7 @@ const DevicesPage: React.FC = () => {
             style={{ width: 120 }}
             value={filters.status}
             onChange={(value) => handleFilterChange('status', value)}
+            className="modern-select"
           >
             <Option value="online">在线</Option>
             <Option value="offline">离线</Option>
@@ -334,6 +345,8 @@ const DevicesPage: React.FC = () => {
             icon={<ReloadOutlined />} 
             onClick={handleRefresh}
             loading={loading}
+            className="modern-button"
+            type="primary"
           >
             刷新
           </Button>
@@ -341,16 +354,22 @@ const DevicesPage: React.FC = () => {
       </Card>
 
       {/* 设备列表 */}
-      <Card bordered={false}>
+      <Card 
+        bordered={false}
+        className="modern-card"
+        bodyStyle={{ padding: 0 }}
+      >
         <Table
           columns={columns}
           dataSource={devices}
           loading={loading}
           rowKey="id"
+          className="modern-table"
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+            style: { padding: '16px' }
           }}
           scroll={{ x: 800 }}
         />
@@ -362,11 +381,12 @@ const DevicesPage: React.FC = () => {
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+          <Button key="close" onClick={() => setDetailModalVisible(false)} className="modern-button">
             关闭
           </Button>,
         ]}
         width={800}
+        className="modern-modal"
       >
         {selectedDevice && (
           <div>
@@ -387,6 +407,7 @@ const DevicesPage: React.FC = () => {
                 <Badge 
                   status={getStatusColor(selectedDevice.status) as any} 
                   text={getStatusText(selectedDevice.status)}
+                  className="modern-badge"
                 />
               </Descriptions.Item>
               <Descriptions.Item label="客户端版本">

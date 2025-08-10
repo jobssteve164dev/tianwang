@@ -85,8 +85,6 @@ const AlertsPage: React.FC = () => {
     return colors[severity as keyof typeof colors] || 'default';
   };
 
-
-
   const columns = [
     {
       title: '告警标题',
@@ -108,7 +106,7 @@ const AlertsPage: React.FC = () => {
       key: 'severity',
       width: 100,
       render: (severity: string) => (
-        <Tag color={getSeverityColor(severity)}>
+        <Tag color={getSeverityColor(severity)} className="modern-tag">
           {severity.toUpperCase()}
         </Tag>
       ),
@@ -122,6 +120,7 @@ const AlertsPage: React.FC = () => {
         <Badge 
           status={status === 'active' ? 'error' : status === 'acknowledged' ? 'warning' : 'success'} 
           text={status === 'active' ? '活跃' : status === 'acknowledged' ? '已确认' : '已解决'}
+          className="modern-badge"
         />
       ),
     },
@@ -151,6 +150,7 @@ const AlertsPage: React.FC = () => {
               size="small" 
               icon={<EyeOutlined />}
               onClick={() => handleViewDetail(record)}
+              className="modern-button"
             />
           </Tooltip>
           
@@ -167,6 +167,7 @@ const AlertsPage: React.FC = () => {
                   size="small" 
                   icon={<CheckCircleOutlined />}
                   style={{ color: '#faad14' }}
+                  className="modern-button"
                 />
               </Tooltip>
             </Popconfirm>
@@ -185,6 +186,7 @@ const AlertsPage: React.FC = () => {
                   size="small" 
                   icon={<CloseCircleOutlined />}
                   style={{ color: '#52c41a' }}
+                  className="modern-button"
                 />
               </Tooltip>
             </Popconfirm>
@@ -195,14 +197,24 @@ const AlertsPage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+    <div className="fade-in-up">
+      <h1 style={{ 
+        marginBottom: 20, 
+        fontSize: 24, 
+        fontWeight: 600,
+        color: '#fff',
+        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+      }}>
         威胁告警管理
       </h1>
 
       {/* 筛选器 */}
-      <Card bordered={false} style={{ marginBottom: 16 }}>
-        <Space wrap>
+      <Card 
+        bordered={false} 
+        className="modern-card mb-16"
+        bodyStyle={{ padding: '16px' }}
+      >
+        <Space wrap size="small">
           <Input.Search
             placeholder="搜索告警标题或描述"
             allowClear
@@ -211,6 +223,7 @@ const AlertsPage: React.FC = () => {
             onSearch={handleSearch}
             style={{ width: 250 }}
             prefix={<SearchOutlined />}
+            className="modern-input"
           />
           
           <Select
@@ -219,6 +232,7 @@ const AlertsPage: React.FC = () => {
             style={{ width: 120 }}
             value={filters.severity}
             onChange={(value) => handleFilterChange('severity', value)}
+            className="modern-select"
           >
             <Option value="critical">紧急</Option>
             <Option value="high">高危</Option>
@@ -232,6 +246,7 @@ const AlertsPage: React.FC = () => {
             style={{ width: 120 }}
             value={filters.status}
             onChange={(value) => handleFilterChange('status', value)}
+            className="modern-select"
           >
             <Option value="active">活跃</Option>
             <Option value="acknowledged">已确认</Option>
@@ -244,6 +259,7 @@ const AlertsPage: React.FC = () => {
             style={{ width: 150 }}
             value={filters.type}
             onChange={(value) => handleFilterChange('type', value)}
+            className="modern-select"
           >
             <Option value="malware">恶意软件</Option>
             <Option value="intrusion">网络入侵</Option>
@@ -254,12 +270,15 @@ const AlertsPage: React.FC = () => {
           <RangePicker
             placeholder={['开始时间', '结束时间']}
             onChange={(dates) => handleFilterChange('dateRange', dates)}
+            style={{ borderRadius: 8 }}
           />
           
           <Button 
             icon={<ReloadOutlined />} 
             onClick={handleRefresh}
             loading={loading}
+            className="modern-button"
+            type="primary"
           >
             刷新
           </Button>
@@ -267,12 +286,17 @@ const AlertsPage: React.FC = () => {
       </Card>
 
       {/* 告警列表 */}
-      <Card bordered={false}>
+      <Card 
+        bordered={false}
+        className="modern-card"
+        bodyStyle={{ padding: 0 }}
+      >
         <Table
           columns={columns}
           dataSource={alerts}
           loading={loading}
           rowKey="id"
+          className="modern-table"
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
@@ -280,6 +304,7 @@ const AlertsPage: React.FC = () => {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+            style: { padding: '16px' }
           }}
           scroll={{ x: 800 }}
         />
@@ -291,7 +316,7 @@ const AlertsPage: React.FC = () => {
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+          <Button key="close" onClick={() => setDetailModalVisible(false)} className="modern-button">
             关闭
           </Button>,
           selectedAlert?.status === 'active' && (
@@ -302,6 +327,7 @@ const AlertsPage: React.FC = () => {
                 handleStatusChange(selectedAlert.id, 'acknowledged');
                 setDetailModalVisible(false);
               }}
+              className="modern-button"
             >
               确认告警
             </Button>
@@ -314,12 +340,14 @@ const AlertsPage: React.FC = () => {
                 handleStatusChange(selectedAlert.id, 'resolved');
                 setDetailModalVisible(false);
               }}
+              className="modern-button"
             >
               解决告警
             </Button>
           ),
         ].filter(Boolean)}
         width={800}
+        className="modern-modal"
       >
         {selectedAlert && (
           <Descriptions column={2} bordered>
@@ -327,7 +355,7 @@ const AlertsPage: React.FC = () => {
               {selectedAlert.title}
             </Descriptions.Item>
             <Descriptions.Item label="严重级别">
-              <Tag color={getSeverityColor(selectedAlert.severity)}>
+              <Tag color={getSeverityColor(selectedAlert.severity)} className="modern-tag">
                 {selectedAlert.severity.toUpperCase()}
               </Tag>
             </Descriptions.Item>
@@ -335,6 +363,7 @@ const AlertsPage: React.FC = () => {
               <Badge 
                 status={selectedAlert.status === 'active' ? 'error' : selectedAlert.status === 'acknowledged' ? 'warning' : 'success'} 
                 text={selectedAlert.status === 'active' ? '活跃' : selectedAlert.status === 'acknowledged' ? '已确认' : '已解决'}
+                className="modern-badge"
               />
             </Descriptions.Item>
             <Descriptions.Item label="告警类型">

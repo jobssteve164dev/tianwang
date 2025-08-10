@@ -127,7 +127,7 @@ const DashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex-center" style={{ height: 400 }}>
+      <div className="modern-loading">
         <Spin size="large" />
       </div>
     );
@@ -139,7 +139,8 @@ const DashboardPage: React.FC = () => {
         message="数据加载失败"
         description={error}
         type="error"
-        style={{ margin: '20px 0' }}
+        style={{ margin: '16px 0' }}
+        className="modern-card"
       />
     );
   }
@@ -148,166 +149,196 @@ const DashboardPage: React.FC = () => {
   const recentAlerts = alerts?.slice(0, 5) || [];
 
   return (
-    <div>
-      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+    <div className="fade-in-up">
+      <h1 style={{ 
+        marginBottom: 20, 
+        fontSize: 24, 
+        fontWeight: 600,
+        color: '#fff',
+        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+      }}>
         安全态势概览
       </h1>
 
       {/* 核心指标卡片 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="总威胁数"
-              value={metrics?.totalThreats || 0}
-              prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a', fontSize: 28 }}
-            />
-          </Card>
-        </Col>
+      <div className="compact-grid mb-20">
+        <div className="stat-card">
+          <Statistic
+            title="总威胁数"
+            value={metrics?.totalThreats || 0}
+            prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}
+            valueStyle={{ color: '#52c41a', fontSize: 28, fontWeight: 600 }}
+          />
+        </div>
         
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="活跃告警"
-              value={metrics?.activeAlerts || 0}
-              prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}
-              valueStyle={{ color: '#ff4d4f', fontSize: 28 }}
-            />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <Statistic
+            title="活跃告警"
+            value={metrics?.activeAlerts || 0}
+            prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}
+            valueStyle={{ color: '#ff4d4f', fontSize: 28, fontWeight: 600 }}
+          />
+        </div>
         
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="在线设备"
-              value={metrics?.connectedDevices || 0}
-              prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff', fontSize: 28 }}
-            />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <Statistic
+            title="在线设备"
+            value={metrics?.connectedDevices || 0}
+            prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
+            valueStyle={{ color: '#1890ff', fontSize: 28, fontWeight: 600 }}
+          />
+        </div>
         
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ textAlign: 'center' }}>
-            <Statistic
-              title="威胁趋势"
-              value={12.5}
-              precision={1}
-              suffix="%"
-              prefix={<RiseOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14', fontSize: 28 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+        <div className="stat-card">
+          <Statistic
+            title="威胁趋势"
+            value={12.5}
+            precision={1}
+            suffix="%"
+            prefix={<RiseOutlined style={{ color: '#faad14' }} />}
+            valueStyle={{ color: '#faad14', fontSize: 28, fontWeight: 600 }}
+          />
+        </div>
+      </div>
 
       {/* 详细分析区域 */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
-          <Card title="威胁趋势分析" bordered={false}>
-            <ThreatTrendChart 
-              data={threatTrendData} 
-              loading={chartsLoading}
-              height={300}
-            />
-          </Card>
-        </Col>
+      <div className="compact-grid-lg mb-20">
+        <Card 
+          title="威胁趋势分析" 
+          bordered={false}
+          className="modern-card"
+          headStyle={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderBottom: 'none',
+            borderRadius: '16px 16px 0 0'
+          }}
+        >
+          <ThreatTrendChart 
+            data={threatTrendData} 
+            loading={chartsLoading}
+            height={280}
+          />
+        </Card>
         
-        <Col xs={24} lg={8}>
-          <Card title="威胁类型分布" bordered={false}>
-            <ThreatDistributionChart 
-              data={threatDistributionData} 
-              loading={chartsLoading}
-              height={300}
-            />
-          </Card>
-        </Col>
-      </Row>
+        <Card 
+          title="威胁类型分布" 
+          bordered={false}
+          className="modern-card"
+          headStyle={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderBottom: 'none',
+            borderRadius: '16px 16px 0 0'
+          }}
+        >
+          <ThreatDistributionChart 
+            data={threatDistributionData} 
+            loading={chartsLoading}
+            height={280}
+          />
+        </Card>
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
-          <Card title="设备状态统计" bordered={false}>
-            <DeviceStatsChart 
-              data={deviceStatsData} 
-              loading={chartsLoading}
-              height={200}
-            />
-          </Card>
-        </Col>
+      <div className="compact-grid-lg">
+        <Card 
+          title="设备状态统计" 
+          bordered={false}
+          className="modern-card"
+          headStyle={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderBottom: 'none',
+            borderRadius: '16px 16px 0 0'
+          }}
+        >
+          <DeviceStatsChart 
+            data={deviceStatsData} 
+            loading={chartsLoading}
+            height={200}
+          />
+        </Card>
         
-        <Col xs={24} lg={12}>
-          <Card 
-            title="最近告警" 
-            bordered={false}
-            extra={
-              <Button 
-                type="link" 
-                icon={<ArrowRightOutlined />}
-                onClick={handleViewAllAlerts}
-              >
-                查看全部
-              </Button>
-            }
-          >
-            <div style={{ height: 200, overflow: 'hidden' }}>
-              {recentAlerts.length > 0 ? (
-                <List
-                  size="small"
-                  dataSource={recentAlerts}
-                  renderItem={(item: any) => (
-                    <List.Item
-                      style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}
-                      actions={[
-                        <Button 
-                          key="view"
-                          type="text" 
-                          size="small" 
-                          icon={<EyeOutlined />}
-                          onClick={() => navigate('/alerts')}
-                        />
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={
-                          <Space>
-                            <Tag color={getSeverityColor(item.severity)}>
-                              {item.severity.toUpperCase()}
-                            </Tag>
-                            <span style={{ fontSize: 13, fontWeight: 500 }}>
-                              {item.title}
-                            </span>
-                          </Space>
-                        }
-                        description={
-                          <div style={{ fontSize: 12, color: '#666' }}>
-                            <div>{item.type} • {item.source}</div>
-                            <div>{dayjs(item.timestamp).format('MM-DD HH:mm')}</div>
-                          </div>
-                        }
+        <Card 
+          title="最近告警" 
+          bordered={false}
+          className="modern-card"
+          headStyle={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderBottom: 'none',
+            borderRadius: '16px 16px 0 0'
+          }}
+          extra={
+            <Button 
+              type="text" 
+              icon={<ArrowRightOutlined />}
+              onClick={handleViewAllAlerts}
+              style={{ color: 'white' }}
+              className="modern-button"
+            >
+              查看全部
+            </Button>
+          }
+        >
+          <div style={{ height: 200, overflow: 'hidden' }}>
+            {recentAlerts.length > 0 ? (
+              <List
+                size="small"
+                dataSource={recentAlerts}
+                renderItem={(item: any) => (
+                  <List.Item
+                    style={{ 
+                      padding: '8px 0', 
+                      borderBottom: '1px solid rgba(0,0,0,0.06)',
+                      marginBottom: 4
+                    }}
+                    actions={[
+                      <Button 
+                        key="view"
+                        type="text" 
+                        size="small" 
+                        icon={<EyeOutlined />}
+                        onClick={() => navigate('/alerts')}
+                        className="modern-button"
                       />
-                    </List.Item>
-                  )}
-                />
-              ) : (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  height: '100%',
-                  color: '#999',
-                  fontSize: 14
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <AlertOutlined style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
-                    暂无活跃告警
-                  </div>
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <Space>
+                          <Tag 
+                            color={getSeverityColor(item.severity)}
+                            className="modern-tag"
+                          >
+                            {item.severity.toUpperCase()}
+                          </Tag>
+                          <span style={{ fontSize: 13, fontWeight: 500 }}>
+                            {item.title}
+                          </span>
+                        </Space>
+                      }
+                      description={
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                          <div>{item.type} • {item.source}</div>
+                          <div>{dayjs(item.timestamp).format('MM-DD HH:mm')}</div>
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <div className="modern-empty">
+                <div style={{ textAlign: 'center' }}>
+                  <AlertOutlined style={{ fontSize: 24, marginBottom: 8, display: 'block', color: '#999' }} />
+                  <div style={{ color: '#999', fontSize: 14 }}>暂无活跃告警</div>
                 </div>
-              )}
-            </div>
-          </Card>
-        </Col>
-      </Row>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };
