@@ -38,14 +38,13 @@ const htmlContent = `<!DOCTYPE html>
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            /* 添加顶部边距，避免与菜单栏重叠 */
-            padding-top: 28px;
         }
 
         .app-container {
             display: flex;
             height: 100vh;
             padding: 0;
+            margin-top: 28px; /* 为标题栏预留空间 */
         }
 
         /* 添加可拖动的标题栏区域 */
@@ -60,15 +59,43 @@ const htmlContent = `<!DOCTYPE html>
             z-index: 1000;
             display: flex;
             align-items: center;
-            justify-content: flex-start;
-            padding: 0;
+            padding: 0 12px;
+            border-bottom: 1px solid #333333;
+        }
+
+        .titlebar-controls {
+            display: flex;
+            gap: 8px;
+            margin-right: 12px;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-button.close {
+            background: #ff5f57;
+        }
+
+        .titlebar-button.minimize {
+            background: #febc2e;
+        }
+
+        .titlebar-button.maximize {
+            background: #28c940;
         }
 
         .titlebar-title {
             font-size: 12px;
             color: #888888;
             font-weight: 500;
-            margin-left: 80px; /* 为操作按钮预留空间 */
+            flex: 1;
         }
 
         .sidebar {
@@ -438,6 +465,11 @@ const htmlContent = `<!DOCTYPE html>
 <body>
     <!-- 可拖动的标题栏 -->
     <div class="titlebar">
+        <div class="titlebar-controls">
+            <button class="titlebar-button close" onclick="window.electronAPI.closeWindow()"></button>
+            <button class="titlebar-button minimize" onclick="window.electronAPI.minimizeWindow()"></button>
+            <button class="titlebar-button maximize" onclick="window.electronAPI.maximizeWindow()"></button>
+        </div>
         <div class="titlebar-title">TianWang Agent</div>
     </div>
     

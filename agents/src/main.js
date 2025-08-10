@@ -58,15 +58,9 @@ function createMainWindow() {
         },
         icon: path.join(__dirname, '../assets/icon.png'),
         show: false,
-        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-        // 添加窗口边距，避免与菜单栏重叠
-        titleBarOverlay: process.platform === 'darwin' ? {
-            color: '#000000',
-            symbolColor: '#ffffff',
-            height: 28
-        } : false,
-        // 设置窗口边距
-        trafficLightPosition: { x: 12, y: 12 }
+        titleBarStyle: 'hidden',
+        // 完全隐藏系统标题栏，使用自定义标题栏
+        frame: false
     });
 
     // 加载应用界面
@@ -123,6 +117,23 @@ function createMainWindow() {
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);
         return { action: 'deny' };
+    });
+
+    // 窗口控制IPC处理器
+    ipcMain.handle('window-close', () => {
+        mainWindow.close();
+    });
+
+    ipcMain.handle('window-minimize', () => {
+        mainWindow.minimize();
+    });
+
+    ipcMain.handle('window-maximize', () => {
+        if (mainWindow.isMaximized()) {
+            mainWindow.unmaximize();
+        } else {
+            mainWindow.maximize();
+        }
     });
 }
 
