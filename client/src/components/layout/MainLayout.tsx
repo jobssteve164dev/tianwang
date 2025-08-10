@@ -74,7 +74,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <ProLayout
       title="天网安全监控"
-      logo={<SafetyCertificateOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
+      logo={<SafetyCertificateOutlined style={{ fontSize: 28, color: '#667eea' }} />}
       collapsed={collapsed}
       onCollapse={setCollapsed}
       location={{
@@ -103,8 +103,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               placement="bottomRight"
             >
               <Space style={{ cursor: 'pointer', padding: '0 8px' }}>
-                <Avatar size="small" icon={<UserOutlined />} />
-                <span style={{ color: '#fff' }}>{user?.username || '用户'}</span>
+                <Avatar 
+                  size="small" 
+                  icon={<UserOutlined />} 
+                  style={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: '2px solid rgba(255, 255, 255, 0.3)'
+                  }} 
+                />
+                <span style={{ color: '#fff', fontWeight: 500 }}>{user?.username || '用户'}</span>
               </Space>
             </Dropdown>
           );
@@ -113,18 +120,66 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       headerTitleRender={(logo, title) => (
         <Space>
           {logo}
-          <span style={{ fontWeight: 600, fontSize: 18 }}>{title}</span>
+          <span style={{ 
+            fontWeight: 600, 
+            fontSize: 18, 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            {title}
+          </span>
         </Space>
       )}
       layout="mix"
       theme="dark"
       contentStyle={{
         margin: 0,
-        padding: 24,
-        minHeight: 'calc(100vh - 64px)',
+        padding: 16,
+        minHeight: 'calc(100vh - 56px)',
+        background: 'transparent',
       }}
+      style={{
+        background: 'transparent',
+      }}
+      siderMenuType="group"
+      menuHeaderRender={(logo, title) => (
+        <div style={{ 
+          padding: '16px 12px', 
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          marginBottom: 8
+        }}>
+          <Space>
+            {logo}
+            <span style={{ 
+              color: '#fff', 
+              fontWeight: 600, 
+              fontSize: 16,
+              opacity: collapsed ? 0 : 1,
+              transition: 'opacity 0.3s'
+            }}>
+              {title}
+            </span>
+          </Space>
+        </div>
+      )}
+      menuItemRender={(item, dom) => (
+        <div 
+          onClick={() => handleMenuItemClick(item.path || '/')}
+          style={{
+            margin: '4px 8px',
+            borderRadius: 8,
+            transition: 'all 0.3s ease',
+          }}
+        >
+          {dom}
+        </div>
+      )}
     >
-      {children}
+      <div className="compact-layout fade-in-up">
+        {children}
+      </div>
     </ProLayout>
   );
 };

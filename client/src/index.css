@@ -10,7 +10,8 @@ body {
     'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f0f2f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
 }
 
 code {
@@ -24,17 +25,147 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* 现代化卡片样式 */
+.modern-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.modern-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* 紧凑布局样式 */
+.compact-layout {
+  padding: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.compact-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.compact-grid-lg {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+}
+
+/* 现代化统计卡片 */
+.stat-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* 现代化按钮样式 */
+.modern-button {
+  border-radius: 8px;
+  border: none;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modern-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 现代化表格样式 */
+.modern-table {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.modern-table .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  font-weight: 600;
+}
+
+.modern-table .ant-table-tbody > tr:hover > td {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+/* 现代化标签样式 */
+.modern-tag {
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* 现代化输入框样式 */
+.modern-input {
+  border-radius: 8px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.modern-input:focus,
+.modern-input:hover {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* 现代化选择器样式 */
+.modern-select .ant-select-selector {
+  border-radius: 8px !important;
+  border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+.modern-select.ant-select-focused .ant-select-selector {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
 }
 
 /* 自定义类名 */
@@ -62,10 +193,121 @@ code {
   align-items: center;
 }
 
+.mb-8 {
+  margin-bottom: 8px;
+}
+
+.mb-12 {
+  margin-bottom: 12px;
+}
+
 .mb-16 {
   margin-bottom: 16px;
 }
 
+.mb-20 {
+  margin-bottom: 20px;
+}
+
 .mb-24 {
   margin-bottom: 24px;
+}
+
+/* 响应式工具类 */
+@media (max-width: 768px) {
+  .compact-layout {
+    padding: 12px;
+  }
+  
+  .compact-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .stat-card {
+    padding: 16px;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* 现代化加载动画 */
+.modern-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.modern-loading .ant-spin-dot {
+  font-size: 24px;
+}
+
+.modern-loading .ant-spin-dot i {
+  background-color: #667eea;
+}
+
+/* 现代化空状态 */
+.modern-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.modern-empty .ant-empty-description {
+  color: #999;
+  font-size: 14px;
+}
+
+/* 现代化徽章样式 */
+.modern-badge .ant-badge-count {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* 现代化模态框样式 */
+.modern-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modern-modal .ant-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.modern-modal .ant-modal-title {
+  color: white;
+  font-weight: 600;
+}
+
+.modern-modal .ant-modal-close {
+  color: white;
+}
+
+.modern-modal .ant-modal-close:hover {
+  color: rgba(255, 255, 255, 0.8);
 } 

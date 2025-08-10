@@ -71,6 +71,9 @@ function createMainWindow() {
 
     // 窗口事件处理
     mainWindow.once('ready-to-show', () => {
+        console.log('主窗口准备显示');
+        logger.info('主窗口准备显示');
+        
         if (!store.get('minimizeToTray', false)) {
             mainWindow.show();
         }
@@ -80,15 +83,31 @@ function createMainWindow() {
     });
 
     mainWindow.on('close', (event) => {
+        console.log('主窗口关闭事件触发');
+        logger.info('主窗口关闭事件触发');
+        
+        if (isQuitting) {
+            console.log('应用正在退出，允许窗口关闭');
+            logger.info('应用正在退出，允许窗口关闭');
+            return; // 允许窗口关闭
+        }
+        
         if (store.get('minimizeToTray', true)) {
+            console.log('阻止窗口关闭，隐藏窗口');
+            logger.info('阻止窗口关闭，隐藏窗口');
             event.preventDefault();
             mainWindow.hide();
         } else {
+            console.log('设置允许退出，退出应用');
+            logger.info('设置允许退出，退出应用');
+            isQuitting = true;
             app.quit();
         }
     });
 
     mainWindow.on('closed', () => {
+        console.log('主窗口已关闭');
+        logger.info('主窗口已关闭');
         mainWindow = null;
     });
 
@@ -141,159 +160,152 @@ function createSettingsWindow() {
 
 // 显示主窗口的通用函数
 function showMainWindow() {
+    console.log('showMainWindow被调用');
+    logger.info('showMainWindow被调用');
+    
     if (!mainWindow) {
+        console.log('主窗口不存在，创建新窗口');
+        logger.info('主窗口不存在，创建新窗口');
         createMainWindow();
         return;
     }
 
-    if (mainWindow.isMinimized()) {
-        mainWindow.restore();
+    try {
+        if (mainWindow.isMinimized()) {
+            console.log('窗口已最小化，恢复窗口');
+            logger.info('窗口已最小化，恢复窗口');
+            mainWindow.restore();
+        }
+        
+        if (!mainWindow.isVisible()) {
+            console.log('窗口不可见，显示窗口');
+            logger.info('窗口不可见，显示窗口');
+            mainWindow.show();
+        }
+        
+        console.log('聚焦窗口');
+        logger.info('聚焦窗口');
+        mainWindow.focus();
+        
+        // 确保窗口内容已加载
+        if (mainWindow.webContents.isLoading()) {
+            console.log('窗口内容正在加载，等待完成');
+            logger.info('窗口内容正在加载，等待完成');
+            mainWindow.webContents.once('did-finish-load', () => {
+                console.log('窗口内容加载完成');
+                logger.info('窗口内容加载完成');
+            });
+        } else {
+            console.log('窗口内容已加载完成');
+            logger.info('窗口内容已加载完成');
+        }
+        
+    } catch (error) {
+        console.error('显示主窗口时出错:', error);
+        logger.error('显示主窗口时出错:', error);
+        
+        // 如果出错，尝试重新创建窗口
+        console.log('尝试重新创建主窗口');
+        logger.info('尝试重新创建主窗口');
+        mainWindow = null;
+        createMainWindow();
     }
-    
-    if (!mainWindow.isVisible()) {
-        mainWindow.show();
-    }
-    
-    mainWindow.focus();
 }
 
 // 创建系统托盘
 function createTray() {
     try {
-        // 创建一个简单的16x16像素的图标
+        console.log('=== 开始创建菜单栏图标 ===');
+        logger.info('=== 开始创建菜单栏图标 ===');
+        
+        // 创建简单的图标
         const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAbwAAAG8B8aLcQwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3Njape.org5vuPBoAAAB9SURBVDiNY2AYBYMRMDIyMjAyMjL8//+f4f///wwsDAwMDP///2f4//8/AwMDA8P///8ZGBgYGP7//8/AwMDA8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+///P8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+//8/AAAb8QABn5Qj5QAAAABJRU5ErkJggg==');
         
+        console.log('图标创建成功');
+        logger.info('图标创建成功');
+        
+        // 创建托盘
         tray = new Tray(icon);
         
-        // 验证托盘对象是否创建成功
         if (!tray) {
             throw new Error('托盘对象创建失败');
         }
         
-        logger.info('托盘图标创建成功');
+        console.log('托盘对象创建成功');
+        logger.info('托盘对象创建成功');
+        
+        // 创建菜单
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '显示主窗口',
+                click: () => {
+                    console.log('菜单：显示主窗口被点击');
+                    logger.info('菜单：显示主窗口被点击');
+                    showMainWindow();
+                }
+            },
+            {
+                label: '设置',
+                click: () => {
+                    console.log('菜单：设置被点击');
+                    logger.info('菜单：设置被点击');
+                    createSettingsWindow();
+                }
+            },
+            { type: 'separator' },
+            {
+                label: '退出',
+                click: () => {
+                    console.log('菜单：退出被点击');
+                    logger.info('菜单：退出被点击');
+                    isQuitting = true;
+                    
+                    // 强制退出应用
+                    try {
+                        // 先尝试正常退出
+                        app.quit();
+                        
+                        // 如果3秒后还没有退出，强制退出
+                        setTimeout(() => {
+                            console.log('强制退出应用');
+                            logger.info('强制退出应用');
+                            process.exit(0);
+                        }, 3000);
+                    } catch (error) {
+                        console.error('退出应用时出错:', error);
+                        logger.error('退出应用时出错:', error);
+                        process.exit(0);
+                    }
+                }
+            }
+        ]);
+        
+        // 设置菜单和工具提示
+        tray.setContextMenu(contextMenu);
+        tray.setToolTip('TianWang Agent');
+        
+        // 设置双击事件
+        tray.on('double-click', () => {
+            console.log('托盘被双击');
+            logger.info('托盘被双击');
+            showMainWindow();
+        });
+        
+        console.log('托盘设置完成');
+        logger.info('托盘设置完成');
+        
     } catch (error) {
-        logger.error('创建托盘图标失败:', error);
+        console.error('创建托盘失败:', error);
+        logger.error('创建托盘失败:', error);
         tray = null;
-        return; // 如果托盘创建完全失败，直接返回，不创建菜单
     }
-
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: '显示主窗口',
-            click: () => {
-                showMainWindow();
-            }
-        },
-        {
-            label: '系统状态',
-            submenu: [
-                {
-                    label: '连接状态: 未连接',
-                    enabled: false,
-                    id: 'connection-status'
-                },
-                {
-                    label: '监控状态: 停止',
-                    enabled: false,
-                    id: 'monitor-status'
-                }
-            ]
-        },
-        { type: 'separator' },
-        {
-            label: '开始监控',
-            click: () => {
-                if (systemMonitor) {
-                    systemMonitor.start();
-                }
-                if (networkMonitor) {
-                    networkMonitor.start();
-                }
-                updateTrayMenu();
-            },
-            id: 'start-monitor'
-        },
-        {
-            label: '停止监控',
-            click: () => {
-                if (systemMonitor) {
-                    systemMonitor.stop();
-                }
-                if (networkMonitor) {
-                    networkMonitor.stop();
-                }
-                updateTrayMenu();
-            },
-            id: 'stop-monitor',
-            enabled: false
-        },
-        { type: 'separator' },
-        {
-            label: '设置',
-            click: () => {
-                createSettingsWindow();
-            }
-        },
-        {
-            label: '关于',
-            click: () => {
-                dialog.showMessageBox(mainWindow, {
-                    type: 'info',
-                    title: '关于 TianWang Agent',
-                    message: 'TianWang AI Security Monitoring System',
-                    detail: `版本: ${app.getVersion()}\n平台: ${os.platform()}\n架构: ${os.arch()}`
-                });
-            }
-        },
-        { type: 'separator' },
-        {
-            label: '退出',
-            click: () => {
-                isQuitting = true;
-                app.quit();
-            }
-        }
-    ]);
-
-    tray.setContextMenu(contextMenu);
-    tray.setToolTip('TianWang Agent');
-
-    tray.on('double-click', () => {
-        showMainWindow();
-    });
 }
 
-// 更新托盘菜单状态
+// 更新托盘菜单状态 - 简化版本
 function updateTrayMenu() {
-    if (!tray || typeof tray.getContextMenu !== 'function') {
-        logger.warn('托盘菜单更新失败：托盘对象不可用');
-        return;
-    }
-
-    try {
-        const menu = tray.getContextMenu();
-        if (!menu) {
-            logger.warn('托盘菜单更新失败：无法获取上下文菜单');
-            return;
-        }
-
-        const connectionStatus = agentService?.isConnected() ? '已连接' : '未连接';
-        const monitorStatus = (systemMonitor?.isRunning() || networkMonitor?.isRunning()) ? '运行中' : '停止';
-        
-        const connectionMenuItem = menu.getMenuItemById('connection-status');
-        const monitorMenuItem = menu.getMenuItemById('monitor-status');
-        const startMenuItem = menu.getMenuItemById('start-monitor');
-        const stopMenuItem = menu.getMenuItemById('stop-monitor');
-        
-        if (connectionMenuItem) connectionMenuItem.label = `连接状态: ${connectionStatus}`;
-        if (monitorMenuItem) monitorMenuItem.label = `监控状态: ${monitorStatus}`;
-        
-        const isMonitoring = systemMonitor?.isRunning() || networkMonitor?.isRunning();
-        if (startMenuItem) startMenuItem.enabled = !isMonitoring;
-        if (stopMenuItem) stopMenuItem.enabled = isMonitoring;
-    } catch (error) {
-        logger.error('更新托盘菜单失败:', error);
-    }
+    // 暂时禁用复杂的菜单更新逻辑
+    console.log('菜单更新功能暂时禁用');
+    logger.info('菜单更新功能暂时禁用');
 }
 
 // 初始化服务
@@ -578,25 +590,72 @@ ipcMain.handle('save-settings', async (event, settings) => {
 
 // 应用程序事件
 app.whenReady().then(() => {
+    console.log('=== 应用启动事件 ===');
+    logger.info('=== 应用启动事件 ===');
+    console.log('创建主窗口...');
+    logger.info('创建主窗口...');
     createMainWindow();
+    console.log('创建菜单栏图标...');
+    logger.info('创建菜单栏图标...');
     createTray();
+    console.log('设置应用就绪状态...');
+    logger.info('设置应用就绪状态...');
     appReady = true;
+    console.log('应用启动完成');
+    logger.info('应用启动完成');
+    
+    // 在macOS上，确保菜单栏图标可见
+    if (process.platform === 'darwin') {
+        console.log('macOS平台：应用已启动');
+        logger.info('macOS平台：应用已启动');
+        
+        // 简单的延迟检查
+        setTimeout(() => {
+            if (tray) {
+                console.log('托盘对象存在，应用应该正常运行');
+                logger.info('托盘对象存在，应用应该正常运行');
+            } else {
+                console.warn('托盘对象不存在');
+                logger.warn('托盘对象不存在');
+            }
+        }, 2000);
+    }
 });
 
 app.on('window-all-closed', () => {
-    // 在 macOS 上，保持应用程序运行
+    console.log('所有窗口已关闭');
+    logger.info('所有窗口已关闭');
+    
+    // 在 macOS 上，保持应用程序运行，除非用户明确退出
     if (process.platform !== 'darwin') {
+        console.log('非macOS平台，退出应用');
+        logger.info('非macOS平台，退出应用');
         app.quit();
+    } else {
+        console.log('macOS平台，保持应用运行');
+        logger.info('macOS平台，保持应用运行');
     }
 });
 
 app.on('activate', () => {
+    console.log('应用被激活');
+    logger.info('应用被激活');
+    
+    // 在macOS上，当点击dock图标时重新创建窗口
     if (BrowserWindow.getAllWindows().length === 0) {
+        console.log('没有窗口，重新创建主窗口');
+        logger.info('没有窗口，重新创建主窗口');
         createMainWindow();
+    } else {
+        console.log('已有窗口，显示主窗口');
+        logger.info('已有窗口，显示主窗口');
+        showMainWindow();
     }
 });
 
 app.on('before-quit', () => {
+    console.log('应用即将退出');
+    logger.info('应用即将退出');
     isQuitting = true;
     
     // 清理资源
