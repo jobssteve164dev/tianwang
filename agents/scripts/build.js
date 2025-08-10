@@ -38,12 +38,35 @@ const htmlContent = `<!DOCTYPE html>
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            /* 添加顶部边距，避免与菜单栏重叠 */
+            padding-top: 28px;
         }
 
         .app-container {
             display: flex;
             height: 100vh;
             padding: 0;
+        }
+
+        /* 添加可拖动的标题栏区域 */
+        .titlebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 28px;
+            background: #000000;
+            -webkit-app-region: drag;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .titlebar-title {
+            font-size: 12px;
+            color: #888888;
+            font-weight: 500;
         }
 
         .sidebar {
@@ -53,6 +76,7 @@ const htmlContent = `<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             padding: 20px 0;
+            -webkit-app-region: no-drag;
         }
 
         .main-content {
@@ -60,6 +84,7 @@ const htmlContent = `<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             background: #000000;
+            -webkit-app-region: no-drag;
         }
 
         .header {
@@ -153,6 +178,7 @@ const htmlContent = `<!DOCTYPE html>
             color: #ffffff;
             min-width: 80px;
             text-align: center;
+            -webkit-app-region: no-drag;
         }
 
         .btn:hover {
@@ -408,6 +434,11 @@ const htmlContent = `<!DOCTYPE html>
     </style>
 </head>
 <body>
+    <!-- 可拖动的标题栏 -->
+    <div class="titlebar">
+        <div class="titlebar-title">TianWang Agent</div>
+    </div>
+    
     <div class="app-container">
         <div class="sidebar">
             <div class="logo">

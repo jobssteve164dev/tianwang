@@ -58,7 +58,15 @@ function createMainWindow() {
         },
         icon: path.join(__dirname, '../assets/icon.png'),
         show: false,
-        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+        // 添加窗口边距，避免与菜单栏重叠
+        titleBarOverlay: process.platform === 'darwin' ? {
+            color: '#000000',
+            symbolColor: '#ffffff',
+            height: 28
+        } : false,
+        // 设置窗口边距
+        trafficLightPosition: { x: 12, y: 12 }
     });
 
     // 加载应用界面
