@@ -149,7 +149,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       }}
       headerTitleRender={(logo, title) => (
         <Space>
-          {logo}
           <span style={{ 
             fontWeight: 600, 
             fontSize: isMobile ? 16 : 18, 
@@ -184,7 +183,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <Space>
             {logo}
             <span style={{ 
-              color: '#fff', 
+              color: '#667eea', 
               fontWeight: 600, 
               fontSize: isMobile ? 14 : 16,
               opacity: collapsed ? 0 : 1,
