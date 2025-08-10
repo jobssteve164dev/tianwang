@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 class SystemMonitor extends EventEmitter {
     constructor() {
         super();
-        this.isRunning = false;
+        this.running = false;
         this.intervalId = null;
         this.config = {
             interval: 30000, // 30秒
@@ -25,13 +25,13 @@ class SystemMonitor extends EventEmitter {
 
     // 开始监控
     async start() {
-        if (this.isRunning) {
+        if (this.running) {
             logger.warn('系统监控已在运行');
             return;
         }
 
         logger.info('启动系统监控...');
-        this.isRunning = true;
+        this.running = true;
 
         // 立即收集一次数据
         await this.collectData();
@@ -55,13 +55,13 @@ class SystemMonitor extends EventEmitter {
 
     // 停止监控
     async stop() {
-        if (!this.isRunning) {
+        if (!this.running) {
             logger.warn('系统监控未运行');
             return;
         }
 
         logger.info('停止系统监控...');
-        this.isRunning = false;
+        this.running = false;
 
         // 清除定时器
         if (this.intervalId) {
@@ -361,7 +361,7 @@ class SystemMonitor extends EventEmitter {
 
     // 获取运行状态
     isRunning() {
-        return this.isRunning;
+        return this.running;
     }
 
     // 更新配置
@@ -370,7 +370,7 @@ class SystemMonitor extends EventEmitter {
         logger.info('系统监控配置已更新:', newConfig);
         
         // 如果正在运行，重启以应用新配置
-        if (this.isRunning) {
+        if (this.running) {
             this.stop().then(() => this.start());
         }
     }

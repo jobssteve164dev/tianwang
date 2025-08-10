@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, nativeImage } = require('electron');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
@@ -21,9 +21,12 @@ let systemMonitor = null;
 let networkMonitor = null;
 let securityService = null;
 let firewallService = null;
+let settingsWindow = null; // 新增：设置窗口
 
 // 应用程序是否已准备就绪
 let appReady = false;
+// 应用退出状态标志
+let isQuitting = false;
 
 // 开发模式检测
 const isDev = process.env.ELECTRON_IS_DEV === '1';
@@ -36,10 +39,7 @@ if (!gotTheLock) {
 } else {
     app.on('second-instance', () => {
         // 当运行第二个实例时，聚焦到主窗口
-        if (mainWindow) {
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.focus();
-        }
+        showMainWindow();
     });
 }
 
@@ -99,19 +99,89 @@ function createMainWindow() {
     });
 }
 
+// 创建设置窗口
+function createSettingsWindow() {
+    if (settingsWindow) {
+        settingsWindow.focus();
+        return;
+    }
+
+    settingsWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        minWidth: 600,
+        minHeight: 400,
+        parent: mainWindow,
+        modal: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            enableRemoteModule: false,
+            preload: path.join(__dirname, 'preload.js')
+        },
+        icon: path.join(__dirname, '../assets/icon.png'),
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
+    });
+
+    // 加载设置界面
+    if (isDev) {
+        settingsWindow.loadURL('http://localhost:3000/settings');
+    } else {
+        settingsWindow.loadFile(path.join(__dirname, '../build/index.html'));
+        // 发送消息到渲染进程，显示设置界面
+        settingsWindow.webContents.on('did-finish-load', () => {
+            settingsWindow.webContents.send('show-settings');
+        });
+    }
+
+    settingsWindow.on('closed', () => {
+        settingsWindow = null;
+    });
+}
+
+// 显示主窗口的通用函数
+function showMainWindow() {
+    if (!mainWindow) {
+        createMainWindow();
+        return;
+    }
+
+    if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+    }
+    
+    if (!mainWindow.isVisible()) {
+        mainWindow.show();
+    }
+    
+    mainWindow.focus();
+}
+
 // 创建系统托盘
 function createTray() {
-    const iconPath = path.join(__dirname, '../assets/tray-icon.png');
-    tray = new Tray(iconPath);
+    try {
+        // 创建一个简单的16x16像素的图标
+        const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAbwAAAG8B8aLcQwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3Njape.org5vuPBoAAAB9SURBVDiNY2AYBYMRMDIyMjAyMjL8//+f4f///wwsDAwMDP///2f4//8/AwMDA8P///8ZGBgYGP7//8/AwMDA8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+///P8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+//8/AAAb8QABn5Qj5QAAAABJRU5ErkJggg==');
+        
+        tray = new Tray(icon);
+        
+        // 验证托盘对象是否创建成功
+        if (!tray) {
+            throw new Error('托盘对象创建失败');
+        }
+        
+        logger.info('托盘图标创建成功');
+    } catch (error) {
+        logger.error('创建托盘图标失败:', error);
+        tray = null;
+        return; // 如果托盘创建完全失败，直接返回，不创建菜单
+    }
 
     const contextMenu = Menu.buildFromTemplate([
         {
             label: '显示主窗口',
             click: () => {
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.focus();
-                }
+                showMainWindow();
             }
         },
         {
@@ -161,10 +231,7 @@ function createTray() {
         {
             label: '设置',
             click: () => {
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.webContents.send('navigate-to', '/settings');
-                }
+                createSettingsWindow();
             }
         },
         {
@@ -182,6 +249,7 @@ function createTray() {
         {
             label: '退出',
             click: () => {
+                isQuitting = true;
                 app.quit();
             }
         }
@@ -191,27 +259,41 @@ function createTray() {
     tray.setToolTip('TianWang Agent');
 
     tray.on('double-click', () => {
-        if (mainWindow) {
-            mainWindow.show();
-            mainWindow.focus();
-        }
+        showMainWindow();
     });
 }
 
 // 更新托盘菜单状态
 function updateTrayMenu() {
-    if (!tray) return;
+    if (!tray || typeof tray.getContextMenu !== 'function') {
+        logger.warn('托盘菜单更新失败：托盘对象不可用');
+        return;
+    }
 
-    const menu = tray.getContextMenu();
-    const connectionStatus = agentService?.isConnected() ? '已连接' : '未连接';
-    const monitorStatus = (systemMonitor?.isRunning() || networkMonitor?.isRunning()) ? '运行中' : '停止';
-    
-    menu.getMenuItemById('connection-status').label = `连接状态: ${connectionStatus}`;
-    menu.getMenuItemById('monitor-status').label = `监控状态: ${monitorStatus}`;
-    
-    const isMonitoring = systemMonitor?.isRunning() || networkMonitor?.isRunning();
-    menu.getMenuItemById('start-monitor').enabled = !isMonitoring;
-    menu.getMenuItemById('stop-monitor').enabled = isMonitoring;
+    try {
+        const menu = tray.getContextMenu();
+        if (!menu) {
+            logger.warn('托盘菜单更新失败：无法获取上下文菜单');
+            return;
+        }
+
+        const connectionStatus = agentService?.isConnected() ? '已连接' : '未连接';
+        const monitorStatus = (systemMonitor?.isRunning() || networkMonitor?.isRunning()) ? '运行中' : '停止';
+        
+        const connectionMenuItem = menu.getMenuItemById('connection-status');
+        const monitorMenuItem = menu.getMenuItemById('monitor-status');
+        const startMenuItem = menu.getMenuItemById('start-monitor');
+        const stopMenuItem = menu.getMenuItemById('stop-monitor');
+        
+        if (connectionMenuItem) connectionMenuItem.label = `连接状态: ${connectionStatus}`;
+        if (monitorMenuItem) monitorMenuItem.label = `监控状态: ${monitorStatus}`;
+        
+        const isMonitoring = systemMonitor?.isRunning() || networkMonitor?.isRunning();
+        if (startMenuItem) startMenuItem.enabled = !isMonitoring;
+        if (stopMenuItem) stopMenuItem.enabled = isMonitoring;
+    } catch (error) {
+        logger.error('更新托盘菜单失败:', error);
+    }
 }
 
 // 初始化服务
@@ -219,9 +301,14 @@ async function initializeServices() {
     try {
         logger.info('初始化代理服务...');
 
-        // 初始化代理服务
-        agentService = new AgentService();
-        await agentService.initialize();
+        // 初始化代理服务（使用try-catch避免循环引用错误）
+        try {
+            agentService = new AgentService();
+            await agentService.initialize();
+        } catch (agentError) {
+            logger.error('代理服务初始化失败:', agentError.message);
+            // 继续初始化其他服务，不中断整个流程
+        }
 
         // 初始化系统监控
         systemMonitor = new SystemMonitor();
@@ -297,8 +384,14 @@ async function initializeServices() {
             }
         });
 
-        // 连接到服务器
-        await agentService.connect();
+        // 尝试连接到服务器（可选，不阻塞启动）
+        if (agentService) {
+            try {
+                await agentService.connect();
+            } catch (connectError) {
+                logger.warn('服务器连接失败，将在后台重试:', connectError.message);
+            }
+        }
 
         // 更新托盘状态
         updateTrayMenu();
@@ -354,12 +447,22 @@ ipcMain.handle('stop-monitoring', async () => {
 });
 
 ipcMain.handle('get-monitoring-status', async () => {
-    return {
-        system: systemMonitor?.isRunning() || false,
-        network: networkMonitor?.isRunning() || false,
-        connected: agentService?.isConnected() || false,
-        firewall: firewallService?.isEnabled || false
-    };
+    try {
+        return {
+            system: systemMonitor?.isRunning() || false,
+            network: networkMonitor?.isRunning() || false,
+            connected: agentService?.isConnected ? agentService.isConnected() : false,
+            firewall: firewallService?.isEnabled || false
+        };
+    } catch (error) {
+        logger.error('获取监控状态失败:', error);
+        return {
+            system: false,
+            network: false,
+            connected: false,
+            firewall: false
+        };
+    }
 });
 
 // 防火墙相关IPC处理
@@ -439,6 +542,40 @@ ipcMain.handle('firewall-disable-auto-block', async () => {
     }
 });
 
+// 设置相关IPC处理
+ipcMain.handle('get-settings', async () => {
+    try {
+        return {
+            monitorInterval: store.get('monitorInterval', 30),
+            autoStart: store.get('autoStart', false),
+            minimizeToTray: store.get('minimizeToTray', true),
+            autoBlock: store.get('autoBlock', false)
+        };
+    } catch (error) {
+        logger.error('获取设置失败:', error);
+        return null;
+    }
+});
+
+ipcMain.handle('save-settings', async (event, settings) => {
+    try {
+        store.set('monitorInterval', settings.monitorInterval);
+        store.set('autoStart', settings.autoStart);
+        store.set('minimizeToTray', settings.minimizeToTray);
+        store.set('autoBlock', settings.autoBlock);
+        
+        // 如果启用了自动阻止，更新防火墙服务配置
+        if (firewallService) {
+            firewallService.config.autoBlock = settings.autoBlock;
+        }
+        
+        return { success: true };
+    } catch (error) {
+        logger.error('保存设置失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // 应用程序事件
 app.whenReady().then(() => {
     createMainWindow();
@@ -460,24 +597,50 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+    isQuitting = true;
+    
     // 清理资源
-    if (systemMonitor) {
-        systemMonitor.stop();
-    }
-    if (networkMonitor) {
-        networkMonitor.stop();
-    }
-    if (agentService) {
-        agentService.disconnect();
+    try {
+        if (systemMonitor) {
+            systemMonitor.stop();
+        }
+        if (networkMonitor) {
+            networkMonitor.stop();
+        }
+        if (agentService) {
+            agentService.disconnect();
+        }
+    } catch (error) {
+        logger.warn('清理资源时出错:', error.message);
     }
 });
 
 // 处理未捕获的异常
 process.on('uncaughtException', (error) => {
+    // 忽略EPIPE错误，这通常是无害的
+    if (error.code === 'EPIPE' || error.message.includes('EPIPE')) {
+        logger.warn('忽略EPIPE错误（管道已关闭）:', error.message);
+        return;
+    }
+    
     logger.error('未捕获的异常:', error);
-    dialog.showErrorBox('应用程序错误', `发生未知错误: ${error.message}`);
+    
+    // 只在主进程存在且未退出时才显示错误对话框
+    if (app && !isQuitting) {
+        try {
+            dialog.showErrorBox('应用程序错误', `发生未知错误: ${error.message}`);
+        } catch (dialogError) {
+            logger.error('显示错误对话框失败:', dialogError);
+        }
+    }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+    // 忽略EPIPE相关的Promise拒绝
+    if (reason && (reason.code === 'EPIPE' || reason.message?.includes('EPIPE'))) {
+        logger.warn('忽略EPIPE Promise拒绝:', reason.message);
+        return;
+    }
+    
     logger.error('未处理的Promise拒绝:', reason);
 }); 

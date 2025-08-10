@@ -47,6 +47,7 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "build/**/*",
       "node_modules/**/*"
     ],
     "mac": {

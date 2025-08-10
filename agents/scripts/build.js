@@ -332,7 +332,127 @@ const htmlContent = `<!DOCTYPE html>
         // 显示设置
         function showSettings() {
             addLog('打开设置界面...');
-            // TODO: 实现设置界面
+            
+            // 创建设置对话框
+            const settingsDialog = document.createElement('div');
+            settingsDialog.style.cssText = 
+                'position: fixed;' +
+                'top: 0;' +
+                'left: 0;' +
+                'width: 100%;' +
+                'height: 100%;' +
+                'background: rgba(0, 0, 0, 0.8);' +
+                'display: flex;' +
+                'justify-content: center;' +
+                'align-items: center;' +
+                'z-index: 1000;';
+            
+            const settingsContent = document.createElement('div');
+            settingsContent.style.cssText = 
+                'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
+                'border-radius: 12px;' +
+                'padding: 30px;' +
+                'max-width: 500px;' +
+                'width: 90%;' +
+                'color: white;' +
+                'border: 1px solid rgba(255, 255, 255, 0.2);';
+            
+            settingsContent.innerHTML = 
+                '<h2 style="margin-top: 0; text-align: center;">⚙️ 设置</h2>' +
+                
+                '<div style="margin-bottom: 20px;">' +
+                    '<label style="display: block; margin-bottom: 5px;">监控间隔 (秒):</label>' +
+                    '<input type="number" id="monitor-interval" value="30" min="10" max="300" ' +
+                           'style="width: 100%; padding: 8px; border-radius: 4px; border: none; background: rgba(255,255,255,0.2); color: white;">' +
+                '</div>' +
+                
+                '<div style="margin-bottom: 20px;">' +
+                    '<label style="display: block; margin-bottom: 5px;">' +
+                        '<input type="checkbox" id="auto-start" style="margin-right: 8px;">' +
+                        '开机自动启动' +
+                    '</label>' +
+                '</div>' +
+                
+                '<div style="margin-bottom: 20px;">' +
+                    '<label style="display: block; margin-bottom: 5px;">' +
+                        '<input type="checkbox" id="minimize-to-tray" style="margin-right: 8px;">' +
+                        '最小化到托盘' +
+                    '</label>' +
+                '</div>' +
+                
+                '<div style="margin-bottom: 20px;">' +
+                    '<label style="display: block; margin-bottom: 5px;">' +
+                        '<input type="checkbox" id="auto-block" style="margin-right: 8px;">' +
+                        '自动阻止威胁IP' +
+                    '</label>' +
+                '</div>' +
+                
+                '<div style="text-align: center; margin-top: 30px;">' +
+                    '<button onclick="saveSettings()" style="' +
+                        'padding: 10px 20px;' +
+                        'margin-right: 10px;' +
+                        'border: none;' +
+                        'border-radius: 6px;' +
+                        'background: #4CAF50;' +
+                        'color: white;' +
+                        'cursor: pointer;' +
+                    '">保存</button>' +
+                    '<button onclick="closeSettings()" style="' +
+                        'padding: 10px 20px;' +
+                        'border: none;' +
+                        'border-radius: 6px;' +
+                        'background: rgba(255,255,255,0.2);' +
+                        'color: white;' +
+                        'cursor: pointer;' +
+                    '">取消</button>' +
+                '</div>';
+            
+            settingsDialog.appendChild(settingsContent);
+            document.body.appendChild(settingsDialog);
+            
+            // 加载当前设置
+            loadSettings();
+        }
+        
+        // 保存设置
+        async function saveSettings() {
+            try {
+                const settings = {
+                    monitorInterval: parseInt(document.getElementById('monitor-interval').value),
+                    autoStart: document.getElementById('auto-start').checked,
+                    minimizeToTray: document.getElementById('minimize-to-tray').checked,
+                    autoBlock: document.getElementById('auto-block').checked
+                };
+                
+                await window.electronAPI.saveSettings(settings);
+                addLog('设置已保存', 'success');
+                closeSettings();
+            } catch (error) {
+                addLog('保存设置失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 关闭设置
+        function closeSettings() {
+            const dialog = document.querySelector('div[style*="position: fixed"]');
+            if (dialog) {
+                dialog.remove();
+            }
+        }
+        
+        // 加载设置
+        async function loadSettings() {
+            try {
+                const settings = await window.electronAPI.getSettings();
+                if (settings) {
+                    document.getElementById('monitor-interval').value = settings.monitorInterval || 30;
+                    document.getElementById('auto-start').checked = settings.autoStart || false;
+                    document.getElementById('minimize-to-tray').checked = settings.minimizeToTray || false;
+                    document.getElementById('auto-block').checked = settings.autoBlock || false;
+                }
+            } catch (error) {
+                addLog('加载设置失败: ' + error.message, 'error');
+            }
         }
 
         // 显示日志

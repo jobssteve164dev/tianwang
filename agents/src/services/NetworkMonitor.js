@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 class NetworkMonitor extends EventEmitter {
     constructor() {
         super();
-        this.isRunning = false;
+        this.running = false;
         this.intervalId = null;
         this.config = {
             interval: 60000, // 1分钟
@@ -25,13 +25,13 @@ class NetworkMonitor extends EventEmitter {
 
     // 开始监控
     async start() {
-        if (this.isRunning) {
+        if (this.running) {
             logger.warn('网络监控已在运行');
             return;
         }
 
         logger.info('启动网络监控...');
-        this.isRunning = true;
+        this.running = true;
 
         // 立即收集一次数据
         await this.collectData();
@@ -50,13 +50,13 @@ class NetworkMonitor extends EventEmitter {
 
     // 停止监控
     async stop() {
-        if (!this.isRunning) {
+        if (!this.running) {
             logger.warn('网络监控未运行');
             return;
         }
 
         logger.info('停止网络监控...');
-        this.isRunning = false;
+        this.running = false;
 
         // 清除定时器
         if (this.intervalId) {
@@ -479,7 +479,7 @@ class NetworkMonitor extends EventEmitter {
 
     // 获取运行状态
     isRunning() {
-        return this.isRunning;
+        return this.running;
     }
 
     // 更新配置
@@ -488,7 +488,7 @@ class NetworkMonitor extends EventEmitter {
         logger.info('网络监控配置已更新:', newConfig);
         
         // 如果正在运行，重启以应用新配置
-        if (this.isRunning) {
+        if (this.running) {
             this.stop().then(() => this.start());
         }
     }

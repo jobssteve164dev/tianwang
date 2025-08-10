@@ -35,12 +35,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onNavigate: (callback) => {
         ipcRenderer.on('navigate-to', (event, path) => callback(path));
     },
+    onShowSettings: (callback) => {
+        ipcRenderer.on('show-settings', (event) => callback());
+    },
     onIPBlocked: (callback) => {
         ipcRenderer.on('ip-blocked', (event, data) => callback(data));
     },
     onIPUnblocked: (callback) => {
         ipcRenderer.on('ip-unblocked', (event, data) => callback(data));
     },
+    
+    // 设置管理
+    getSettings: () => ipcRenderer.invoke('get-settings'),
+    saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
     
     // 移除监听器
     removeAllListeners: (channel) => {

@@ -49,17 +49,17 @@ class AgentService extends EventEmitter {
 
     // 注册代理到服务器
     async registerAgent() {
-        const agentInfo = {
-            agentId: this.agentId,
-            hostname: os.hostname(),
-            platform: os.platform(),
-            arch: os.arch(),
-            version: process.env.npm_package_version || '1.0.0',
-            capabilities: this.getCapabilities(),
-            systemInfo: await this.getSystemInfo()
-        };
-
         try {
+            const agentInfo = {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                platform: os.platform(),
+                arch: os.arch(),
+                version: process.env.npm_package_version || '1.0.0',
+                capabilities: this.getCapabilities(),
+                systemInfo: await this.getSystemInfo()
+            };
+
             const response = await axios.post(`${this.config.apiUrl}/agents/register`, agentInfo);
             this.authToken = response.data.token;
             logger.info('代理注册成功', { agentId: this.agentId });
@@ -101,36 +101,52 @@ class AgentService extends EventEmitter {
                 si.networkInterfaces()
             ]);
 
-            return {
+            // 安全地提取系统信息，避免循环引用
+            const safeSystemInfo = {
                 cpu: {
-                    manufacturer: cpu.manufacturer,
-                    brand: cpu.brand,
-                    cores: cpu.cores,
-                    physicalCores: cpu.physicalCores,
-                    speed: cpu.speed
+                    manufacturer: cpu.manufacturer || '',
+                    brand: cpu.brand || '',
+                    cores: cpu.cores || 0,
+                    physicalCores: cpu.physicalCores || 0,
+                    speed: cpu.speed || 0
                 },
                 memory: {
-                    total: mem.total,
-                    available: mem.available
+                    total: mem.total || 0,
+                    available: mem.available || 0
                 },
                 os: {
-                    platform: osInfo.platform,
-                    distro: osInfo.distro,
-                    release: osInfo.release,
-                    kernel: osInfo.kernel,
-                    arch: osInfo.arch
+                    platform: osInfo.platform || '',
+                    distro: osInfo.distro || '',
+                    release: osInfo.release || '',
+                    kernel: osInfo.kernel || '',
+                    arch: osInfo.arch || ''
                 },
-                network: network.filter(iface => !iface.internal).map(iface => ({
-                    iface: iface.iface,
-                    type: iface.type,
-                    mac: iface.mac,
-                    ip4: iface.ip4,
-                    ip6: iface.ip6
-                }))
+                network: []
             };
+
+            // 安全地处理网络接口信息
+            if (Array.isArray(network)) {
+                safeSystemInfo.network = network
+                    .filter(iface => iface && !iface.internal)
+                    .map(iface => ({
+                        iface: iface.iface || '',
+                        type: iface.type || '',
+                        mac: iface.mac || '',
+                        ip4: iface.ip4 || '',
+                        ip6: iface.ip6 || ''
+                    }));
+            }
+
+            return safeSystemInfo;
         } catch (error) {
             logger.error('获取系统信息失败:', error);
-            return {};
+            // 返回基本的系统信息
+            return {
+                cpu: { manufacturer: '', brand: '', cores: 0, physicalCores: 0, speed: 0 },
+                memory: { total: 0, available: 0 },
+                os: { platform: os.platform(), distro: '', release: '', kernel: '', arch: os.arch() },
+                network: []
+            };
         }
     }
 
