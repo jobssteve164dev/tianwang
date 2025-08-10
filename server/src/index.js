@@ -144,56 +144,119 @@ app.use('*', (req, res) => {
 // 初始化函数
 async function initialize() {
   try {
+    console.log('🚀 Starting TianWang Security Monitoring System...');
     logger.info('🚀 Starting TianWang Security Monitoring System...');
 
     // 连接数据库
+    console.log('📊 Connecting to databases...');
     logger.info('📊 Connecting to databases...');
-    await connectDatabases();
-    logger.info('✅ Databases connected successfully');
+    try {
+      await connectDatabases();
+      console.log('✅ Databases connected successfully');
+      logger.info('✅ Databases connected successfully');
+    } catch (dbError) {
+      console.error('❌ Database connection failed:', dbError.message);
+      logger.error('❌ Database connection failed:', dbError);
+      // 继续执行，不阻塞启动
+    }
 
-    // 初始化Kafka
-    logger.info('📨 Initializing Kafka...');
-    await initializeKafka();
-    logger.info('✅ Kafka initialized successfully');
+    // 初始化Kafka（暂时跳过）
+    console.log('📨 Skipping Kafka initialization for now...');
+    logger.info('📨 Skipping Kafka initialization for now...');
+    console.log('✅ Kafka initialization skipped');
+    logger.info('✅ Kafka initialization skipped');
 
     // 初始化WebSocket服务
+    console.log('🔗 Initializing WebSocket service...');
     logger.info('🔗 Initializing WebSocket service...');
-    WebSocketService.initialize(server);
-    logger.info('✅ WebSocket service initialized successfully');
+    try {
+      WebSocketService.initialize(server);
+      console.log('✅ WebSocket service initialized successfully');
+      logger.info('✅ WebSocket service initialized successfully');
+    } catch (wsError) {
+      console.error('❌ WebSocket service initialization failed:', wsError.message);
+      logger.error('❌ WebSocket service initialization failed:', wsError);
+    }
 
     // 初始化通知服务
+    console.log('📧 Initializing notification service...');
     logger.info('📧 Initializing notification service...');
-    notificationService = new NotificationService();
-    await notificationService.initialize();
-    logger.info('✅ Notification service initialized successfully');
+    try {
+      notificationService = new NotificationService();
+      await notificationService.initialize();
+      console.log('✅ Notification service initialized successfully');
+      logger.info('✅ Notification service initialized successfully');
+    } catch (notifyError) {
+      console.error('❌ Notification service initialization failed:', notifyError.message);
+      logger.error('❌ Notification service initialization failed:', notifyError);
+    }
 
     // 初始化报告服务
+    console.log('📊 Initializing report service...');
     logger.info('📊 Initializing report service...');
-    reportService = new ReportService();
-    await reportService.initialize();
-    logger.info('✅ Report service initialized successfully');
+    try {
+      reportService = new ReportService();
+      await reportService.initialize();
+      console.log('✅ Report service initialized successfully');
+      logger.info('✅ Report service initialized successfully');
+    } catch (reportError) {
+      console.error('❌ Report service initialization failed:', reportError.message);
+      logger.error('❌ Report service initialization failed:', reportError);
+    }
 
     // 初始化安全服务
+    console.log('🔐 Initializing security services...');
     logger.info('🔐 Initializing security services...');
-    await keyManagementService.initialize();
-    logger.info('✅ Key management service initialized successfully');
-    logger.info('✅ Device fingerprint service initialized successfully');
-    logger.info('✅ Registration code service initialized successfully');
+    try {
+      await keyManagementService.initialize();
+      console.log('✅ Key management service initialized successfully');
+      logger.info('✅ Key management service initialized successfully');
+      console.log('✅ Device fingerprint service initialized successfully');
+      logger.info('✅ Device fingerprint service initialized successfully');
+      console.log('✅ Registration code service initialized successfully');
+      logger.info('✅ Registration code service initialized successfully');
+    } catch (securityError) {
+      console.error('❌ Security services initialization failed:', securityError.message);
+      logger.error('❌ Security services initialization failed:', securityError);
+    }
 
     // 设置路由服务实例
-    setRouteServices(notificationService, reportService);
+    console.log('🔧 Setting up route services...');
+    try {
+      setRouteServices(notificationService, reportService);
+      console.log('✅ Route services configured successfully');
+    } catch (routeError) {
+      console.error('❌ Route services configuration failed:', routeError.message);
+      logger.error('❌ Route services configuration failed:', routeError);
+    }
 
     // 启动服务器
     const port = config.app.port;
-    server.listen(port, config.app.host, () => {
-      logger.info(`🌟 Server running on ${config.app.host}:${port}`);
-      logger.info(`📖 API Documentation: http://${config.app.host}:${port}/api-docs`);
-      logger.info(`🔍 Health Check: http://${config.app.host}:${port}/health`);
-      logger.info(`🔗 WebSocket Endpoint: ws://${config.app.host}:${port}/ws`);
-      logger.info(`🌍 Environment: ${config.app.env}`);
-    });
+    console.log(`🚀 Starting server on ${config.app.host}:${port}...`);
+    logger.info(`🚀 Starting server on ${config.app.host}:${port}...`);
+    
+    try {
+      server.listen(port, config.app.host, () => {
+        console.log(`🌟 Server running on ${config.app.host}:${port}`);
+        logger.info(`🌟 Server running on ${config.app.host}:${port}`);
+        console.log(`📖 API Documentation: http://${config.app.host}:${port}/api-docs`);
+        logger.info(`📖 API Documentation: http://${config.app.host}:${port}/api-docs`);
+        console.log(`🔍 Health Check: http://${config.app.host}:${port}/health`);
+        logger.info(`🔍 Health Check: http://${config.app.host}:${port}/health`);
+        console.log(`🔗 WebSocket Endpoint: ws://${config.app.host}:${port}/ws`);
+        logger.info(`🔗 WebSocket Endpoint: ws://${config.app.host}:${port}/ws`);
+        console.log(`🌍 Environment: ${config.app.env}`);
+        logger.info(`🌍 Environment: ${config.app.env}`);
+      });
+    } catch (serverError) {
+      console.error('❌ Server startup failed:', serverError.message);
+      logger.error('❌ Server startup failed:', serverError);
+      throw serverError;
+    }
 
   } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Stack trace:', error.stack);
     logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
@@ -235,7 +298,27 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // 启动应用
 if (require.main === module) {
-  initialize();
+  console.log('🚀 Starting application...');
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Port:', process.env.APP_PORT || 8000);
+  
+  // 添加未捕获异常处理
+  process.on('uncaughtException', (error) => {
+    console.error('💥 Uncaught Exception:', error.message);
+    console.error('Stack trace:', error.stack);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  });
+
+  initialize().catch((error) => {
+    console.error('💥 Failed to initialize application:', error.message);
+    console.error('Stack trace:', error.stack);
+    process.exit(1);
+  });
 }
 
-module.exports = { app, server, io }; 
+module.exports = { app, server, io, initialize }; 

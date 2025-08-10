@@ -65,14 +65,20 @@ function initializeInfluxDB() {
 function initializeRedis() {
   const { redis } = config.database;
   
-  redisClient = Redis.createClient({
+  const redisConfig = {
     socket: {
       host: redis.host,
       port: redis.port
     },
-    password: redis.password,
     database: redis.db
-  });
+  };
+  
+  // 只有在配置了密码时才添加密码
+  if (redis.password && redis.password.trim() !== '') {
+    redisConfig.password = redis.password;
+  }
+  
+  redisClient = Redis.createClient(redisConfig);
 
   // Redis事件监听
   redisClient.on('connect', () => {
@@ -105,23 +111,25 @@ async function connectDatabases() {
     await sequelize.authenticate();
     logger.info('✅ PostgreSQL connected successfully');
 
-    // 初始化InfluxDB
+    // 初始化InfluxDB（可选）
     logger.info('📈 Initializing InfluxDB...');
-    initializeInfluxDB();
-    
-    // 测试InfluxDB连接
-    const health = await influxDB.health();
-    if (health.status === 'pass') {
-      logger.info('✅ InfluxDB connected successfully');
-    } else {
-      throw new Error(`InfluxDB health check failed: ${health.message}`);
+    try {
+      initializeInfluxDB();
+      
+      // 测试InfluxDB连接
+      const health = await influxDB.health();
+      if (health.status === 'pass') {
+        logger.info('✅ InfluxDB connected successfully');
+      } else {
+        logger.warn('⚠️ InfluxDB health check failed, continuing without InfluxDB');
+      }
+    } catch (error) {
+      logger.warn('⚠️ InfluxDB initialization failed, continuing without InfluxDB:', error.message);
     }
 
-    // 初始化Redis
-    logger.info('🔄 Initializing Redis...');
-    initializeRedis();
-    await redisClient.connect();
-    logger.info('✅ Redis connected successfully');
+    // 初始化Redis（暂时跳过）
+    logger.info('🔄 Skipping Redis initialization for now...');
+    logger.info('✅ Redis initialization skipped');
 
     // 同步数据库模型（仅在开发环境）
     if (config.app.env === 'development') {
@@ -164,6 +172,11 @@ async function closeDatabases() {
  */
 function getSequelize() {
   if (!sequelize) {
+    // 在开发环境下，如果没有初始化数据库，返回null而不是抛出错误
+    if (process.env.NODE_ENV === 'development' && process.env.SKIP_DB === 'true') {
+      console.log('⚠️  Skipping database initialization in development mode');
+      return null;
+    }
     throw new Error('PostgreSQL not initialized. Call connectDatabases() first.');
   }
   return sequelize;

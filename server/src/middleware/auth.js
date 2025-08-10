@@ -4,7 +4,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const models = require('../models');
 const config = require('../config');
 const logger = require('../utils/logger');
 
@@ -27,8 +27,16 @@ const authenticate = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, config.jwt.secret);
       
+      // 检查模型是否可用
+      if (!models.User) {
+        return res.status(503).json({
+          error: 'Database not available',
+          code: 'DB_UNAVAILABLE'
+        });
+      }
+
       // 查找用户
-      const user = await User.findByPk(decoded.userId, {
+      const user = await models.User.findByPk(decoded.userId, {
         include: ['organization']
       });
       
@@ -178,6 +186,7 @@ const verifyRefreshToken = (token) => {
 
 module.exports = {
   authenticate,
+  protect: authenticate, // 别名
   optionalAuth,
   authorize,
   requireOrganization,

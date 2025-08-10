@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const url = require('url');
 const logger = require('../utils/logger');
-const Agent = require('../models/Agent');
+const models = require('../models');
 const keyManagementService = require('./KeyManagementService');
 
 class WebSocketService {
@@ -62,8 +62,14 @@ class WebSocketService {
         }
       }
 
-      // 验证代理是否存在
-      const agent = await Agent.findOne({ agentId: decoded.agentId });
+                  // 检查模型是否可用
+            if (!models.Agent) {
+              logger.warn('Database not available for agent verification');
+              return false;
+            }
+
+            // 验证代理是否存在
+            const agent = await models.Agent.findOne({ agentId: decoded.agentId });
       if (!agent) {
         logger.warn('WebSocket连接的代理不存在:', decoded.agentId);
         return false;

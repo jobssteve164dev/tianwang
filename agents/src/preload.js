@@ -49,7 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettings: () => ipcRenderer.invoke('get-settings'),
     saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
     
-
+    // 注册码管理
+    setRegistrationCode: (code) => ipcRenderer.invoke('set-registration-code', code),
+    getRegistrationCode: () => ipcRenderer.invoke('get-registration-code'),
+    getConnectionInfo: () => ipcRenderer.invoke('get-connection-info'),
     
     // 移除监听器
     removeAllListeners: (channel) => {

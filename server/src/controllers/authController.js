@@ -2,7 +2,7 @@
  * 认证控制器
  */
 
-const { User, Organization } = require('../models');
+const models = require('../models');
 const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
@@ -13,8 +13,16 @@ const login = async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    // 检查模型是否可用
+    if (!models.User) {
+      return res.status(503).json({
+        error: 'Database not available',
+        code: 'DB_UNAVAILABLE'
+      });
+    }
+
     // 查找用户
-    const user = await User.findOne({
+    const user = await models.User.findOne({
       where: { username },
       include: ['organization']
     });

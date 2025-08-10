@@ -561,6 +561,7 @@ ipcMain.handle('firewall-disable-auto-block', async () => {
 ipcMain.handle('get-settings', async () => {
     try {
         return {
+            registrationCode: store.get('registrationCode', ''),
             monitorInterval: store.get('monitorInterval', 30),
             autoStart: store.get('autoStart', false),
             minimizeToTray: store.get('minimizeToTray', true),
@@ -578,6 +579,7 @@ ipcMain.handle('save-settings', async (event, settings) => {
         store.set('autoStart', settings.autoStart);
         store.set('minimizeToTray', settings.minimizeToTray);
         store.set('autoBlock', settings.autoBlock);
+        store.set('registrationCode', settings.registrationCode);
         
         // 如果启用了自动阻止，更新防火墙服务配置
         if (firewallService) {
@@ -588,6 +590,60 @@ ipcMain.handle('save-settings', async (event, settings) => {
     } catch (error) {
         logger.error('保存设置失败:', error);
         return { success: false, error: error.message };
+    }
+});
+
+// 注册码相关IPC处理
+ipcMain.handle('set-registration-code', async (event, code) => {
+    try {
+        if (agentService) {
+            agentService.setRegistrationCode(code);
+            store.set('registrationCode', code);
+            logger.info('注册码已设置:', code ? code.substring(0, 8) + '...' : 'null');
+            return { success: true };
+        }
+        return { success: false, error: '代理服务未初始化' };
+    } catch (error) {
+        logger.error('设置注册码失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('get-registration-code', async () => {
+    try {
+        if (agentService) {
+            return agentService.getRegistrationCode();
+        }
+        return store.get('registrationCode', '');
+    } catch (error) {
+        logger.error('获取注册码失败:', error);
+        return '';
+    }
+});
+
+ipcMain.handle('get-connection-info', async () => {
+    try {
+        if (agentService) {
+            return agentService.getConnectionInfo();
+        }
+        return {
+            agentId: 'unknown',
+            isConnected: false,
+            hasAuthToken: false,
+            hasRegistrationCode: !!store.get('registrationCode'),
+            hasDeviceFingerprint: false,
+            hasConnectionKey: false
+        };
+    } catch (error) {
+        logger.error('获取连接信息失败:', error);
+        return {
+            agentId: 'error',
+            isConnected: false,
+            hasAuthToken: false,
+            hasRegistrationCode: false,
+            hasDeviceFingerprint: false,
+            hasConnectionKey: false
+        };
     }
 });
 

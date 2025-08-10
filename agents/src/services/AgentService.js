@@ -21,6 +21,10 @@ class AgentService extends EventEmitter {
         this.heartbeatTimer = null;
         this.agentId = this.generateAgentId();
         this.authToken = null;
+        this.registrationCode = null; // 注册码
+        this.deviceFingerprint = null; // 设备指纹
+        this.connectionKey = null; // 连接密钥
+        this.publicKey = null; // 服务器公钥
         this.dataBuffer = [];
         this.maxBufferSize = 1000;
     }
@@ -48,8 +52,13 @@ class AgentService extends EventEmitter {
     }
 
     // 注册代理到服务器
-    async registerAgent() {
+    async registerAgent(registrationCode = null) {
         try {
+            // 生成设备指纹
+            if (!this.deviceFingerprint) {
+                this.deviceFingerprint = await this.generateDeviceFingerprint();
+            }
+
             const agentInfo = {
                 agentId: this.agentId,
                 hostname: os.hostname(),
@@ -57,11 +66,18 @@ class AgentService extends EventEmitter {
                 arch: os.arch(),
                 version: process.env.npm_package_version || '1.0.0',
                 capabilities: this.getCapabilities(),
-                systemInfo: await this.getSystemInfo()
+                systemInfo: await this.getSystemInfo(),
+                registrationCode: registrationCode || this.registrationCode,
+                deviceFingerprint: this.deviceFingerprint
             };
 
             const response = await axios.post(`${this.config.apiUrl}/agents/register`, agentInfo);
+            
+            // 保存认证信息
             this.authToken = response.data.token;
+            this.connectionKey = response.data.connectionKey;
+            this.publicKey = response.data.publicKey;
+            
             logger.info('代理注册成功', { agentId: this.agentId });
             return response.data;
         } catch (error) {
@@ -79,13 +95,89 @@ class AgentService extends EventEmitter {
         try {
             const response = await axios.post(`${this.config.apiUrl}/agents/auth`, {
                 agentId: this.agentId,
-                hostname: os.hostname()
+                hostname: os.hostname(),
+                deviceFingerprint: this.deviceFingerprint
             });
+            
+            // 保存认证信息
             this.authToken = response.data.token;
+            this.connectionKey = response.data.connectionKey;
+            this.publicKey = response.data.publicKey;
+            
             return response.data;
         } catch (error) {
             logger.error('代理认证失败:', error);
             throw error;
+        }
+    }
+
+    // 生成设备指纹
+    async generateDeviceFingerprint() {
+        try {
+            const si = require('systeminformation');
+            
+            const [cpu, mem, osInfo, network, disk, system] = await Promise.all([
+                si.cpu(),
+                si.mem(),
+                si.osInfo(),
+                si.networkInterfaces(),
+                si.diskLayout(),
+                si.system()
+            ]);
+
+            // 构建设备指纹数据
+            const deviceInfo = {
+                hostname: os.hostname(),
+                platform: os.platform(),
+                arch: os.arch(),
+                macAddresses: network
+                    .filter(iface => iface && iface.mac && !iface.internal)
+                    .map(iface => iface.mac),
+                cpuInfo: {
+                    model: cpu.brand || '',
+                    cores: cpu.cores || 0,
+                    architecture: os.arch(),
+                    vendor: cpu.manufacturer || ''
+                },
+                memoryInfo: {
+                    total: mem.total || 0,
+                    type: 'Unknown'
+                },
+                diskInfo: disk
+                    .filter(d => d && d.serial)
+                    .map(d => ({
+                        serial: d.serial || '',
+                        model: d.model || '',
+                        size: d.size || 0
+                    })),
+                networkInterfaces: network
+                    .filter(iface => iface && iface.iface)
+                    .map(iface => ({
+                        name: iface.iface || '',
+                        mac: iface.mac || '',
+                        type: iface.type || ''
+                    })),
+                systemUuid: system.uuid || '',
+                biosInfo: {
+                    vendor: system.manufacturer || '',
+                    version: system.version || '',
+                    releaseDate: ''
+                }
+            };
+
+            // 生成指纹哈希
+            const crypto = require('crypto');
+            const dataString = JSON.stringify(deviceInfo, Object.keys(deviceInfo).sort());
+            const hash = crypto.createHash('sha256');
+            hash.update(dataString);
+            
+            return hash.digest('hex');
+        } catch (error) {
+            logger.error('生成设备指纹失败:', error);
+            // 返回基于基本信息的简单指纹
+            const basicInfo = `${os.hostname()}-${os.platform()}-${os.arch()}`;
+            const crypto = require('crypto');
+            return crypto.createHash('sha256').update(basicInfo).digest('hex');
         }
     }
 
@@ -178,7 +270,13 @@ class AgentService extends EventEmitter {
         }
 
         return new Promise((resolve, reject) => {
-            const wsUrl = `${this.config.serverUrl}/agents/${this.agentId}?token=${this.authToken}`;
+            // 构建WebSocket URL，包含token和连接密钥
+            let wsUrl = `${this.config.serverUrl}/agents/${this.agentId}?token=${this.authToken}`;
+            
+            // 如果有连接密钥，添加到URL中
+            if (this.connectionKey && this.connectionKey.signature) {
+                wsUrl += `&connectionKey=${this.connectionKey.signature}`;
+            }
             
             logger.info('连接到服务器...', { url: wsUrl });
             
@@ -422,6 +520,34 @@ class AgentService extends EventEmitter {
     updateConfig(newConfig) {
         Object.assign(this.config, newConfig);
         logger.info('配置已更新:', newConfig);
+    }
+
+    // 设置注册码
+    setRegistrationCode(code) {
+        this.registrationCode = code;
+        logger.info('注册码已设置', { code: code ? code.substring(0, 8) + '...' : 'null' });
+    }
+
+    // 获取注册码
+    getRegistrationCode() {
+        return this.registrationCode;
+    }
+
+    // 获取设备指纹
+    getDeviceFingerprint() {
+        return this.deviceFingerprint;
+    }
+
+    // 获取连接状态信息
+    getConnectionInfo() {
+        return {
+            agentId: this.agentId,
+            isConnected: this.isConnected,
+            hasAuthToken: !!this.authToken,
+            hasRegistrationCode: !!this.registrationCode,
+            hasDeviceFingerprint: !!this.deviceFingerprint,
+            hasConnectionKey: !!this.connectionKey
+        };
     }
 }
 

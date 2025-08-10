@@ -1,4 +1,4 @@
-const Agent = require('../models/Agent');
+const models = require('../models');
 const SecurityEvent = require('../models/SecurityEvent');
 const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
@@ -51,7 +51,15 @@ class AgentController {
       }
 
       // 检查代理是否已存在
-      let agent = await Agent.findOne({ agentId });
+              // 检查模型是否可用
+        if (!models.Agent) {
+          return res.status(503).json({
+            error: 'Database not available',
+            code: 'DB_UNAVAILABLE'
+          });
+        }
+
+        let agent = await models.Agent.findOne({ agentId });
             
       if (agent) {
         // 更新现有代理信息
@@ -173,7 +181,7 @@ class AgentController {
       }
 
       // 查找代理
-      const agent = await Agent.findOne({ agentId, hostname });
+              const agent = await models.Agent.findOne({ agentId, hostname });
             
       if (!agent) {
         return res.status(404).json({
@@ -262,7 +270,7 @@ class AgentController {
       }
 
       // 验证代理存在
-      const agent = await Agent.findOne({ agentId });
+      const agent = await models.Agent.findOne({ agentId });
       if (!agent) {
         return res.status(404).json({
           success: false,
