@@ -817,7 +817,15 @@ const htmlContent = `<!DOCTYPE html>
                     autoBlock: document.getElementById('auto-block').checked
                 };
                 
+                // 保存常规设置
                 await window.electronAPI.saveSettings(settings);
+                
+                // 保存注册码
+                const registrationCode = document.getElementById('registration-code').value.trim();
+                if (registrationCode) {
+                    await window.electronAPI.setRegistrationCode(registrationCode);
+                }
+                
                 addLog('设置已保存', 'success');
                 closeSettings();
             } catch (error) {
