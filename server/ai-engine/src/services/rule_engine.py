@@ -29,7 +29,12 @@ class RuleEngine:
         self.suricata_manager = SuricataRuleManager()
         self.sigma_manager = SigmaRuleManager()
         self.yara_manager = YaraRuleManager()
-        self.misp_manager = MispManager(config.threatIntelligence.get("misp", {}))
+        # 创建MISP配置字典
+        misp_config = {
+            "url": config.misp_url,
+            "api_key": config.misp_api_key
+        }
+        self.misp_manager = MispManager(misp_config)
     
     async def initialize(self):
         """初始化规则引擎"""

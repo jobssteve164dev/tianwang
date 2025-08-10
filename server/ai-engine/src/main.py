@@ -13,7 +13,7 @@ from .services.ai_service import AIService
 from .services.kafka_service import KafkaService
 from .services.rule_engine import RuleEngine
 from .services.external_api_service import ExternalAPIService
-from .api.routes import router as api_router
+from .api.routes import router as api_router, set_services
 
 # 全局服务实例
 ai_service: AIService = None
@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
     
     # 设置服务间的引用关系
     ai_service.set_external_api_service(external_api_service)
+    
+    # 设置API路由中的服务实例
+    set_services(ai_service, kafka_service, rule_engine, external_api_service)
     
     logger.info(f"AI分析引擎启动成功，监听端口: {config.port}")
     

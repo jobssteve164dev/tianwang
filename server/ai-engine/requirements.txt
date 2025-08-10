@@ -3,6 +3,7 @@
 fastapi==0.104.1
 uvicorn==0.24.0
 pydantic==2.5.0
+pydantic-settings==2.1.0
 
 # 机器学习框架
 scikit-learn==1.3.2
@@ -15,7 +16,7 @@ scipy==1.11.4
 
 # 异常检测
 pyod==1.1.3
-isolation-forest==0.1.2
+# isolation-forest==0.1.2  # 注释掉不存在的包
 
 # 深度学习
 keras==2.15.0
@@ -29,11 +30,11 @@ asyncpg==0.29.0
 
 # 消息队列
 kafka-python==2.0.2
-aiokafka==0.8.11
+aiokafka==0.8.1
 
 # 网络安全工具
 yara-python==4.3.1
-suricata-update==1.3.2
+suricata-update==1.3.3
 
 # Git操作
 GitPython==3.1.40
@@ -45,7 +46,7 @@ google-generativeai==0.3.2
 
 # 数据处理
 joblib==1.3.2
-pickle5==0.0.12
+pickle5==0.0.11
 jsonschema==4.20.0
 
 # 日志和监控

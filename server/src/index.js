@@ -4,7 +4,20 @@
  */
 
 require('express-async-errors');
-require('dotenv').config();
+
+// 加载环境变量 - 优先加载 dev.local，然后加载 .env
+const path = require('path');
+const fs = require('fs');
+
+// 检查是否存在 dev.local 文件
+const devLocalPath = path.join(__dirname, '../../dev.local');
+if (fs.existsSync(devLocalPath)) {
+  require('dotenv').config({ path: devLocalPath });
+  console.log('Loaded environment variables from dev.local');
+} else {
+  require('dotenv').config();
+  console.log('Loaded environment variables from .env');
+}
 
 const express = require('express');
 const http = require('http');

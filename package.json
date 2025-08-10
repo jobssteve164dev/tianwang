@@ -9,7 +9,12 @@
     "client"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "dev": "./scripts/dev-start.sh",
+    "dev:stop": "./scripts/dev-stop.sh",
+    "dev:status": "./scripts/dev-status.sh",
+    "dev:cleanup": "./scripts/dev-cleanup.sh",
+    "dev:test": "./scripts/dev-test.sh",
+    "dev:legacy": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "server:dev": "cd server && npm run dev",
     "client:dev": "cd client && npm run dev",
     "build": "npm run server:build && npm run client:build",

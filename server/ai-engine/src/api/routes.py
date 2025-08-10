@@ -9,8 +9,19 @@ from loguru import logger
 import asyncio
 from datetime import datetime
 
-# 导入服务实例（在main.py中初始化）
-from ..main import ai_service, kafka_service, rule_engine, external_api_service
+# 服务实例将在运行时动态获取
+ai_service = None
+kafka_service = None
+rule_engine = None
+external_api_service = None
+
+def set_services(ai_svc, kafka_svc, rule_eng, ext_api_svc):
+    """设置服务实例"""
+    global ai_service, kafka_service, rule_engine, external_api_service
+    ai_service = ai_svc
+    kafka_service = kafka_svc
+    rule_engine = rule_eng
+    external_api_service = ext_api_svc
 
 router = APIRouter()
 
