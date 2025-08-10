@@ -202,8 +202,8 @@ const AlertsPage: React.FC = () => {
         marginBottom: 20, 
         fontSize: 24, 
         fontWeight: 600,
-        color: '#fff',
-        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+        color: '#1a1a1a',
+        textShadow: 'none'
       }}>
         威胁告警管理
       </h1>

@@ -29,9 +29,9 @@ const DashboardPage: React.FC = () => {
   // 根据屏幕尺寸调整图表高度
   const getChartHeight = () => {
     if (isMobile) return 250;
-    if (isTablet) return 300;
-    if (isDesktop) return 350;
-    return 400;
+    if (isTablet) return 350;
+    if (isDesktop) return 450;
+    return 500; // 大屏幕使用更高高度
   };
 
   if (loading) {
@@ -55,19 +55,23 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="fade-in-up">
+    <div className="fade-in-up" style={{ 
+      maxWidth: isDesktop ? '100%' : '1200px',
+      margin: '0 auto',
+      padding: isMobile ? '16px' : isDesktop ? '24px 32px' : '20px'
+    }}>
       <h1 style={{ 
-        marginBottom: isMobile ? 16 : 20, 
-        fontSize: isMobile ? 20 : 24, 
+        marginBottom: isMobile ? 16 : 24, 
+        fontSize: isMobile ? 20 : isDesktop ? 28 : 24, 
         fontWeight: 600,
-        color: '#fff',
-        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+        color: '#1a1a1a',
+        textShadow: 'none'
       }}>
         安全态势概览
       </h1>
 
       {/* 核心指标卡片 - 使用Ant Design的Row/Col系统 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: isMobile ? 16 : 20 }}>
+      <Row gutter={[20, 20]} style={{ marginBottom: isMobile ? 16 : 24 }}>
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <div className="stat-card">
             <Statistic
@@ -76,7 +80,7 @@ const DashboardPage: React.FC = () => {
               prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}
               valueStyle={{ 
                 color: '#52c41a', 
-                fontSize: isMobile ? 24 : 28, 
+                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
                 fontWeight: 600 
               }}
             />
@@ -91,7 +95,7 @@ const DashboardPage: React.FC = () => {
               prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}
               valueStyle={{ 
                 color: '#ff4d4f', 
-                fontSize: isMobile ? 24 : 28, 
+                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
                 fontWeight: 600 
               }}
             />
@@ -106,7 +110,7 @@ const DashboardPage: React.FC = () => {
               prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ 
                 color: '#1890ff', 
-                fontSize: isMobile ? 24 : 28, 
+                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
                 fontWeight: 600 
               }}
             />
@@ -132,9 +136,9 @@ const DashboardPage: React.FC = () => {
       </Row>
 
       {/* 详细分析区域 - 响应式图表布局 */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
         {/* 威胁趋势分析 */}
-        <Col xs={24} lg={12}>
+        <Col xs={24} xl={16}>
           <Card
             title="威胁趋势分析"
             className="modern-card"
@@ -162,7 +166,7 @@ const DashboardPage: React.FC = () => {
         </Col>
 
         {/* 威胁类型分布 */}
-        <Col xs={24} lg={12}>
+        <Col xs={24} xl={8}>
           <Card
             title="威胁类型分布"
             className="modern-card"
@@ -191,13 +195,13 @@ const DashboardPage: React.FC = () => {
       </Row>
 
       {/* 设备统计图表 - 全宽显示 */}
-      <Row style={{ marginTop: 16 }}>
+      <Row style={{ marginTop: 24 }}>
         <Col span={24}>
           <Card
             title="设备状态统计"
             className="modern-card"
             style={{ 
-              minHeight: getChartHeight()
+              minHeight: getChartHeight() * 0.7 // 设备统计图表稍微矮一些
             }}
             headStyle={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -212,7 +216,7 @@ const DashboardPage: React.FC = () => {
             }}
           >
             <DeviceStatsChart 
-              height={getChartHeight() - 80}
+              height={getChartHeight() * 0.7 - 80}
               data={deviceStats}
             />
           </Card>

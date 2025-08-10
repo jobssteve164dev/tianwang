@@ -306,8 +306,8 @@ const RegistrationCodesPage: React.FC = () => {
     <div className="fade-in-up">
       <Title level={2} style={{ 
         marginBottom: 20, 
-        color: '#fff',
-        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+        color: '#1a1a1a',
+        textShadow: 'none'
       }}>
         注册码管理
       </Title>
