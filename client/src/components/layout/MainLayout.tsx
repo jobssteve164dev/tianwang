@@ -164,12 +164,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       theme="dark"
       contentStyle={{
         margin: 0,
-        padding: isMobile ? 12 : 16,
-        minHeight: 'calc(100vh - 56px)',
+        padding: 0,
+        minHeight: '100vh',
         background: 'transparent',
+        overflow: 'auto',
+        position: 'relative',
       }}
       style={{
         background: 'transparent',
+        minHeight: '100vh',
       }}
       siderMenuType="group"
       menuHeaderRender={false}

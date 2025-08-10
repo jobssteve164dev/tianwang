@@ -35,7 +35,7 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface RegistrationCode {
   code: string;
@@ -304,13 +304,9 @@ const RegistrationCodesPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <Title level={2} style={{ 
-        marginBottom: 20, 
-        color: '#1a1a1a',
-        textShadow: 'none'
-      }}>
+      <h1 className="page-title">
         注册码管理
-      </Title>
+      </h1>
 
       {/* 统计卡片 */}
       {stats && (

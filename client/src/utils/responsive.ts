@@ -1,6 +1,6 @@
 import React from 'react';
 
-// 响应式断点定义
+// 响应式断点定义 - 增加对大屏幕的支持
 export const BREAKPOINTS = {
   xs: 480,
   sm: 576,
@@ -8,6 +8,7 @@ export const BREAKPOINTS = {
   lg: 992,
   xl: 1200,
   xxl: 1600,
+  xxxl: 1920, // 新增超大屏幕断点
 } as const;
 
 // 屏幕尺寸类型
@@ -17,6 +18,7 @@ export type ScreenSize = keyof typeof BREAKPOINTS;
 export const getScreenSize = (): ScreenSize => {
   const width = window.innerWidth;
   
+  if (width >= BREAKPOINTS.xxxl) return 'xxxl';
   if (width >= BREAKPOINTS.xxl) return 'xxl';
   if (width >= BREAKPOINTS.xl) return 'xl';
   if (width >= BREAKPOINTS.lg) return 'lg';
@@ -40,12 +42,24 @@ export const isDesktop = (): boolean => {
   return window.innerWidth > BREAKPOINTS.lg;
 };
 
+// 检查是否为大屏幕设备
+export const isLargeScreen = (): boolean => {
+  return window.innerWidth >= BREAKPOINTS.xxl;
+};
+
+// 检查是否为超大屏幕设备
+export const isExtraLargeScreen = (): boolean => {
+  return window.innerWidth >= BREAKPOINTS.xxxl;
+};
+
 // 响应式Hook
 export const useResponsive = () => {
   const [screenSize, setScreenSize] = React.useState<ScreenSize>(getScreenSize);
   const [isMobileDevice, setIsMobileDevice] = React.useState(isMobile);
   const [isTabletDevice, setIsTabletDevice] = React.useState(isTablet);
   const [isDesktopDevice, setIsDesktopDevice] = React.useState(isDesktop);
+  const [isLargeScreenDevice, setIsLargeScreenDevice] = React.useState(isLargeScreen);
+  const [isExtraLargeScreenDevice, setIsExtraLargeScreenDevice] = React.useState(isExtraLargeScreen);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -54,6 +68,8 @@ export const useResponsive = () => {
       setIsMobileDevice(isMobile());
       setIsTabletDevice(isTablet());
       setIsDesktopDevice(isDesktop());
+      setIsLargeScreenDevice(isLargeScreen());
+      setIsExtraLargeScreenDevice(isExtraLargeScreen());
     };
 
     window.addEventListener('resize', handleResize);
@@ -65,6 +81,8 @@ export const useResponsive = () => {
     isMobile: isMobileDevice,
     isTablet: isTabletDevice,
     isDesktop: isDesktopDevice,
+    isLargeScreen: isLargeScreenDevice,
+    isExtraLargeScreen: isExtraLargeScreenDevice,
     breakpoints: BREAKPOINTS,
   };
 };
@@ -86,7 +104,7 @@ export const getResponsiveClassNames = (classNames: Record<ScreenSize, string>) 
   return classNames[currentSize] || classNames.md || '';
 };
 
-// 响应式配置
+// 响应式配置 - 优化大屏幕支持
 export const RESPONSIVE_CONFIG = {
   // 布局配置
   layout: {
@@ -97,6 +115,7 @@ export const RESPONSIVE_CONFIG = {
       lg: 256,
       xl: 280,
       xxl: 300,
+      xxxl: 320,
     },
     headerHeight: {
       xs: 48,
@@ -105,6 +124,7 @@ export const RESPONSIVE_CONFIG = {
       lg: 56,
       xl: 64,
       xxl: 64,
+      xxxl: 64,
     },
     contentPadding: {
       xs: 12,
@@ -113,9 +133,10 @@ export const RESPONSIVE_CONFIG = {
       lg: 18,
       xl: 20,
       xxl: 24,
+      xxxl: 32,
     },
   },
-  // 网格配置
+  // 网格配置 - 优化大屏幕列数
   grid: {
     columns: {
       xs: 1,
@@ -123,7 +144,8 @@ export const RESPONSIVE_CONFIG = {
       md: 2,
       lg: 3,
       xl: 4,
-      xxl: 4,
+      xxl: 5,
+      xxxl: 6,
     },
     gap: {
       xs: 8,
@@ -132,6 +154,7 @@ export const RESPONSIVE_CONFIG = {
       lg: 16,
       xl: 20,
       xxl: 24,
+      xxxl: 28,
     },
   },
   // 卡片配置
@@ -143,6 +166,7 @@ export const RESPONSIVE_CONFIG = {
       lg: 22,
       xl: 24,
       xxl: 28,
+      xxxl: 32,
     },
     borderRadius: {
       xs: 8,
@@ -151,6 +175,28 @@ export const RESPONSIVE_CONFIG = {
       lg: 14,
       xl: 16,
       xxl: 18,
+      xxxl: 20,
+    },
+  },
+  // 标题配置
+  title: {
+    fontSize: {
+      xs: 20,
+      sm: 22,
+      md: 24,
+      lg: 26,
+      xl: 28,
+      xxl: 30,
+      xxxl: 32,
+    },
+    marginBottom: {
+      xs: 16,
+      sm: 18,
+      md: 20,
+      lg: 22,
+      xl: 24,
+      xxl: 28,
+      xxxl: 32,
     },
   },
 } as const;
@@ -170,6 +216,8 @@ export const responsiveUtils = {
   isMobile,
   isTablet,
   isDesktop,
+  isLargeScreen,
+  isExtraLargeScreen,
   getResponsiveStyles,
   getResponsiveClassNames,
   getResponsiveValue,

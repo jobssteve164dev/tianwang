@@ -26,12 +26,12 @@ const DashboardPage: React.FC = () => {
     dispatch(fetchDeviceStats() as any);
   }, [dispatch]);
 
-  // 根据屏幕尺寸调整图表高度
+  // 根据屏幕尺寸调整图表高度 - 优化以确保不超出一个屏幕高度
   const getChartHeight = () => {
-    if (isMobile) return 250;
-    if (isTablet) return 350;
-    if (isDesktop) return 450;
-    return 500; // 大屏幕使用更高高度
+    if (isMobile) return 200; // 移动端使用较小高度
+    if (isTablet) return 250; // 平板使用中等高度
+    if (isDesktop) return 300; // 桌面使用适中高度
+    return 350; // 大屏幕使用较大但合理的高度
   };
 
   if (loading) {
@@ -55,18 +55,8 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="fade-in-up" style={{ 
-      maxWidth: isDesktop ? '100%' : '1200px',
-      margin: '0 auto',
-      padding: isMobile ? '16px' : isDesktop ? '24px 32px' : '20px'
-    }}>
-      <h1 style={{ 
-        marginBottom: isMobile ? 16 : 24, 
-        fontSize: isMobile ? 20 : isDesktop ? 28 : 24, 
-        fontWeight: 600,
-        color: '#1a1a1a',
-        textShadow: 'none'
-      }}>
+    <div className="fade-in-up">
+      <h1 className="page-title">
         安全态势概览
       </h1>
 
@@ -121,7 +111,7 @@ const DashboardPage: React.FC = () => {
           <div className="stat-card">
             <Statistic
               title="威胁趋势"
-              value={metrics?.threatTrend || 12.5}
+              value={metrics?.threatTrend || 0}
               precision={1}
               suffix="%"
               prefix={<RiseOutlined style={{ color: '#faad14' }} />}
@@ -135,90 +125,35 @@ const DashboardPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* 详细分析区域 - 响应式图表布局 */}
-      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-        {/* 威胁趋势分析 */}
-        <Col xs={24} xl={16}>
-          <Card
-            title="威胁趋势分析"
+      {/* 图表区域 - 响应式布局 */}
+      <Row gutter={[20, 20]}>
+        <Col xs={24} lg={12}>
+          <Card 
+            title="威胁趋势分析" 
             className="modern-card"
-            style={{ 
-              height: '100%',
-              minHeight: getChartHeight()
-            }}
-            headStyle={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              borderBottom: 'none',
-              borderRadius: '12px 12px 0 0',
-              padding: isMobile ? '12px 16px' : '16px 20px'
-            }}
-            bodyStyle={{
-              padding: isMobile ? '12px' : '16px',
-              height: 'calc(100% - 60px)'
-            }}
+            style={{ height: getChartHeight() + 80 }}
           >
-            <ThreatTrendChart 
-              height={getChartHeight() - 80}
-              data={threatTrends}
-            />
+            <ThreatTrendChart data={threatTrends} height={getChartHeight()} />
           </Card>
         </Col>
-
-        {/* 威胁类型分布 */}
-        <Col xs={24} xl={8}>
-          <Card
-            title="威胁类型分布"
+        
+        <Col xs={24} lg={12}>
+          <Card 
+            title="威胁类型分布" 
             className="modern-card"
-            style={{ 
-              height: '100%',
-              minHeight: getChartHeight()
-            }}
-            headStyle={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              borderBottom: 'none',
-              borderRadius: '12px 12px 0 0',
-              padding: isMobile ? '12px 16px' : '16px 20px'
-            }}
-            bodyStyle={{
-              padding: isMobile ? '12px' : '16px',
-              height: 'calc(100% - 60px)'
-            }}
+            style={{ height: getChartHeight() + 80 }}
           >
-            <ThreatDistributionChart 
-              height={getChartHeight() - 80}
-              data={threatDistribution}
-            />
+            <ThreatDistributionChart data={threatDistribution} height={getChartHeight()} />
           </Card>
         </Col>
-      </Row>
-
-      {/* 设备统计图表 - 全宽显示 */}
-      <Row style={{ marginTop: 24 }}>
-        <Col span={24}>
-          <Card
-            title="设备状态统计"
+        
+        <Col xs={24}>
+          <Card 
+            title="设备状态统计" 
             className="modern-card"
-            style={{ 
-              minHeight: getChartHeight() * 0.7 // 设备统计图表稍微矮一些
-            }}
-            headStyle={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              borderBottom: 'none',
-              borderRadius: '12px 12px 0 0',
-              padding: isMobile ? '12px 16px' : '16px 20px'
-            }}
-            bodyStyle={{
-              padding: isMobile ? '12px' : '16px',
-              height: 'calc(100% - 60px)'
-            }}
+            style={{ height: getChartHeight() + 80 }}
           >
-            <DeviceStatsChart 
-              height={getChartHeight() * 0.7 - 80}
-              data={deviceStats}
-            />
+            <DeviceStatsChart data={deviceStats} height={getChartHeight()} />
           </Card>
         </Col>
       </Row>

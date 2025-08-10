@@ -198,13 +198,7 @@ const AlertsPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 style={{ 
-        marginBottom: 20, 
-        fontSize: 24, 
-        fontWeight: 600,
-        color: '#1a1a1a',
-        textShadow: 'none'
-      }}>
+      <h1 className="page-title">
         威胁告警管理
       </h1>
 

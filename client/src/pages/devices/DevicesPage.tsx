@@ -192,13 +192,7 @@ const DevicesPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 style={{ 
-        marginBottom: isMobile ? 16 : 20, 
-        fontSize: isMobile ? 20 : 24, 
-        fontWeight: 600,
-        color: '#1a1a1a',
-        textShadow: 'none'
-      }}>
+      <h1 className="page-title">
         设备管理
       </h1>
 

@@ -53,35 +53,45 @@ code {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-/* 紧凑布局样式 - 优化PC端响应式 */
+/* 页面标题统一样式 */
+.page-title {
+  margin: 0 0 24px 0; /* 移除顶部margin，只保留底部margin */
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-shadow: none;
+  line-height: 1.2;
+}
+
+/* 紧凑布局样式 - 优化PC端响应式，充分利用屏幕空间 */
 .compact-layout {
-  padding: 20px;
-  max-width: 1600px;
-  margin: 0 auto;
+  padding: 24px; /* 恢复适当的边距 */
   width: 100%;
+  max-width: none; /* 移除最大宽度限制，充分利用屏幕空间 */
+  margin: 0;
 }
 
 /* 响应式网格系统 - 针对不同PC屏幕尺寸优化 */
 .compact-grid {
   display: grid;
-  gap: 16px;
+  gap: 20px;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 .compact-grid-lg {
   display: grid;
-  gap: 20px;
+  gap: 24px;
   grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
 }
 
 /* 现代化统计卡片 */
 .stat-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -94,21 +104,26 @@ code {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
 }
 
 /* 现代化按钮样式 */
 .modern-button {
   border-radius: 8px;
-  border: none;
-  padding: 8px 16px;
   font-weight: 500;
   transition: all 0.3s ease;
+  border: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -117,52 +132,68 @@ code {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.modern-button.ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.modern-button.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  transform: translateY(-1px);
+}
+
 /* 现代化表格样式 */
 .modern-table {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .modern-table .ant-table-thead > tr > th {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
+  background: rgba(102, 126, 234, 0.05);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
   font-weight: 600;
+  color: #1a1a1a;
 }
 
 .modern-table .ant-table-tbody > tr:hover > td {
   background: rgba(102, 126, 234, 0.05);
 }
 
-/* 现代化标签样式 */
-.modern-tag {
-  border-radius: 6px;
-  border: none;
+/* 现代化表单样式 */
+.modern-form .ant-form-item-label > label {
   font-weight: 500;
-  padding: 4px 8px;
-  font-size: 12px;
+  color: #1a1a1a;
 }
 
-/* 现代化输入框样式 */
 .modern-input {
   border-radius: 8px;
   border: 1px solid rgba(102, 126, 234, 0.2);
   transition: all 0.3s ease;
 }
 
-.modern-input:focus,
 .modern-input:hover {
+  border-color: #667eea;
+}
+
+.modern-input:focus,
+.modern-input.ant-input-focused {
   border-color: #667eea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
 /* 现代化选择器样式 */
 .modern-select .ant-select-selector {
-  border-radius: 8px !important;
-  border: 1px solid rgba(102, 126, 234, 0.2) !important;
+  border-radius: 8px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.modern-select:hover .ant-select-selector {
+  border-color: #667eea;
 }
 
 .modern-select.ant-select-focused .ant-select-selector {
@@ -215,21 +246,51 @@ code {
   margin-bottom: 24px;
 }
 
-/* 响应式工具类 - 优化PC端断点 */
-/* 大屏幕 (1920px+) */
-@media (min-width: 1920px) {
+/* 响应式工具类 - 优化PC端断点，充分利用大屏幕空间 */
+/* 超大屏幕 (2560px+) */
+@media (min-width: 2560px) {
   .compact-layout {
-    padding: 24px;
-    max-width: 1800px;
+    padding: 32px 48px;
+  }
+  
+  .page-title {
+    font-size: 32px;
+    margin: 0 0 32px 0; /* 移除顶部margin，只保留底部margin */
   }
   
   .compact-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 24px;
   }
   
   .compact-grid-lg {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+  
+  .stat-card {
+    padding: 32px;
+  }
+}
+
+/* 大屏幕 (1920px - 2559px) */
+@media (min-width: 1920px) and (max-width: 2559px) {
+  .compact-layout {
+    padding: 28px 40px;
+  }
+  
+  .page-title {
+    font-size: 30px;
+    margin: 0 0 28px 0;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 22px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: repeat(3, 1fr);
     gap: 24px;
   }
   
@@ -241,18 +302,22 @@ code {
 /* 中等大屏幕 (1440px - 1919px) */
 @media (min-width: 1440px) and (max-width: 1919px) {
   .compact-layout {
-    padding: 20px;
-    max-width: 1400px;
+    padding: 24px 32px;
+  }
+  
+  .page-title {
+    font-size: 28px;
+    margin: 0 0 24px 0;
   }
   
   .compact-grid {
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+    gap: 20px;
   }
   
   .compact-grid-lg {
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 22px;
   }
   
   .stat-card {
@@ -263,18 +328,22 @@ code {
 /* 标准桌面 (1200px - 1439px) */
 @media (min-width: 1200px) and (max-width: 1439px) {
   .compact-layout {
-    padding: 18px;
-    max-width: 1200px;
+    padding: 20px 28px;
+  }
+  
+  .page-title {
+    font-size: 26px;
+    margin: 0 0 22px 0;
   }
   
   .compact-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 18px;
   }
   
   .compact-grid-lg {
     grid-template-columns: repeat(2, 1fr);
-    gap: 18px;
+    gap: 20px;
   }
   
   .stat-card {
@@ -285,8 +354,38 @@ code {
 /* 小桌面 (992px - 1199px) */
 @media (min-width: 992px) and (max-width: 1199px) {
   .compact-layout {
-    padding: 16px;
-    max-width: 1000px;
+    padding: 18px 24px;
+  }
+  
+  .page-title {
+    font-size: 24px;
+    margin: 0 0 20px 0;
+  }
+  
+  .compact-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  
+  .compact-grid-lg {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+}
+
+/* 平板 (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .compact-layout {
+    padding: 16px 20px;
+  }
+  
+  .page-title {
+    font-size: 22px;
+    margin: 0 0 18px 0;
   }
   
   .compact-grid {
@@ -300,28 +399,6 @@ code {
   }
   
   .stat-card {
-    padding: 20px;
-  }
-}
-
-/* 平板 (768px - 991px) */
-@media (min-width: 768px) and (max-width: 991px) {
-  .compact-layout {
-    padding: 14px;
-    max-width: 800px;
-  }
-  
-  .compact-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-  
-  .compact-grid-lg {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  
-  .stat-card {
     padding: 18px;
   }
 }
@@ -329,17 +406,22 @@ code {
 /* 移动端 (768px以下) */
 @media (max-width: 767px) {
   .compact-layout {
-    padding: 12px;
+    padding: 12px 16px;
+  }
+  
+  .page-title {
+    font-size: 20px;
+    margin: 0 0 16px 0;
   }
   
   .compact-grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 12px;
   }
   
   .compact-grid-lg {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 14px;
   }
   
   .stat-card {
