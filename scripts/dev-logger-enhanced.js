@@ -169,6 +169,22 @@ class EnhancedDevLogger {
             this.rolloverLog();
         }
     }
+
+    /**
+     * 写入日志到文件，不添加额外时间戳
+     */
+    writeLogWithoutTimestamp(service, message) {
+        if (!this.writeStream) return;
+
+        const logEntry = `[${service}] ${message}\n`;
+        this.writeStream.write(logEntry);
+        this.currentLines++;
+
+        // 检查是否需要滚动日志
+        if (this.currentLines > this.maxLines) {
+            this.rolloverLog();
+        }
+    }
     
     /**
      * 滚动日志文件
@@ -202,6 +218,13 @@ class EnhancedDevLogger {
         this.writeLog('SYSTEM', '');
     }
     
+    /**
+     * 清理ANSI颜色代码
+     */
+    cleanAnsiCodes(line) {
+        return line.replace(/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGKH]/g, '');
+    }
+
     /**
      * 启动AI引擎日志收集
      */
@@ -240,11 +263,98 @@ class EnhancedDevLogger {
             });
         });
         
-        // 收集stderr
+        // 收集stderr - 解析loguru格式的日志
         aiProcess.stderr.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('AI-ENGINE-ERROR', line);
+                // 1. 解析loguru格式的日志: "2025-08-11 07:36:13.869 | INFO     | src.services.ai_service:initialize:58 - AI服务初始化完成"
+                // 注意：loguru格式中级别后面可能有多个空格
+                const loguruPattern = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \| (\w+)\s* \| (.+?)(?: - (.+))?$/;
+                const loguruMatch = line.match(loguruPattern);
+                
+                if (loguruMatch) {
+                    // 解析成功，提取各个部分
+                    const [, timestamp, level, source, message] = loguruMatch;
+                    
+                    // 如果没有单独的消息部分，则整个source就是消息
+                    const actualMessage = message || source;
+                    const actualSource = message ? source : '';
+                    
+                    // 根据日志级别确定服务标签
+                    let serviceTag = 'AI-ENGINE';
+                    if (level === 'ERROR' || level === 'CRITICAL') {
+                        serviceTag = 'AI-ENGINE-ERROR';
+                    } else if (level === 'WARNING') {
+                        serviceTag = 'AI-ENGINE-WARN';
+                    } else if (level === 'DEBUG') {
+                        serviceTag = 'AI-ENGINE-DEBUG';
+                    }
+                    
+                    // 构建日志内容，不包含原始时间戳
+                    let logContent = `${level}`;
+                    if (actualSource) {
+                        logContent += ` | ${actualSource}`;
+                    }
+                    if (actualMessage) {
+                        logContent += ` | ${actualMessage}`;
+                    }
+                    
+                    // 使用writeLog，让日志收集器添加统一的时间戳
+                    this.writeLog(serviceTag, logContent);
+                    return;
+                }
+                
+                // 2. 解析uvicorn格式的日志: "INFO: Uvicorn running on http://0.0.0.0:8888 (Press CTRL+C to quit)"
+                // 只匹配标准的日志级别
+                const uvicornPattern = /^(INFO|ERROR|WARNING|DEBUG):\s*(.+)$/;
+                const uvicornMatch = line.match(uvicornPattern);
+                
+                if (uvicornMatch) {
+                    const [, level, message] = uvicornMatch;
+                    let serviceTag = 'AI-ENGINE';
+                    if (level === 'ERROR' || level === 'CRITICAL') {
+                        serviceTag = 'AI-ENGINE-ERROR';
+                    } else if (level === 'WARNING') {
+                        serviceTag = 'AI-ENGINE-WARN';
+                    } else if (level === 'DEBUG') {
+                        serviceTag = 'AI-ENGINE-DEBUG';
+                    }
+                    
+                    this.writeLog(serviceTag, `${level} | ${message}`);
+                    return;
+                }
+                
+                // 3. 解析Python warnings: "UserWarning: Field "model_name" has conflict with protected namespace "model_"."
+                // 匹配以Warning结尾的类型
+                const warningPattern = /^(\w+Warning):\s*(.+)$/;
+                const warningMatch = line.match(warningPattern);
+                
+                if (warningMatch) {
+                    const [, warningType, message] = warningMatch;
+                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${warningType} | ${message}`);
+                    return;
+                }
+                
+                // 4. 解析Python warnings的后续行: "You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`."
+                const warningLinePattern = /^(.+)$/;
+                const warningLineMatch = line.match(warningLinePattern);
+                
+                if (warningLineMatch && (line.includes('warning') || line.includes('Warning') || line.includes('resolve'))) {
+                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${line}`);
+                    return;
+                }
+                
+                // 5. 解析Python warnings的堆栈行: "  warnings.warn("
+                const stackPattern = /^\s+(.+)$/;
+                const stackMatch = line.match(stackPattern);
+                
+                if (stackMatch && (line.includes('warnings.warn') || line.includes('warn('))) {
+                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${line.trim()}`);
+                    return;
+                }
+                
+                // 6. 无法解析的日志，按原样处理
+                this.writeLog('AI-ENGINE-RAW', line);
             });
         });
         
@@ -276,7 +386,12 @@ class EnhancedDevLogger {
         serverProcess.stdout.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('SERVER', line);
+                // 清理ANSI颜色代码
+                const cleanLine = this.cleanAnsiCodes(line);
+                
+                // 解析服务器日志格式，清理重复时间戳
+                const parsedLine = this.parseServerLog(cleanLine);
+                this.writeLog('SERVER', parsedLine);
             });
         });
         
@@ -284,7 +399,12 @@ class EnhancedDevLogger {
         serverProcess.stderr.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('SERVER-ERROR', line);
+                // 清理ANSI颜色代码
+                const cleanLine = this.cleanAnsiCodes(line);
+                
+                // 解析服务器日志格式，清理重复时间戳
+                const parsedLine = this.parseServerLog(cleanLine);
+                this.writeLog('SERVER-ERROR', parsedLine);
             });
         });
         
@@ -295,6 +415,46 @@ class EnhancedDevLogger {
         });
         
         this.writeLog('SYSTEM', '服务端日志收集已启动');
+    }
+    
+    /**
+     * 解析服务器日志，清理重复时间戳
+     */
+    parseServerLog(line) {
+        // 匹配服务器日志格式: "07:36:15.814 info [tianwang-server]: 127.0.0.1 - - [10/Aug/2025:23:36:15 +0000] "GET /api/dashboard/security-metrics HTTP/1.1" 200 351 ..."
+        // 支持带毫秒的时间戳格式
+        const serverLogPattern = /^(\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+(\w+)\s+\[([^\]]+)\]:\s+(.+)$/;
+        const match = line.match(serverLogPattern);
+        
+        if (match) {
+            const [, time, level, service, rest] = match;
+            
+            // 进一步解析HTTP请求部分，移除HTTP日志中的时间戳
+            // 注意：状态码304等特殊情况下，响应大小可能是"-"而不是数字
+            const httpPattern = /^(\d+\.\d+\.\d+\.\d+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s+([-\d]+)\s+"([^"]*)"\s+"([^"]*)"$/;
+            const httpMatch = rest.match(httpPattern);
+            
+            if (httpMatch) {
+                const [, ip, httpTime, request, status, size, referer, userAgent] = httpMatch;
+                
+                // 提取HTTP方法和路径
+                const requestParts = request.split(' ');
+                const method = requestParts[0];
+                const path = requestParts[1];
+                
+                // 处理响应大小，如果是"-"则显示为"-"
+                const sizeDisplay = size === '-' ? '-' : `${size}B`;
+                
+                // 构建简化的日志内容
+                return `${level.toUpperCase()} | ${service} | ${method} ${path} | ${status} | ${sizeDisplay}`;
+            } else {
+                // 如果不是HTTP请求，返回简化格式
+                return `${level.toUpperCase()} | ${service} | ${rest}`;
+            }
+        }
+        
+        // 如果无法解析，返回原行
+        return line;
     }
     
     /**
@@ -316,7 +476,9 @@ class EnhancedDevLogger {
         clientProcess.stdout.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('CLIENT', line);
+                // 清理ANSI颜色代码
+                const cleanLine = this.cleanAnsiCodes(line);
+                this.writeLog('CLIENT', cleanLine);
             });
         });
         
@@ -324,7 +486,9 @@ class EnhancedDevLogger {
         clientProcess.stderr.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('CLIENT-ERROR', line);
+                // 清理ANSI颜色代码
+                const cleanLine = this.cleanAnsiCodes(line);
+                this.writeLog('CLIENT-ERROR', cleanLine);
             });
         });
         

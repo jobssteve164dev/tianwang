@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
   SafetyCertificateOutlined,
   KeyOutlined,
+  SecurityScanOutlined,
 } from '@ant-design/icons';
 import { Avatar, Dropdown, Space } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -62,6 +63,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/registration-codes',
       name: '注册码管理',
       icon: <KeyOutlined />,
+    },
+    {
+      path: '/security-rules',
+      name: '安全规则',
+      icon: <SecurityScanOutlined />,
     },
   ];
 

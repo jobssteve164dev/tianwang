@@ -98,8 +98,14 @@ class AgentService extends EventEmitter {
         try {
             logger.info('测试服务器连接...', { apiUrl: this.config.apiUrl });
             
-            // 测试API连接
-            const response = await axios.get(`${this.config.apiUrl}/health`, {
+            // 构建健康检查URL - 使用基础URL而不是API路径
+            const baseUrl = this.config.apiUrl.replace('/api', '');
+            const healthUrl = `${baseUrl}/health`;
+            
+            logger.info('健康检查URL:', healthUrl);
+            
+            // 测试健康检查连接
+            const response = await axios.get(healthUrl, {
                 timeout: 10000
             });
             

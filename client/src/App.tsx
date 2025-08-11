@@ -9,6 +9,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import AlertsPage from './pages/alerts/AlertsPage';
 import DevicesPage from './pages/devices/DevicesPage';
 import RegistrationCodesPage from './pages/registration/RegistrationCodesPage';
+import SecurityRulesPage from './pages/security/SecurityRulesPage';
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -49,6 +50,7 @@ const App: React.FC = () => {
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="devices" element={<DevicesPage />} />
             <Route path="registration-codes" element={<RegistrationCodesPage />} />
+            <Route path="security-rules" element={<SecurityRulesPage />} />
           </Route>
         )}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />

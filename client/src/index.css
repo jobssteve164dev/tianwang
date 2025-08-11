@@ -527,4 +527,113 @@ code {
 
 .modern-modal .ant-modal-close:hover {
   color: rgba(255, 255, 255, 0.8);
+}
+
+/* 安全规则管理页面样式 */
+.security-rules-page {
+  padding: 24px;
+  background: transparent;
+}
+
+.security-rules-page .page-header {
+  margin-bottom: 32px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.security-rules-page .ant-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.security-rules-page .ant-table {
+  background: transparent;
+}
+
+.security-rules-page .ant-table-thead > tr > th {
+  background: rgba(102, 126, 234, 0.1);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  font-weight: 600;
+  color: #333;
+}
+
+.security-rules-page .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.security-rules-page .ant-table-tbody > tr:hover > td {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.security-rules-page .ant-statistic-title {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.security-rules-page .ant-statistic-content {
+  color: #333;
+  font-weight: 600;
+}
+
+.security-rules-page .ant-badge-status-text {
+  color: #666;
+  font-size: 12px;
+}
+
+.security-rules-page .ant-tag {
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.security-rules-page .ant-switch {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.security-rules-page .ant-switch-checked {
+  background: #52c41a;
+}
+
+.security-rules-page .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.security-rules-page .ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.security-rules-page .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.security-rules-page .ant-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: none;
+}
+
+.security-rules-page .ant-modal-title {
+  color: white;
+  font-weight: 600;
+}
+
+.security-rules-page .ant-modal-close {
+  color: white;
+}
+
+.security-rules-page .ant-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
 } 

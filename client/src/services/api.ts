@@ -400,6 +400,18 @@ export const registrationCodeApi = {
   getSecurityStatus: () => request('/agents/security-status'),
 };
 
+// 安全规则管理API
+export const securityRulesApi = {
+  getRuleSources: () => request('/security/rules/sources'),
+  getRuleStatistics: () => request('/security/rules/statistics'),
+  updateRules: (data?: { source_type?: string; source_name?: string }) => 
+    request('/security/rules/update', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  getRuleStatus: () => request('/security/rules/status'),
+};
+
 // 默认导出所有API
 export default {
   auth: authAPI,
@@ -409,4 +421,5 @@ export default {
   user: userAPI,
   system: systemAPI,
   registrationCode: registrationCodeApi,
+  securityRules: securityRulesApi,
 }; 
