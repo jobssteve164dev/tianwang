@@ -15,7 +15,8 @@ import {
   Typography,
   Switch,
   Badge,
-  Empty
+  Empty,
+  Tabs
 } from 'antd';
 import {
   ReloadOutlined,
@@ -25,9 +26,14 @@ import {
   ClockCircleOutlined,
   SafetyCertificateOutlined,
   BugOutlined,
-  SecurityScanOutlined
+  SecurityScanOutlined,
+  PlusOutlined,
+  EditOutlined,
+  PlayCircleOutlined,
+  CodeOutlined
 } from '@ant-design/icons';
 import { securityRulesApi } from '../../services/api';
+import CustomRuleEditor from '../../components/security/CustomRuleEditor';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -59,6 +65,22 @@ interface RuleStatistics {
   false_positives: number;
 }
 
+interface CustomRule {
+  id: string;
+  filename: string;
+  title: string;
+  description: string;
+  author: string;
+  date: string;
+  level: string;
+  status: string;
+  logsource: any;
+  tags: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const SecurityRulesPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -66,6 +88,13 @@ const SecurityRulesPage: React.FC = () => {
   const [statistics, setStatistics] = useState<RuleStatistics | null>(null);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [selectedSource, setSelectedSource] = useState<{ type: string; source: string } | null>(null);
+  
+  // 自定义规则相关状态
+  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
+  const [customRulesLoading, setCustomRulesLoading] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
+  const [selectedRuleId, setSelectedRuleId] = useState<string>('');
 
   // const { user } = useAppSelector((state) => state.auth);
 
@@ -141,13 +170,52 @@ const SecurityRulesPage: React.FC = () => {
     message.success(`${enabled ? '启用' : '禁用'}规则源成功`);
   };
 
+  // 获取自定义规则列表
+  const fetchCustomRules = async () => {
+    try {
+      setCustomRulesLoading(true);
+      const response = await securityRulesApi.getCustomRules();
+      if (response.success) {
+        setCustomRules(response.data);
+      } else {
+        message.error('获取自定义规则列表失败');
+      }
+    } catch (error) {
+      console.error('获取自定义规则列表失败:', error);
+      message.error('获取自定义规则列表失败');
+    } finally {
+      setCustomRulesLoading(false);
+    }
+  };
+
+  // 打开创建规则编辑器
+  const openCreateEditor = () => {
+    setEditorMode('create');
+    setSelectedRuleId('');
+    setEditorVisible(true);
+  };
+
+  // 打开编辑规则编辑器
+  const openEditEditor = (ruleId: string) => {
+    setEditorMode('edit');
+    setSelectedRuleId(ruleId);
+    setEditorVisible(true);
+  };
+
+  // 编辑器成功回调
+  const handleEditorSuccess = () => {
+    fetchCustomRules();
+    fetchStatistics();
+  };
+
   useEffect(() => {
     fetchRuleSources();
     fetchStatistics();
+    fetchCustomRules();
   }, []);
 
-  // 表格列配置
-  const columns = [
+  // 规则源表格列配置
+  const sourceColumns = [
     {
       title: '规则源',
       dataIndex: 'name',
@@ -207,6 +275,104 @@ const SecurityRulesPage: React.FC = () => {
           </Space>
         );
       },
+    },
+  ];
+
+  // 自定义规则表格列配置
+  const customRuleColumns = [
+    {
+      title: '规则标题',
+      dataIndex: 'title',
+      key: 'title',
+      render: (text: string, record: CustomRule) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{text}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {record.description}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: '作者',
+      dataIndex: 'author',
+      key: 'author',
+      render: (text: string) => <Text>{text}</Text>,
+    },
+    {
+      title: '级别',
+      dataIndex: 'level',
+      key: 'level',
+      render: (level: string) => {
+        const colorMap = {
+          low: 'green',
+          medium: 'orange',
+          high: 'red',
+          critical: 'purple'
+        };
+        return <Tag color={colorMap[level as keyof typeof colorMap]}>{level.toUpperCase()}</Tag>;
+      },
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => {
+        const colorMap = {
+          experimental: 'blue',
+          test: 'orange',
+          stable: 'green'
+        };
+        return <Tag color={colorMap[status as keyof typeof colorMap]}>{status}</Tag>;
+      },
+    },
+    {
+      title: '标签',
+      dataIndex: 'tags',
+      key: 'tags',
+      render: (tags: string[]) => (
+        <Space wrap>
+          {tags.slice(0, 3).map(tag => (
+            <Tag key={tag}>{tag}</Tag>
+          ))}
+          {tags.length > 3 && <Tag>+{tags.length - 3}</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: '启用状态',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      render: (enabled: boolean) => (
+        <Badge 
+          status={enabled ? 'success' : 'default'} 
+          text={enabled ? '已启用' : '已禁用'} 
+        />
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: CustomRule) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => openEditEditor(record.id)}
+          >
+            编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<PlayCircleOutlined />}
+            onClick={() => openEditEditor(record.id)}
+          >
+            测试
+          </Button>
+        </Space>
+      ),
     },
   ];
 
@@ -275,67 +441,128 @@ const SecurityRulesPage: React.FC = () => {
       {/* 统计信息 */}
       {renderStatisticsCards()}
 
-      {/* 规则源管理 */}
-      <Card
-        title={
-          <Space>
-            <SettingOutlined />
-            规则源管理
-          </Space>
-        }
-        extra={
-          <Space>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                fetchRuleSources();
-                fetchStatistics();
-              }}
-              loading={loading}
-            >
-              刷新
-            </Button>
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              onClick={() => {
-                setSelectedSource(null);
-                setUpdateModalVisible(true);
-              }}
-              loading={updating}
-            >
-              全部更新
-            </Button>
-          </Space>
-        }
-      >
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <Spin size="large" />
-          </div>
-        ) : Object.keys(ruleSources).length === 0 ? (
-          <Empty description="暂无规则源数据" />
-        ) : (
-          Object.entries(ruleSources).map(([type, ruleType]) => (
-            <div key={type} style={{ marginBottom: 24 }}>
-              <Title level={4} style={{ marginBottom: 16 }}>
-                {ruleType.name}
-                <Text type="secondary" style={{ marginLeft: 8, fontSize: 14 }}>
-                  {ruleType.description}
-                </Text>
-              </Title>
+      {/* 规则管理标签页 */}
+      <Tabs defaultActiveKey="sources" size="large">
+        <Tabs.TabPane tab="规则源管理" key="sources">
+          <Card
+            title={
+              <Space>
+                <SettingOutlined />
+                规则源管理
+              </Space>
+            }
+            extra={
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    fetchRuleSources();
+                    fetchStatistics();
+                  }}
+                  loading={loading}
+                >
+                  刷新
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  onClick={() => {
+                    setSelectedSource(null);
+                    setUpdateModalVisible(true);
+                  }}
+                  loading={updating}
+                >
+                  全部更新
+                </Button>
+              </Space>
+            }
+          >
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <Spin size="large" />
+              </div>
+            ) : Object.keys(ruleSources).length === 0 ? (
+              <Empty description="暂无规则源数据" />
+            ) : (
+              Object.entries(ruleSources).map(([type, ruleType]) => (
+                <div key={type} style={{ marginBottom: 24 }}>
+                  <Title level={4} style={{ marginBottom: 16 }}>
+                    {ruleType.name}
+                    <Text type="secondary" style={{ marginLeft: 8, fontSize: 14 }}>
+                      {ruleType.description}
+                    </Text>
+                  </Title>
+                  <Table
+                    columns={sourceColumns}
+                    dataSource={ruleType.sources}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    bordered
+                  />
+                </div>
+              ))
+            )}
+          </Card>
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="自定义规则" key="custom">
+          <Card
+            title={
+              <Space>
+                <CodeOutlined />
+                自定义规则管理
+              </Space>
+            }
+            extra={
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={fetchCustomRules}
+                  loading={customRulesLoading}
+                >
+                  刷新
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={openCreateEditor}
+                >
+                  创建规则
+                </Button>
+              </Space>
+            }
+          >
+            {customRulesLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <Spin size="large" />
+              </div>
+            ) : customRules.length === 0 ? (
+              <Empty 
+                description="暂无自定义规则" 
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              >
+                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateEditor}>
+                  创建第一个规则
+                </Button>
+              </Empty>
+            ) : (
               <Table
-                columns={columns}
-                dataSource={ruleType.sources}
+                columns={customRuleColumns}
+                dataSource={customRules}
                 rowKey="id"
-                pagination={false}
-                size="small"
-                bordered
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+                }}
+                size="middle"
               />
-            </div>
-          ))
-        )}
-      </Card>
+            )}
+          </Card>
+        </Tabs.TabPane>
+      </Tabs>
 
       {/* 更新规则模态框 */}
       <Modal
@@ -380,6 +607,15 @@ const SecurityRulesPage: React.FC = () => {
           </ul>
         </div>
       </Modal>
+
+      {/* 自定义规则编辑器 */}
+      <CustomRuleEditor
+        visible={editorVisible}
+        mode={editorMode}
+        ruleId={selectedRuleId}
+        onCancel={() => setEditorVisible(false)}
+        onSuccess={handleEditorSuccess}
+      />
     </div>
   );
 };

@@ -410,6 +410,25 @@ export const securityRulesApi = {
       body: JSON.stringify(data || {}),
     }),
   getRuleStatus: () => request('/security/rules/status'),
+  
+  // 自定义规则管理
+  getCustomRules: () => request('/security/rules/custom'),
+  getCustomRule: (id: string) => request(`/security/rules/custom/${id}`),
+  createCustomRule: (data: any) => request('/security/rules/custom', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateCustomRule: (id: string, data: any) => request(`/security/rules/custom/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteCustomRule: (id: string) => request(`/security/rules/custom/${id}`, {
+    method: 'DELETE',
+  }),
+  testCustomRule: (id: string, data: { test_data: any }) => request(`/security/rules/custom/${id}/test`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };
 
 // 默认导出所有API
