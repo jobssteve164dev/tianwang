@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { Card, Statistic, Row, Col, Spin, Alert } from 'antd';
+import { Card, Statistic, Row, Col, Spin, Alert, Typography } from 'antd';
 import {
   SafetyCertificateOutlined,
   AlertOutlined,
   DesktopOutlined,
   RiseOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchSecurityMetrics, fetchThreatTrends, fetchThreatDistribution, fetchDeviceStats } from '../../store/slices/dashboardSlice';
@@ -12,6 +13,8 @@ import DeviceStatsChart from '../../components/charts/DeviceStatsChart';
 import ThreatDistributionChart from '../../components/charts/ThreatDistributionChart';
 import ThreatTrendChart from '../../components/charts/ThreatTrendChart';
 import { useResponsive } from '../../utils/responsive';
+
+const { Title, Paragraph } = Typography;
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();

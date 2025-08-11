@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Form,
@@ -8,10 +8,7 @@ import {
   Select,
   Space,
   Divider,
-  Alert,
   Spin,
-  Row,
-  Col,
   Typography,
   Tag,
   Tooltip,
@@ -23,7 +20,6 @@ import {
   SettingOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ExperimentOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import { aiModelApi } from '../../services/api';
@@ -103,7 +99,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
   };
 
   // 加载配置
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       const response = await aiModelApi.getConfig();
@@ -120,10 +116,10 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form, message]);
 
   // 保存配置
-  const handleSave = async (values: any) => {
+  const handleSave = async (values: AIModelConfigData) => {
     try {
       setSaving(true);
       const response = await aiModelApi.updateConfig(values);
@@ -177,7 +173,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
 
   useEffect(() => {
     loadConfig();
-  }, []);
+  }, [loadConfig]);
 
   if (loading) {
     return (
@@ -208,75 +204,77 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
           </Text>
         </div>
 
-        {Object.entries(providers).map(([key, provider]) => (
-          <Collapse key={key} style={{ marginBottom: '16px' }}>
-            <Collapse.Panel
-              header={
-                <Space>
-                  <span style={{ fontSize: '18px' }}>{provider.icon}</span>
-                  <span>{provider.name}</span>
-                  <Tag color={provider.color}>{provider.pricing}</Tag>
-                </Space>
-              }
-              key={key}
-            >
-              <Form.Item
-                name={[key, 'enabled']}
-                valuePropName="checked"
-                label="启用"
-              >
-                <Switch />
-              </Form.Item>
-
-              <Form.Item
-                name={[key, 'api_key']}
-                label="API密钥"
-                rules={[
-                  {
-                    required: form.getFieldValue([key, 'enabled']),
-                    message: '请输入API密钥'
-                  }
-                ]}
-              >
-                <Password placeholder="请输入API密钥" />
-              </Form.Item>
-
-              <Form.Item
-                name={[key, 'default_model']}
-                label="默认模型"
-                rules={[
-                  {
-                    required: form.getFieldValue([key, 'enabled']),
-                    message: '请选择默认模型'
-                  }
-                ]}
-              >
-                <Select placeholder="选择默认模型">
-                  {provider.models?.map((model: string) => (
-                    <Option key={model} value={model}>
-                      {model}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
+        <Collapse 
+          items={Object.entries(providers).map(([key, provider]) => ({
+            key,
+            label: (
               <Space>
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  loading={testing === key}
-                  onClick={() => handleTestConnection(key)}
-                  disabled={!form.getFieldValue([key, 'enabled'])}
-                >
-                  测试连接
-                </Button>
-                <Tooltip title={provider.description}>
-                  <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                </Tooltip>
+                <span style={{ fontSize: '18px' }}>{provider.icon}</span>
+                <span>{provider.name}</span>
+                <Tag color={provider.color}>{provider.pricing}</Tag>
               </Space>
-            </Collapse.Panel>
-          </Collapse>
-        ))}
+            ),
+            children: (
+              <>
+                <Form.Item
+                  name={[key, 'enabled']}
+                  valuePropName="checked"
+                  label="启用"
+                >
+                  <Switch />
+                </Form.Item>
+
+                <Form.Item
+                  name={[key, 'api_key']}
+                  label="API密钥"
+                  rules={[
+                    {
+                      required: form.getFieldValue([key, 'enabled']),
+                      message: '请输入API密钥'
+                    }
+                  ]}
+                >
+                  <Password placeholder="请输入API密钥" />
+                </Form.Item>
+
+                <Form.Item
+                  name={[key, 'default_model']}
+                  label="默认模型"
+                  rules={[
+                    {
+                      required: form.getFieldValue([key, 'enabled']),
+                      message: '请选择默认模型'
+                    }
+                  ]}
+                >
+                  <Select placeholder="选择默认模型">
+                    {provider.models?.map((model: string) => (
+                      <Option key={model} value={model}>
+                        {model}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    loading={testing === key}
+                    onClick={() => handleTestConnection(key)}
+                    disabled={!form.getFieldValue([key, 'enabled'])}
+                  >
+                    测试连接
+                  </Button>
+                  <Tooltip title={provider.description}>
+                    <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                  </Tooltip>
+                </Space>
+              </>
+            )
+          }))}
+          style={{ marginBottom: '16px' }}
+        />
 
         <Divider />
 

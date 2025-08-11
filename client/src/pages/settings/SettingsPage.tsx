@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Form,
@@ -33,7 +33,7 @@ const SettingsPage: React.FC = () => {
   const [form] = Form.useForm();
 
   // 加载配置
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       const response = await notificationApi.getConfig();
@@ -48,7 +48,7 @@ const SettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]);
 
   // 保存配置
   const handleSave = async (values: any) => {
@@ -71,7 +71,7 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     loadConfig();
-  }, []);
+  }, [loadConfig]);
 
   // 定义Tabs的items
   const tabItems = [
