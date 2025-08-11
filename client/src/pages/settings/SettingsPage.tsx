@@ -74,6 +74,7 @@ const SettingsPage: React.FC = () => {
   const [testing, setTesting] = useState(false);
   const [config, setConfig] = useState<NotificationConfig | null>(null);
   const [form] = Form.useForm();
+  const [, forceUpdate] = useState({});
 
   // 加载配置
   const loadConfig = useCallback(async () => {
@@ -98,7 +99,21 @@ const SettingsPage: React.FC = () => {
   const handleSave = useCallback(async (values: any) => {
     try {
       setSaving(true);
-      const response = await notificationApi.updateConfig(values);
+      
+      // 过滤配置，只保存启用的通知方式
+      const filteredValues = {
+        email: values.email?.enabled ? {
+          smtp: values.email.smtp,
+          from: values.email.from
+        } : undefined,
+        sms: values.sms?.enabled ? {
+          aliyun: values.sms.aliyun
+        } : undefined,
+        webhook: values.webhook,
+        general: values.general
+      };
+
+      const response = await notificationApi.updateConfig(filteredValues);
       if (response.success) {
         message.success('配置保存成功');
         await loadConfig(); // 重新加载配置
@@ -145,6 +160,11 @@ const SettingsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 处理表单值变化
+  const handleValuesChange = useCallback(() => {
+    forceUpdate({});
+  }, []);
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -167,6 +187,7 @@ const SettingsPage: React.FC = () => {
         form={form}
         layout="vertical"
         onFinish={handleSave}
+        onValuesChange={handleValuesChange}
         initialValues={config || {}}
       >
         <Tabs defaultActiveKey="notification" size="large">
@@ -187,13 +208,13 @@ const SettingsPage: React.FC = () => {
                     <Space>
                       <MailOutlined />
                       邮件通知配置
-                      {config?.email.enabled ? (
+                      {form.getFieldValue(['email', 'enabled']) ? (
                         <Tag color="green" icon={<CheckCircleOutlined />}>
                           已启用
                         </Tag>
                       ) : (
                         <Tag color="red" icon={<CloseCircleOutlined />}>
-                          未配置
+                          未启用
                         </Tag>
                       )}
                     </Space>
@@ -205,7 +226,7 @@ const SettingsPage: React.FC = () => {
                         icon={<MailOutlined />}
                         onClick={() => handleTest('email')}
                         loading={testing}
-                        disabled={!config?.email.enabled}
+                        disabled={!form.getFieldValue(['email', 'enabled'])}
                       >
                         测试
                       </Button>
@@ -215,7 +236,17 @@ const SettingsPage: React.FC = () => {
                   <Form.Item
                     label="SMTP服务器"
                     name={['email', 'smtp', 'host']}
-                    rules={[{ required: true, message: '请输入SMTP服务器地址' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const emailEnabled = form.getFieldValue(['email', 'enabled']);
+                          if (emailEnabled && !value) {
+                            return Promise.reject(new Error('请输入SMTP服务器地址'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Input placeholder="例如: smtp.gmail.com" />
                   </Form.Item>
@@ -225,7 +256,17 @@ const SettingsPage: React.FC = () => {
                       <Form.Item
                         label="端口"
                         name={['email', 'smtp', 'port']}
-                        rules={[{ required: true, message: '请输入端口号' }]}
+                        rules={[
+                          {
+                            validator: (_, value) => {
+                              const emailEnabled = form.getFieldValue(['email', 'enabled']);
+                              if (emailEnabled && !value) {
+                                return Promise.reject(new Error('请输入端口号'));
+                              }
+                              return Promise.resolve();
+                            }
+                          }
+                        ]}
                       >
                         <InputNumber
                           min={1}
@@ -250,8 +291,18 @@ const SettingsPage: React.FC = () => {
                     label="邮箱地址"
                     name={['email', 'smtp', 'auth', 'user']}
                     rules={[
-                      { required: true, message: '请输入邮箱地址' },
-                      { type: 'email', message: '请输入有效的邮箱地址' },
+                      {
+                        validator: (_, value) => {
+                          const emailEnabled = form.getFieldValue(['email', 'enabled']);
+                          if (emailEnabled && !value) {
+                            return Promise.reject(new Error('请输入邮箱地址'));
+                          }
+                          if (emailEnabled && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                            return Promise.reject(new Error('请输入有效的邮箱地址'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
                     ]}
                   >
                     <Input placeholder="your-email@gmail.com" />
@@ -260,7 +311,17 @@ const SettingsPage: React.FC = () => {
                   <Form.Item
                     label="密码/应用密码"
                     name={['email', 'smtp', 'auth', 'pass']}
-                    rules={[{ required: true, message: '请输入密码' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const emailEnabled = form.getFieldValue(['email', 'enabled']);
+                          if (emailEnabled && !value) {
+                            return Promise.reject(new Error('请输入密码'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Password placeholder="邮箱密码或应用专用密码" />
                   </Form.Item>
@@ -269,11 +330,29 @@ const SettingsPage: React.FC = () => {
                     label="发件人邮箱"
                     name={['email', 'from']}
                     rules={[
-                      { required: true, message: '请输入发件人邮箱' },
-                      { type: 'email', message: '请输入有效的邮箱地址' },
+                      {
+                        validator: (_, value) => {
+                          const emailEnabled = form.getFieldValue(['email', 'enabled']);
+                          if (emailEnabled && !value) {
+                            return Promise.reject(new Error('请输入发件人邮箱'));
+                          }
+                          if (emailEnabled && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                            return Promise.reject(new Error('请输入有效的邮箱地址'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
                     ]}
                   >
                     <Input placeholder="alerts@your-domain.com" />
+                  </Form.Item>
+
+                  <Form.Item
+                    label="启用邮件通知"
+                    name={['email', 'enabled']}
+                    valuePropName="checked"
+                  >
+                    <Switch />
                   </Form.Item>
 
                   <Form.Item
@@ -300,13 +379,13 @@ const SettingsPage: React.FC = () => {
                     <Space>
                       <MessageOutlined />
                       短信通知配置
-                      {config?.sms.enabled ? (
+                      {form.getFieldValue(['sms', 'enabled']) ? (
                         <Tag color="green" icon={<CheckCircleOutlined />}>
                           已启用
                         </Tag>
                       ) : (
                         <Tag color="red" icon={<CloseCircleOutlined />}>
-                          未配置
+                          未启用
                         </Tag>
                       )}
                     </Space>
@@ -318,7 +397,7 @@ const SettingsPage: React.FC = () => {
                         icon={<MessageOutlined />}
                         onClick={() => handleTest('sms')}
                         loading={testing}
-                        disabled={!config?.sms.enabled}
+                        disabled={!form.getFieldValue(['sms', 'enabled'])}
                       >
                         测试
                       </Button>
@@ -326,9 +405,27 @@ const SettingsPage: React.FC = () => {
                   }
                 >
                   <Form.Item
+                    label="启用短信通知"
+                    name={['sms', 'enabled']}
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+
+                  <Form.Item
                     label="阿里云AccessKey"
                     name={['sms', 'aliyun', 'accessKey']}
-                    rules={[{ required: true, message: '请输入AccessKey' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const smsEnabled = form.getFieldValue(['sms', 'enabled']);
+                          if (smsEnabled && !value) {
+                            return Promise.reject(new Error('请输入AccessKey'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Input placeholder="阿里云AccessKey" />
                   </Form.Item>
@@ -336,7 +433,17 @@ const SettingsPage: React.FC = () => {
                   <Form.Item
                     label="阿里云SecretKey"
                     name={['sms', 'aliyun', 'secretKey']}
-                    rules={[{ required: true, message: '请输入SecretKey' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const smsEnabled = form.getFieldValue(['sms', 'enabled']);
+                          if (smsEnabled && !value) {
+                            return Promise.reject(new Error('请输入SecretKey'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Password placeholder="阿里云SecretKey" />
                   </Form.Item>
@@ -344,7 +451,17 @@ const SettingsPage: React.FC = () => {
                   <Form.Item
                     label="短信签名"
                     name={['sms', 'aliyun', 'signName']}
-                    rules={[{ required: true, message: '请输入短信签名' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const smsEnabled = form.getFieldValue(['sms', 'enabled']);
+                          if (smsEnabled && !value) {
+                            return Promise.reject(new Error('请输入短信签名'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Input placeholder="例如: 天网安全" />
                   </Form.Item>
@@ -352,7 +469,17 @@ const SettingsPage: React.FC = () => {
                   <Form.Item
                     label="短信模板代码"
                     name={['sms', 'aliyun', 'templateCode']}
-                    rules={[{ required: true, message: '请输入模板代码' }]}
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          const smsEnabled = form.getFieldValue(['sms', 'enabled']);
+                          if (smsEnabled && !value) {
+                            return Promise.reject(new Error('请输入模板代码'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
                   >
                     <Input placeholder="例如: SMS_123456789" />
                   </Form.Item>
