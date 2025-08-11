@@ -550,6 +550,64 @@ create_kafka_topics() {
     done
 }
 
+# 启动服务函数
+start_services() {
+    log_step "启动项目服务..."
+    
+    # 启动 AI 引擎（如果存在启动脚本）
+    if [ -f "server/ai-engine/start.sh" ]; then
+        log_info "启动 AI 引擎..."
+        cd server/ai-engine
+        ./start.sh &
+        cd ../..
+        sleep 2
+    elif [ -f "server/ai-engine/src/main.py" ]; then
+        log_info "启动 AI 引擎 (Python)..."
+        cd server/ai-engine
+        source venv/bin/activate
+        python src/main.py &
+        AI_PID=$!
+        echo $AI_PID > .ai_engine.pid
+        deactivate
+        cd ../..
+        log_success "AI 引擎已启动 (PID: $AI_PID)"
+    fi
+    
+    # 启动服务端（如果存在启动脚本）
+    if [ -f "server/start.sh" ]; then
+        log_info "启动服务端..."
+        cd server
+        ./start.sh &
+        cd ..
+        sleep 2
+    elif [ -f "server/src/index.js" ]; then
+        log_info "启动服务端 (Node.js)..."
+        cd server
+        npm start &
+        SERVER_PID=$!
+        echo $SERVER_PID > .server.pid
+        cd ..
+        log_success "服务端已启动 (PID: $SERVER_PID)"
+    fi
+    
+    # 启动客户端（如果存在启动脚本）
+    if [ -f "client/start.sh" ]; then
+        log_info "启动客户端..."
+        cd client
+        ./start.sh &
+        cd ..
+        sleep 2
+    elif [ -f "client/package.json" ]; then
+        log_info "启动客户端 (React)..."
+        cd client
+        npm start &
+        CLIENT_PID=$!
+        echo $CLIENT_PID > .client.pid
+        cd ..
+        log_success "客户端已启动 (PID: $CLIENT_PID)"
+    fi
+}
+
 # 启动增强版日志收集器
 start_enhanced_logger() {
     log_step "启动增强版开发环境日志收集器..."
@@ -905,8 +963,9 @@ main() {
         esac
     done
     
-    # 设置信号处理
-    trap cleanup EXIT INT TERM
+    # 设置信号处理 - 增强版
+    # 捕获更多退出信号以确保彻底清理
+    trap cleanup EXIT INT TERM HUP QUIT ABRT USR1 USR2
     
     # 执行启动流程
     create_directories
@@ -927,6 +986,10 @@ main() {
     
     start_kafka
     start_enhanced_logger
+    
+    # 启动其他服务（如果存在启动脚本）
+    start_services
+    
     show_status
     
     log_success "增强版开发环境启动完成！"
@@ -934,6 +997,7 @@ main() {
     log_info "查看实时日志: node scripts/dev-log-tail.js watch"
     log_info "浏览器日志已自动收集到统一日志文件"
     log_info "如需强制重新安装依赖，请使用: $0 --force-install"
+    log_info "如需手动清理所有进程，请使用: ./scripts/dev-cleanup.sh"
     
     # 等待用户中断
     wait
