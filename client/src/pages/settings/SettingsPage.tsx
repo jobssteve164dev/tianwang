@@ -25,7 +25,6 @@ import {
   SettingOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { notificationApi } from '../../services/api';
 
@@ -143,7 +142,7 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     loadConfig();
-  }, []);
+  }, [loadConfig]);
 
   if (loading) {
     return (
@@ -167,7 +166,7 @@ const SettingsPage: React.FC = () => {
         form={form}
         layout="vertical"
         onFinish={handleSave}
-        initialValues={config}
+        initialValues={config || {}}
       >
         <Tabs defaultActiveKey="notification" size="large">
           <TabPane
