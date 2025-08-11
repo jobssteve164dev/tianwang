@@ -656,11 +656,35 @@ show_status() {
 cleanup() {
     log_info "正在停止所有服务..."
     
+    # 定义项目相关的进程名称模式
+    local process_patterns=(
+        "node.*dev-logger-enhanced.js"
+        "node.*server/src/index.js"
+        "node.*client/node_modules/.bin/react-scripts"
+        "python.*server/ai-engine/src/main.py"
+        "kafka-server-start"
+        "kafka-topics"
+        "kafka-console-producer"
+        "kafka-console-consumer"
+    )
+    
+    # 定义项目相关的端口
+    local project_ports=(8888 5555 3333 8889 9092 9093)
+    
+    # 1. 基于PID文件停止服务
+    log_step "基于PID文件停止服务..."
+    
     # 停止增强版日志收集器
     if [ -f ".enhanced-logger.pid" ]; then
         LOGGER_PID=$(cat .enhanced-logger.pid)
         if ps -p $LOGGER_PID > /dev/null; then
-            kill $LOGGER_PID
+            log_info "停止增强版日志收集器 (PID: $LOGGER_PID)..."
+            kill $LOGGER_PID 2>/dev/null
+            sleep 1
+            if ps -p $LOGGER_PID > /dev/null; then
+                log_warning "强制终止增强版日志收集器..."
+                kill -9 $LOGGER_PID 2>/dev/null
+            fi
             log_info "增强版日志收集器已停止"
         fi
         rm -f .enhanced-logger.pid
@@ -670,7 +694,13 @@ cleanup() {
     if [ -f "server/ai-engine/.ai_engine.pid" ]; then
         AI_PID=$(cat server/ai-engine/.ai_engine.pid)
         if ps -p $AI_PID > /dev/null; then
-            kill $AI_PID
+            log_info "停止 AI 引擎 (PID: $AI_PID)..."
+            kill $AI_PID 2>/dev/null
+            sleep 1
+            if ps -p $AI_PID > /dev/null; then
+                log_warning "强制终止 AI 引擎..."
+                kill -9 $AI_PID 2>/dev/null
+            fi
             log_info "AI 引擎已停止"
         fi
         rm -f server/ai-engine/.ai_engine.pid
@@ -680,7 +710,13 @@ cleanup() {
     if [ -f "server/.server.pid" ]; then
         SERVER_PID=$(cat server/.server.pid)
         if ps -p $SERVER_PID > /dev/null; then
-            kill $SERVER_PID
+            log_info "停止服务端 (PID: $SERVER_PID)..."
+            kill $SERVER_PID 2>/dev/null
+            sleep 1
+            if ps -p $SERVER_PID > /dev/null; then
+                log_warning "强制终止服务端..."
+                kill -9 $SERVER_PID 2>/dev/null
+            fi
             log_info "服务端已停止"
         fi
         rm -f server/.server.pid
@@ -690,7 +726,13 @@ cleanup() {
     if [ -f "client/.client.pid" ]; then
         CLIENT_PID=$(cat client/.client.pid)
         if ps -p $CLIENT_PID > /dev/null; then
-            kill $CLIENT_PID
+            log_info "停止客户端 (PID: $CLIENT_PID)..."
+            kill $CLIENT_PID 2>/dev/null
+            sleep 1
+            if ps -p $CLIENT_PID > /dev/null; then
+                log_warning "强制终止客户端..."
+                kill -9 $CLIENT_PID 2>/dev/null
+            fi
             log_info "客户端已停止"
         fi
         rm -f client/.client.pid
@@ -700,13 +742,114 @@ cleanup() {
     if [ -f ".kafka.pid" ]; then
         KAFKA_PID=$(cat .kafka.pid)
         if ps -p $KAFKA_PID > /dev/null; then
-            kill $KAFKA_PID
+            log_info "停止 Kafka (PID: $KAFKA_PID)..."
+            kill $KAFKA_PID 2>/dev/null
+            sleep 2
+            if ps -p $KAFKA_PID > /dev/null; then
+                log_warning "强制终止 Kafka..."
+                kill -9 $KAFKA_PID 2>/dev/null
+            fi
             log_info "Kafka 已停止"
         fi
         rm -f .kafka.pid
     fi
     
-    log_success "所有服务已停止"
+    # 2. 基于进程名称模式清理残留进程
+    log_step "清理基于进程名称的残留进程..."
+    for pattern in "${process_patterns[@]}"; do
+        local pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            log_info "发现匹配模式 '$pattern' 的进程: $pids"
+            for pid in $pids; do
+                if ps -p $pid > /dev/null; then
+                    log_info "终止进程 $pid (模式: $pattern)..."
+                    kill $pid 2>/dev/null
+                    sleep 1
+                    if ps -p $pid > /dev/null; then
+                        log_warning "强制终止进程 $pid..."
+                        kill -9 $pid 2>/dev/null
+                    fi
+                fi
+            done
+        fi
+    done
+    
+    # 3. 基于端口清理残留进程
+    log_step "清理基于端口的残留进程..."
+    for port in "${project_ports[@]}"; do
+        local pids=$(lsof -ti:$port 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            log_info "发现占用端口 $port 的进程: $pids"
+            for pid in $pids; do
+                if ps -p $pid > /dev/null; then
+                    local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "未知")
+                    log_info "终止占用端口 $port 的进程 $pid ($process_name)..."
+                    kill $pid 2>/dev/null
+                    sleep 1
+                    if ps -p $pid > /dev/null; then
+                        log_warning "强制终止进程 $pid..."
+                        kill -9 $pid 2>/dev/null
+                    fi
+                fi
+            done
+        fi
+    done
+    
+    # 4. 清理子进程（防止僵尸进程）
+    log_step "清理子进程..."
+    local child_pids=$(pgrep -P $$ 2>/dev/null || true)
+    if [ -n "$child_pids" ]; then
+        log_info "发现子进程: $child_pids"
+        for pid in $child_pids; do
+            if ps -p $pid > /dev/null; then
+                local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "未知")
+                log_info "终止子进程 $pid ($process_name)..."
+                kill $pid 2>/dev/null
+                sleep 1
+                if ps -p $pid > /dev/null; then
+                    log_warning "强制终止子进程 $pid..."
+                    kill -9 $pid 2>/dev/null
+                fi
+            fi
+        done
+    fi
+    
+    # 5. 清理临时文件和PID文件
+    log_step "清理临时文件..."
+    rm -f .enhanced-logger.pid
+    rm -f server/ai-engine/.ai_engine.pid
+    rm -f server/.server.pid
+    rm -f client/.client.pid
+    rm -f .kafka.pid
+    
+    # 6. 最终验证
+    log_step "验证清理结果..."
+    local remaining_processes=0
+    
+    # 检查是否还有项目相关进程
+    for pattern in "${process_patterns[@]}"; do
+        local pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            log_warning "仍有进程匹配模式 '$pattern': $pids"
+            remaining_processes=$((remaining_processes + 1))
+        fi
+    done
+    
+    # 检查是否还有端口被占用
+    for port in "${project_ports[@]}"; do
+        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            local pids=$(lsof -ti:$port 2>/dev/null || true)
+            log_warning "端口 $port 仍被占用: $pids"
+            remaining_processes=$((remaining_processes + 1))
+        fi
+    done
+    
+    if [ $remaining_processes -eq 0 ]; then
+        log_success "所有项目相关进程已彻底清理"
+    else
+        log_warning "仍有 $remaining_processes 个进程或端口未完全清理"
+        log_info "如需手动清理，请使用: pkill -f 'tianwang|dev-logger|ai-engine'"
+    fi
 }
 
 # 清理所有项目相关端口
