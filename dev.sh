@@ -195,11 +195,11 @@ check_dependencies_installed() {
     local missing_deps=()
     local need_install=false
     
-    # 检查根目录依赖
+    # 检查根目录依赖 - 使用更智能的检查方法
     if [ ! -d "node_modules" ]; then
         missing_deps+=("根目录依赖")
         need_install=true
-    elif [ "package.json" -nt "node_modules" ]; then
+    elif [ ! -f "package-lock.json" ] || [ "package.json" -nt "package-lock.json" ]; then
         missing_deps+=("根目录依赖(package.json已更新)")
         need_install=true
     fi
@@ -208,7 +208,7 @@ check_dependencies_installed() {
     if [ ! -d "server/node_modules" ]; then
         missing_deps+=("服务端依赖")
         need_install=true
-    elif [ "server/package.json" -nt "server/node_modules" ]; then
+    elif [ ! -f "server/package-lock.json" ] || [ "server/package.json" -nt "server/package-lock.json" ]; then
         missing_deps+=("服务端依赖(package.json已更新)")
         need_install=true
     fi
@@ -217,16 +217,16 @@ check_dependencies_installed() {
     if [ ! -d "client/node_modules" ]; then
         missing_deps+=("客户端依赖")
         need_install=true
-    elif [ "client/package.json" -nt "client/node_modules" ]; then
+    elif [ ! -f "client/package-lock.json" ] || [ "client/package.json" -nt "client/package-lock.json" ]; then
         missing_deps+=("客户端依赖(package.json已更新)")
         need_install=true
     fi
     
-    # 检查 AI 引擎依赖
+    # 检查 AI 引擎依赖 - 使用更可靠的时间戳检查
     if [ -f "server/ai-engine/requirements.txt" ] && [ ! -d "server/ai-engine/venv" ]; then
         missing_deps+=("AI引擎依赖")
         need_install=true
-    elif [ -d "server/ai-engine/venv" ] && [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv" ]; then
+    elif [ -d "server/ai-engine/venv" ] && [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv/pyvenv.cfg" ]; then
         missing_deps+=("AI引擎依赖(requirements.txt已更新)")
         need_install=true
     fi
@@ -245,7 +245,7 @@ install_dependencies() {
     log_step "安装依赖..."
     
     # 安装根目录依赖
-    if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules" ]; then
+    if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ] || [ "package.json" -nt "package-lock.json" ]; then
         if [ ! -d "node_modules" ]; then
             log_info "安装根目录依赖..."
         else
@@ -257,7 +257,7 @@ install_dependencies() {
     fi
     
     # 安装服务端依赖
-    if [ ! -d "server/node_modules" ] || [ "server/package.json" -nt "server/node_modules" ]; then
+    if [ ! -d "server/node_modules" ] || [ ! -f "server/package-lock.json" ] || [ "server/package.json" -nt "server/package-lock.json" ]; then
         if [ ! -d "server/node_modules" ]; then
             log_info "安装服务端依赖..."
         else
@@ -271,7 +271,7 @@ install_dependencies() {
     fi
     
     # 安装客户端依赖
-    if [ ! -d "client/node_modules" ] || [ "client/package.json" -nt "client/node_modules" ]; then
+    if [ ! -d "client/node_modules" ] || [ ! -f "client/package-lock.json" ] || [ "client/package.json" -nt "client/package-lock.json" ]; then
         if [ ! -d "client/node_modules" ]; then
             log_info "安装客户端依赖..."
         else
@@ -296,7 +296,7 @@ install_dependencies() {
             pip install -r requirements.txt
             deactivate
             cd ../..
-        elif [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv" ]; then
+        elif [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv/pyvenv.cfg" ]; then
             cd server/ai-engine
             log_info "AI引擎requirements.txt已更新，重新安装依赖..."
             source venv/bin/activate
@@ -361,22 +361,12 @@ debug_kafka_connection() {
         echo -e "端口 9092: ${YELLOW}空闲${NC}"
     fi
     
-    # 测试连接
-    echo ""
-    echo "测试 Kafka 连接..."
-    if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
-        echo -e "Kafka 连接: ${GREEN}成功${NC}"
-        local topics=$(kafka-topics --bootstrap-server localhost:9092 --list 2>/dev/null | wc -l)
-        echo -e "主题数量: ${CYAN}$topics${NC}"
+    # 快速检查Kafka状态（不进行连接测试）
+    if lsof -Pi :9092 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "Kafka 状态: ${GREEN}端口已监听${NC}"
         return 0
     else
-        echo -e "Kafka 连接: ${RED}失败${NC}"
-        
-        # 详细错误诊断
-        echo ""
-        echo "详细连接测试..."
-        kafka-topics --bootstrap-server localhost:9092 --list 2>&1 | head -n 5
-        
+        echo -e "Kafka 状态: ${YELLOW}端口未监听${NC}"
         return 1
     fi
 }
@@ -520,8 +510,9 @@ start_kafka() {
         log_info "创建必要的 Kafka 主题..."
         create_kafka_topics
         
-        # 最终连接测试
-        if debug_kafka_connection; then
+        # 快速连接测试
+        log_info "验证 Kafka 连接..."
+        if kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
             log_success "Kafka 服务完全就绪"
             return 0
         else

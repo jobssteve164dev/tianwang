@@ -3,7 +3,6 @@
  */
 
 const logger = require('../utils/logger');
-const config = require('../config');
 
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
@@ -20,9 +19,10 @@ const errorHandler = (err, req, res, next) => {
   });
 
   // Sequelize验证错误
-  if (err.name === 'SequelizeValidationError') {
+  if (err.name === 'SequelizeValidationError' && err.errors && Array.isArray(err.errors)) {
     const message = err.errors.map(error => error.message).join(', ');
     return res.status(400).json({
+      success: false,
       error: 'Validation Error',
       message,
       code: 'VALIDATION_ERROR'
@@ -32,6 +32,7 @@ const errorHandler = (err, req, res, next) => {
   // Sequelize唯一约束错误
   if (err.name === 'SequelizeUniqueConstraintError') {
     return res.status(409).json({
+      success: false,
       error: 'Resource already exists',
       message: 'A record with this information already exists',
       code: 'DUPLICATE_RESOURCE'
@@ -41,6 +42,7 @@ const errorHandler = (err, req, res, next) => {
   // JWT错误
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
+      success: false,
       error: 'Invalid token',
       code: 'INVALID_TOKEN'
     });
@@ -48,14 +50,15 @@ const errorHandler = (err, req, res, next) => {
 
   // 默认错误响应
   const statusCode = err.statusCode || 500;
-  const message = config.app.env === 'production' && statusCode === 500 
+  const message = process.env.NODE_ENV === 'production' && statusCode === 500 
     ? 'Internal server error' 
     : err.message;
 
   res.status(statusCode).json({
+    success: false,
     error: message,
     code: err.code || 'INTERNAL_ERROR',
-    ...(config.app.env === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 };
 

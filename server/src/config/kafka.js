@@ -16,13 +16,17 @@ let consumer = null;
  */
 async function initializeKafka() {
   try {
+    // 等待Kafka服务器完全启动
+    logger.info('⏳ Waiting for Kafka server to be ready...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     // 创建Kafka实例
     kafka = new Kafka({
       clientId: config.kafka.clientId,
       brokers: config.kafka.brokers,
       retry: {
-        initialRetryTime: 100,
-        retries: 8
+        initialRetryTime: 500,  // 增加初始重试时间
+        retries: 10             // 增加重试次数
       }
     });
 
@@ -48,6 +52,9 @@ async function initializeKafka() {
     await consumer.connect();
     logger.info('✅ Kafka consumer connected');
 
+    // 验证连接健康状态
+    await validateKafkaConnection();
+
     // 创建必要的主题
     await createTopics();
 
@@ -58,6 +65,25 @@ async function initializeKafka() {
 
   } catch (error) {
     logger.error('❌ Kafka initialization failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * 验证Kafka连接健康状态
+ */
+async function validateKafkaConnection() {
+  try {
+    const admin = kafka.admin();
+    await admin.connect();
+    
+    // 获取集群元数据
+    const metadata = await admin.fetchTopicMetadata();
+    logger.info(`✅ Kafka connection validated. Found ${metadata.topics.length} topics`);
+    
+    await admin.disconnect();
+  } catch (error) {
+    logger.error('❌ Kafka connection validation failed:', error);
     throw error;
   }
 }
@@ -300,5 +326,6 @@ module.exports = {
   sendMessage,
   sendLogMessage,
   sendAlertMessage,
-  sendActionMessage
+  sendActionMessage,
+  validateKafkaConnection
 }; 

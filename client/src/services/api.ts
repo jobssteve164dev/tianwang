@@ -25,8 +25,15 @@ const request = async (endpoint: string, options: any = {}) => {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: '网络错误' }));
-    throw new Error(error.message || `HTTP Error: ${response.status}`);
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: '网络错误' };
+    }
+    
+    const errorMessage = errorData.message || errorData.error || `HTTP Error: ${response.status}`;
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -446,6 +453,21 @@ export const notificationApi = {
   getStatus: () => request('/notifications/status'),
 };
 
+// AI模型配置管理API
+export const aiModelApi = {
+  getConfig: () => request('/system/ai-model/config'),
+  updateConfig: (config: any) => request('/system/ai-model/config', {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  }),
+  getUsageStats: () => request('/system/ai-model/usage-stats'),
+  testConnection: (data: { provider: string; api_key: string; model?: string }) => 
+    request('/system/ai-model/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 // 默认导出所有API
 export default {
   auth: authAPI,
@@ -457,4 +479,5 @@ export default {
   registrationCode: registrationCodeApi,
   securityRules: securityRulesApi,
   notification: notificationApi,
+  aiModel: aiModelApi,
 }; 
