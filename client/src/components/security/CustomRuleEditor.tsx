@@ -28,7 +28,7 @@ import { securityRulesApi } from '../../services/api';
 const { TextArea } = Input;
 const { Option } = Select;
 // const { Title, Text, Paragraph } = Typography;
-const { TabPane } = Tabs;
+// const { TabPane } = Tabs;
 
 interface CustomRuleEditorProps {
   visible: boolean;
@@ -281,268 +281,289 @@ enabled: ${yamlContent.enabled}`;
       onCancel={onCancel}
       width={1200}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
-      <Tabs defaultActiveKey="basic" size="large">
-        <TabPane tab="基本信息" key="basic">
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={ruleData}
-            onValuesChange={(_, allValues) => setRuleData(allValues)}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="title"
-                  label="规则标题"
-                  rules={[{ required: true, message: '请输入规则标题' }]}
-                >
-                  <Input placeholder="例如：检测可疑的PowerShell执行" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="author"
-                  label="作者"
-                  rules={[{ required: true, message: '请输入作者' }]}
-                >
-                  <Input placeholder="规则作者" />
-                </Form.Item>
-              </Col>
-            </Row>
+      <Tabs 
+        defaultActiveKey="basic" 
+        size="large"
+        items={[
+          {
+            key: 'basic',
+            label: '基本信息',
+            children: (
+              <Form
+                form={form}
+                layout="vertical"
+                initialValues={ruleData}
+                onValuesChange={(_, allValues) => setRuleData(allValues)}
+              >
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      name="title"
+                      label="规则标题"
+                      rules={[{ required: true, message: '请输入规则标题' }]}
+                    >
+                      <Input placeholder="例如：检测可疑的PowerShell执行" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      name="author"
+                      label="作者"
+                      rules={[{ required: true, message: '请输入作者' }]}
+                    >
+                      <Input placeholder="规则作者" />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-            <Form.Item
-              name="description"
-              label="规则描述"
-            >
-              <TextArea
-                rows={3}
-                placeholder="详细描述规则的用途和检测目标"
-              />
-            </Form.Item>
+                <Form.Item
+                  name="description"
+                  label="规则描述"
+                >
+                  <TextArea
+                    rows={3}
+                    placeholder="详细描述规则的用途和检测目标"
+                  />
+                </Form.Item>
 
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  name="level"
-                  label="严重级别"
-                  rules={[{ required: true, message: '请选择严重级别' }]}
-                >
-                  <Select>
-                    <Option value="low">低</Option>
-                    <Option value="medium">中</Option>
-                    <Option value="high">高</Option>
-                    <Option value="critical">严重</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name="status"
-                  label="规则状态"
-                  rules={[{ required: true, message: '请选择规则状态' }]}
-                >
-                  <Select>
-                    <Option value="experimental">实验性</Option>
-                    <Option value="test">测试</Option>
-                    <Option value="stable">稳定</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name="enabled"
-                  label="启用状态"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </TabPane>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item
+                      name="level"
+                      label="严重级别"
+                      rules={[{ required: true, message: '请选择严重级别' }]}
+                    >
+                      <Select>
+                        <Option value="low">低</Option>
+                        <Option value="medium">中</Option>
+                        <Option value="high">高</Option>
+                        <Option value="critical">严重</Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name="status"
+                      label="规则状态"
+                      rules={[{ required: true, message: '请选择规则状态' }]}
+                    >
+                      <Select>
+                        <Option value="experimental">实验性</Option>
+                        <Option value="test">测试</Option>
+                        <Option value="stable">稳定</Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name="enabled"
+                      label="启用状态"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Form>
+            )
+          },
+          {
+            key: 'logsource',
+            label: '日志源配置',
+            children: (
+              <Form
+                form={form}
+                layout="vertical"
+                initialValues={ruleData}
+                onValuesChange={(_, allValues) => setRuleData(allValues)}
+              >
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item
+                      name={['logsource', 'product']}
+                      label="产品类型"
+                      rules={[{ required: true, message: '请选择产品类型' }]}
+                    >
+                      <Select placeholder="选择产品类型">
+                        {logsourceOptions.map(option => (
+                          <Option key={option.value} value={option.value}>
+                            {option.label}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name={['logsource', 'service']}
+                      label="服务类型"
+                    >
+                      <Select placeholder="选择服务类型" allowClear>
+                        {serviceOptions.map(option => (
+                          <Option key={option.value} value={option.value}>
+                            {option.label}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name={['logsource', 'category']}
+                      label="分类"
+                    >
+                      <Input placeholder="例如：process_creation" />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-        <TabPane tab="日志源配置" key="logsource">
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={ruleData}
-            onValuesChange={(_, allValues) => setRuleData(allValues)}
-          >
-            <Row gutter={16}>
-              <Col span={8}>
+                <Alert
+                  message="日志源配置说明"
+                  description="日志源配置定义了规则适用的日志类型。product指定操作系统或产品，service指定具体的服务，category指定日志分类。"
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              </Form>
+            )
+          },
+          {
+            key: 'detection',
+            label: '检测逻辑',
+            children: (
+              <Form
+                form={form}
+                layout="vertical"
+                initialValues={ruleData}
+                onValuesChange={(_, allValues) => setRuleData(allValues)}
+              >
                 <Form.Item
-                  name={['logsource', 'product']}
-                  label="产品类型"
-                  rules={[{ required: true, message: '请选择产品类型' }]}
+                  name={['detection', 'selection']}
+                  label="选择条件"
                 >
-                  <Select placeholder="选择产品类型">
-                    {logsourceOptions.map(option => (
-                      <Option key={option.value} value={option.value}>
-                        {option.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name={['logsource', 'service']}
-                  label="服务类型"
-                >
-                  <Select placeholder="选择服务类型" allowClear>
-                    {serviceOptions.map(option => (
-                      <Option key={option.value} value={option.value}>
-                        {option.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name={['logsource', 'category']}
-                  label="分类"
-                >
-                  <Input placeholder="例如：process_creation" />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Alert
-              message="日志源配置说明"
-              description="日志源配置定义了规则适用的日志类型。product指定操作系统或产品，service指定具体的服务，category指定日志分类。"
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          </Form>
-        </TabPane>
-
-        <TabPane tab="检测逻辑" key="detection">
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={ruleData}
-            onValuesChange={(_, allValues) => setRuleData(allValues)}
-          >
-            <Form.Item
-              name={['detection', 'selection']}
-              label="选择条件"
-            >
-              <TextArea
-                rows={6}
-                placeholder={`例如：
+                  <TextArea
+                    rows={6}
+                    placeholder={`例如：
 Image: "powershell.exe"
 CommandLine: 
   - "*bypass*"
   - "*executionpolicy*"
 ParentImage: "cmd.exe"`}
-              />
-            </Form.Item>
+                  />
+                </Form.Item>
 
-            <Form.Item
-              name={['detection', 'condition']}
-              label="匹配条件"
-              rules={[{ required: true, message: '请输入匹配条件' }]}
-            >
-              <Input placeholder="例如：selection" />
-            </Form.Item>
+                <Form.Item
+                  name={['detection', 'condition']}
+                  label="匹配条件"
+                  rules={[{ required: true, message: '请输入匹配条件' }]}
+                >
+                  <Input placeholder="例如：selection" />
+                </Form.Item>
 
-            <Alert
-              message="检测逻辑说明"
-              description="selection定义要匹配的字段和值，condition定义匹配逻辑。常用的condition包括：selection（匹配所有selection条件）、1 of selection（匹配任意一个selection条件）、all of selection（匹配所有selection条件）。"
-              type="info"
-              showIcon
-            />
-          </Form>
-        </TabPane>
+                <Alert
+                  message="检测逻辑说明"
+                  description="selection定义要匹配的字段和值，condition定义匹配逻辑。常用的condition包括：selection（匹配所有selection条件）、1 of selection（匹配任意一个selection条件）、all of selection（匹配所有selection条件）。"
+                  type="info"
+                  showIcon
+                />
+              </Form>
+            )
+          },
+          {
+            key: 'tags',
+            label: '标签管理',
+            children: (
+              <Form
+                form={form}
+                layout="vertical"
+                initialValues={ruleData}
+                onValuesChange={(_, allValues) => setRuleData(allValues)}
+              >
+                <Form.Item
+                  name="tags"
+                  label="规则标签"
+                >
+                  <Select
+                    mode="tags"
+                    placeholder="输入标签后按回车添加"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
 
-        <TabPane tab="标签管理" key="tags">
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={ruleData}
-            onValuesChange={(_, allValues) => setRuleData(allValues)}
-          >
-            <Form.Item
-              name="tags"
-              label="规则标签"
-            >
-              <Select
-                mode="tags"
-                placeholder="输入标签后按回车添加"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-
-            <Alert
-              message="标签说明"
-              description="标签用于对规则进行分类和管理。建议使用有意义的标签，如攻击技术、威胁类型、适用环境等。"
-              type="info"
-              showIcon
-            />
-          </Form>
-        </TabPane>
-
-        <TabPane tab="YAML预览" key="preview">
-          <Card title="规则YAML内容" extra={<EyeOutlined />}>
-            <TextArea
-              value={yamlPreview}
-              rows={20}
-              readOnly
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Card>
-        </TabPane>
-
-        {mode === 'edit' && (
-          <TabPane tab="规则测试" key="test">
-            <Card title="规则测试" extra={<PlayCircleOutlined />}>
-              <Form layout="vertical">
-                <Form.Item label="测试数据 (JSON格式)">
-                  <TextArea
-                    value={testData}
-                    onChange={(e) => setTestData(e.target.value)}
-                    rows={8}
-                    placeholder={`例如：
+                <Alert
+                  message="标签说明"
+                  description="标签用于对规则进行分类和管理。建议使用有意义的标签，如攻击技术、威胁类型、适用环境等。"
+                  type="info"
+                  showIcon
+                />
+              </Form>
+            )
+          },
+          {
+            key: 'preview',
+            label: 'YAML预览',
+            children: (
+              <Card title="规则YAML内容" extra={<EyeOutlined />}>
+                <TextArea
+                  value={yamlPreview}
+                  rows={20}
+                  readOnly
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </Card>
+            )
+          },
+          ...(mode === 'edit' ? [{
+            key: 'test',
+            label: '规则测试',
+            children: (
+              <Card title="规则测试" extra={<PlayCircleOutlined />}>
+                <Form layout="vertical">
+                  <Form.Item label="测试数据 (JSON格式)">
+                    <TextArea
+                      value={testData}
+                      onChange={(e) => setTestData(e.target.value)}
+                      rows={8}
+                      placeholder={`例如：
 {
   "Image": "powershell.exe",
   "CommandLine": "powershell.exe -ExecutionPolicy Bypass -Command ...",
   "ParentImage": "cmd.exe"
 }`}
-                  />
-                </Form.Item>
-
-                <Space>
-                  <Button
-                    type="primary"
-                    icon={<PlayCircleOutlined />}
-                    onClick={handleTest}
-                    loading={testing}
-                  >
-                    测试规则
-                  </Button>
-                </Space>
-
-                {testResult && (
-                  <div style={{ marginTop: 16 }}>
-                    <Alert
-                      message={`测试结果: ${testResult.matched ? '匹配' : '不匹配'}`}
-                      type={testResult.matched ? 'success' : 'info'}
-                      showIcon
                     />
-                    <Card size="small" style={{ marginTop: 8 }}>
-                      <pre>{JSON.stringify(testResult.test_result, null, 2)}</pre>
-                    </Card>
-                  </div>
-                )}
-              </Form>
-            </Card>
-          </TabPane>
-        )}
-      </Tabs>
+                  </Form.Item>
+
+                  <Space>
+                    <Button
+                      type="primary"
+                      icon={<PlayCircleOutlined />}
+                      onClick={handleTest}
+                      loading={testing}
+                    >
+                      测试规则
+                    </Button>
+                  </Space>
+
+                  {testResult && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        message={`测试结果: ${testResult.matched ? '匹配' : '不匹配'}`}
+                        type={testResult.matched ? 'success' : 'info'}
+                        showIcon
+                      />
+                      <Card size="small" style={{ marginTop: 8 }}>
+                        <pre>{JSON.stringify(testResult.test_result, null, 2)}</pre>
+                      </Card>
+                    </div>
+                  )}
+                </Form>
+              </Card>
+            )
+          }] : [])
+        ]}
+      />
 
       <Divider />
 

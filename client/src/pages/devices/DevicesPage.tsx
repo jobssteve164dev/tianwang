@@ -268,7 +268,7 @@ const DevicesPage: React.FC = () => {
         variant="outlined"
         className="modern-card"
         style={{ marginBottom: 16 }}
-        bodyStyle={{ padding: isMobile ? '12px' : '16px' }}
+        styles={{ body: { padding: isMobile ? '12px' : '16px' } }}
       >
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} sm={12} md={8} lg={6}>

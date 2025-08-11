@@ -442,127 +442,138 @@ const SecurityRulesPage: React.FC = () => {
       {renderStatisticsCards()}
 
       {/* 规则管理标签页 */}
-      <Tabs defaultActiveKey="sources" size="large">
-        <Tabs.TabPane tab="规则源管理" key="sources">
-          <Card
-            title={
-              <Space>
-                <SettingOutlined />
-                规则源管理
-              </Space>
-            }
-            extra={
-              <Space>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    fetchRuleSources();
-                    fetchStatistics();
-                  }}
-                  loading={loading}
-                >
-                  刷新
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<DownloadOutlined />}
-                  onClick={() => {
-                    setSelectedSource(null);
-                    setUpdateModalVisible(true);
-                  }}
-                  loading={updating}
-                >
-                  全部更新
-                </Button>
-              </Space>
-            }
-          >
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <Spin size="large" />
-              </div>
-            ) : Object.keys(ruleSources).length === 0 ? (
-              <Empty description="暂无规则源数据" />
-            ) : (
-              Object.entries(ruleSources).map(([type, ruleType]) => (
-                <div key={type} style={{ marginBottom: 24 }}>
-                  <Title level={4} style={{ marginBottom: 16 }}>
-                    {ruleType.name}
-                    <Text type="secondary" style={{ marginLeft: 8, fontSize: 14 }}>
-                      {ruleType.description}
-                    </Text>
-                  </Title>
-                  <Table
-                    columns={sourceColumns}
-                    dataSource={ruleType.sources}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    bordered
-                  />
-                </div>
-              ))
-            )}
-          </Card>
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="自定义规则" key="custom">
-          <Card
-            title={
-              <Space>
-                <CodeOutlined />
-                自定义规则管理
-              </Space>
-            }
-            extra={
-              <Space>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={fetchCustomRules}
-                  loading={customRulesLoading}
-                >
-                  刷新
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={openCreateEditor}
-                >
-                  创建规则
-                </Button>
-              </Space>
-            }
-          >
-            {customRulesLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <Spin size="large" />
-              </div>
-            ) : customRules.length === 0 ? (
-              <Empty 
-                description="暂无自定义规则" 
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
+      <Tabs 
+        defaultActiveKey="sources" 
+        size="large"
+        items={[
+          {
+            key: 'sources',
+            label: '规则源管理',
+            children: (
+              <Card
+                title={
+                  <Space>
+                    <SettingOutlined />
+                    规则源管理
+                  </Space>
+                }
+                extra={
+                  <Space>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => {
+                        fetchRuleSources();
+                        fetchStatistics();
+                      }}
+                      loading={loading}
+                    >
+                      刷新
+                    </Button>
+                    <Button
+                      type="primary"
+                      icon={<DownloadOutlined />}
+                      onClick={() => {
+                        setSelectedSource(null);
+                        setUpdateModalVisible(true);
+                      }}
+                      loading={updating}
+                    >
+                      全部更新
+                    </Button>
+                  </Space>
+                }
               >
-                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateEditor}>
-                  创建第一个规则
-                </Button>
-              </Empty>
-            ) : (
-              <Table
-                columns={customRuleColumns}
-                dataSource={customRules}
-                rowKey="id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
-                }}
-                size="middle"
-              />
-            )}
-          </Card>
-        </Tabs.TabPane>
-      </Tabs>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <Spin size="large" />
+                  </div>
+                ) : Object.keys(ruleSources).length === 0 ? (
+                  <Empty description="暂无规则源数据" />
+                ) : (
+                  Object.entries(ruleSources).map(([type, ruleType]) => (
+                    <div key={type} style={{ marginBottom: 24 }}>
+                      <Title level={4} style={{ marginBottom: 16 }}>
+                        {ruleType.name}
+                        <Text type="secondary" style={{ marginLeft: 8, fontSize: 14 }}>
+                          {ruleType.description}
+                        </Text>
+                      </Title>
+                      <Table
+                        columns={sourceColumns}
+                        dataSource={ruleType.sources}
+                        rowKey="id"
+                        pagination={false}
+                        size="small"
+                        bordered
+                      />
+                    </div>
+                  ))
+                )}
+              </Card>
+            )
+          },
+          {
+            key: 'custom',
+            label: '自定义规则',
+            children: (
+              <Card
+                title={
+                  <Space>
+                    <CodeOutlined />
+                    自定义规则管理
+                  </Space>
+                }
+                extra={
+                  <Space>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={fetchCustomRules}
+                      loading={customRulesLoading}
+                    >
+                      刷新
+                    </Button>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={openCreateEditor}
+                    >
+                      创建规则
+                    </Button>
+                  </Space>
+                }
+              >
+                {customRulesLoading ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <Spin size="large" />
+                  </div>
+                ) : customRules.length === 0 ? (
+                  <Empty 
+                    description="暂无自定义规则" 
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  >
+                    <Button type="primary" icon={<PlusOutlined />} onClick={openCreateEditor}>
+                      创建第一个规则
+                    </Button>
+                  </Empty>
+                ) : (
+                  <Table
+                    columns={customRuleColumns}
+                    dataSource={customRules}
+                    rowKey="id"
+                    pagination={{
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showQuickJumper: true,
+                      showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+                    }}
+                    size="middle"
+                  />
+                )}
+              </Card>
+            )
+          }
+        ]}
+      />
 
       {/* 更新规则模态框 */}
       <Modal
