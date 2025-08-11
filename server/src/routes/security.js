@@ -14,7 +14,7 @@ router.get('/', protect, (req, res) => {
 router.get('/rules/status', protect, async (req, res) => {
   try {
     // 调用AI引擎的规则状态API
-    const response = await fetch('http://localhost:8001/rules/status');
+    const response = await fetch('http://localhost:8888/api/rules/status');
     const data = await response.json();
     res.json(data);
   } catch (error) {
@@ -110,7 +110,7 @@ router.post('/rules/update', protect, async (req, res) => {
     const { source_type, source_name } = req.body;
     
     // 调用AI引擎的规则更新API
-    const response = await fetch('http://localhost:8001/rules/update', {
+    const response = await fetch('http://localhost:8888/api/rules/update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -132,7 +132,7 @@ router.post('/rules/update', protect, async (req, res) => {
 router.get('/rules/statistics', protect, async (req, res) => {
   try {
     // 获取规则统计信息
-    const response = await fetch('http://localhost:8001/rules/status');
+    const response = await fetch('http://localhost:8888/api/rules/status');
     const data = await response.json();
     
     if (data.success) {
@@ -478,7 +478,7 @@ router.post('/rules/custom/:id/test', protect, async (req, res) => {
     const rule = yaml.load(content);
     
     // 调用AI引擎进行规则测试
-    const response = await fetch('http://localhost:8001/rules/match', {
+    const response = await fetch('http://localhost:8888/api/rules/match', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -343,7 +343,7 @@ const https = require('https');
 const services = [
   { name: 'API Server', url: 'http://localhost:8000/api/health' },
   { name: 'Frontend', url: 'http://localhost:3000' },
-  { name: 'AI Engine', url: 'http://localhost:8001/health' }
+  { name: 'AI Engine', url: 'http://localhost:8888/health' }
 ];
 
 async function checkHealth(service) {

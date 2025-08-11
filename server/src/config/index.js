@@ -87,7 +87,7 @@ const config = {
 
   // AI引擎配置
   ai: {
-    engineUrl: process.env.AI_ENGINE_URL || 'http://localhost:8001',
+    engineUrl: process.env.AI_ENGINE_URL || 'http://localhost:8888',
     timeout: parseInt(process.env.AI_ENGINE_TIMEOUT) || 30000,
     modelPath: process.env.AI_MODEL_PATH || './models',
     confidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD) || 0.8
