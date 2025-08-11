@@ -13,19 +13,23 @@ import {
   Badge,
   Tooltip,
   message,
-  Popconfirm
+  Popconfirm,
+  Typography
 } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
   CheckCircleOutlined,
   CloseCircleOutlined,
-  EyeOutlined
+  EyeOutlined,
+  AlertOutlined
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchAlerts, setFilters, updateAlertStatus, clearError } from '../../store/slices/alertSlice';
 import type { Alert } from '../../store/slices/alertSlice';
 import dayjs from 'dayjs';
+
+const { Title, Paragraph } = Typography;
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -198,9 +202,15 @@ const AlertsPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 className="page-title">
-        威胁告警管理
-      </h1>
+      <div className="page-header">
+        <Title level={2}>
+          <AlertOutlined style={{ marginRight: 8 }} />
+          威胁告警管理
+        </Title>
+        <Paragraph type="secondary">
+          查看和处理系统安全告警，及时响应安全威胁
+        </Paragraph>
+      </div>
 
       {/* 筛选器 */}
       <Card 

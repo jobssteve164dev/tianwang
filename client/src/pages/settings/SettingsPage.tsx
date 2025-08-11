@@ -6,7 +6,6 @@ import {
   Button,
   Switch,
   Space,
-  Divider,
   Row,
   Col,
   Typography,
@@ -16,15 +15,12 @@ import {
 } from 'antd';
 import {
   SettingOutlined,
-  BellOutlined,
-  RobotOutlined,
-  ApiOutlined,
 } from '@ant-design/icons';
 import { notificationApi } from '../../services/api';
 import AIModelConfig from '../../components/settings/AIModelConfig';
 import AIUsageStats from '../../components/settings/AIUsageStats';
 
-const { Title } = Typography;
+const { Title, Paragraph } = Typography;
 
 const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -77,21 +73,43 @@ const SettingsPage: React.FC = () => {
   const tabItems = [
     {
       key: 'notification',
-      label: (
-        <span>
-          <BellOutlined />
-          通知配置
-        </span>
-      ),
+      label: '通知配置',
       children: (
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSave}
+        <Card
+          title={
+            <Space>
+              <SettingOutlined />
+              通知配置
+            </Space>
+          }
+          extra={
+            <Space>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={saving}
+                icon={<SettingOutlined />}
+                onClick={() => form.submit()}
+              >
+                保存配置
+              </Button>
+              <Button
+                onClick={loadConfig}
+                icon={<SettingOutlined />}
+              >
+                重置
+              </Button>
+            </Space>
+          }
         >
-          <Row gutter={[24, 24]}>
-            <Col span={12}>
-              <Card title="邮件通知配置" size="small">
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSave}
+          >
+            <Row gutter={[24, 24]}>
+              <Col span={12}>
+                <Card title="邮件通知配置" size="small">
                 <Form.Item
                   label="启用邮件通知"
                   name={['email', 'enabled']}
@@ -312,56 +330,42 @@ const SettingsPage: React.FC = () => {
               </Card>
             </Col>
           </Row>
-
-          <Divider />
-
-          <div style={{ textAlign: 'center', marginTop: 24 }}>
-            <Space size="large">
-              <Button
-                type="primary"
-                size="large"
-                htmlType="submit"
-                loading={saving}
-                icon={<SettingOutlined />}
-              >
-                保存配置
-              </Button>
-              <Button
-                size="large"
-                onClick={loadConfig}
-                icon={<SettingOutlined />}
-              >
-                重置
-              </Button>
-            </Space>
-          </div>
         </Form>
+        </Card>
       )
     },
     {
       key: 'ai-model',
-      label: (
-        <span>
-          <RobotOutlined />
-          AI模型配置
-        </span>
-      ),
+      label: 'AI模型配置',
       children: (
-        <AIModelConfig 
-          onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
-        />
+        <Card
+          title={
+            <Space>
+              <SettingOutlined />
+              AI模型配置
+            </Space>
+          }
+        >
+          <AIModelConfig 
+            onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
+          />
+        </Card>
       )
     },
     {
       key: 'ai-stats',
-      label: (
-        <span>
-          <ApiOutlined />
-          API使用统计
-        </span>
-      ),
+      label: 'API使用统计',
       children: (
-        <AIUsageStats refreshTrigger={refreshTrigger} />
+        <Card
+          title={
+            <Space>
+              <SettingOutlined />
+              API使用统计
+            </Space>
+          }
+        >
+          <AIUsageStats refreshTrigger={refreshTrigger} />
+        </Card>
       )
     }
   ];
@@ -375,10 +379,23 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>系统设置</Title>
+    <div className="fade-in-up">
+      <div className="page-header">
+        <Title level={2}>
+          <SettingOutlined style={{ marginRight: 8 }} />
+          系统设置
+        </Title>
+        <Paragraph type="secondary">
+          配置系统参数、通知设置和AI模型配置
+        </Paragraph>
+      </div>
       
-      <Tabs items={tabItems} style={{ marginTop: 24 }} />
+      <Tabs 
+        defaultActiveKey="notification" 
+        size="large"
+        items={tabItems} 
+        style={{ marginTop: 24 }} 
+      />
     </div>
   );
 };

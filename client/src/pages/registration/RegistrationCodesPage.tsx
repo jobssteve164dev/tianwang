@@ -28,14 +28,16 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  KeyOutlined
 } from '@ant-design/icons';
 import { registrationCodeApi } from '../../services/api';
 import dayjs from 'dayjs';
 
+const { Title, Paragraph, Text } = Typography;
+
 const { Option } = Select;
 const { TextArea } = Input;
-const { Text } = Typography;
 
 interface RegistrationCode {
   code: string;
@@ -304,9 +306,15 @@ const RegistrationCodesPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 className="page-title">
-        注册码管理
-      </h1>
+      <div className="page-header">
+        <Title level={2}>
+          <KeyOutlined style={{ marginRight: 8 }} />
+          注册码管理
+        </Title>
+        <Paragraph type="secondary">
+          生成和管理设备注册码，控制设备接入权限
+        </Paragraph>
+      </div>
 
       {/* 统计卡片 */}
       {stats && (

@@ -22,7 +22,7 @@ import {
 } from '@ant-design/icons';
 import { aiModelApi } from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface UsageStats {
   total_requests: number;
@@ -222,27 +222,6 @@ const AIUsageStats: React.FC<AIUsageStatsProps> = ({ refreshTrigger }) => {
 
   return (
     <div className="ai-usage-stats">
-      <div className="section-header">
-        <Title level={3}>
-          API使用量统计
-        </Title>
-        <Space>
-          <Button
-            type="primary"
-            icon={<ReloadOutlined />}
-            onClick={loadStats}
-            loading={loading}
-          >
-            刷新数据
-          </Button>
-          {lastUpdate && (
-            <Text type="secondary">
-              最后更新: {lastUpdate.toLocaleString()}
-            </Text>
-          )}
-        </Space>
-      </div>
-
       {/* 统计概览 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
@@ -292,9 +271,19 @@ const AIUsageStats: React.FC<AIUsageStatsProps> = ({ refreshTrigger }) => {
         title="提供商详细统计"
         extra={
           <Space>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {lastUpdate && `最后更新: ${lastUpdate.toLocaleString()}`}
-            </Text>
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={loadStats}
+              loading={loading}
+            >
+              刷新数据
+            </Button>
+            {lastUpdate && (
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                最后更新: {lastUpdate.toLocaleString()}
+              </Text>
+            )}
           </Space>
         }
       >

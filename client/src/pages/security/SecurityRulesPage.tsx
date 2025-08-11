@@ -427,7 +427,7 @@ const SecurityRulesPage: React.FC = () => {
   };
 
   return (
-    <div className="security-rules-page">
+    <div className="fade-in-up">
       <div className="page-header">
         <Title level={2}>
           <SecurityScanOutlined style={{ marginRight: 8 }} />

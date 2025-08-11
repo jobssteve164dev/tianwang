@@ -15,7 +15,8 @@ import {
   Progress,
   Popconfirm,
   Row,
-  Col
+  Col,
+  Typography
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -25,13 +26,16 @@ import {
   WindowsOutlined,
   AppleOutlined,
   WifiOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  LaptopOutlined
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchDevices, setFilters, setSelectedDevice, clearError } from '../../store/slices/deviceSlice';
 import type { Device } from '../../store/slices/deviceSlice';
 import { useResponsive } from '../../utils/responsive';
 import dayjs from 'dayjs';
+
+const { Title, Paragraph } = Typography;
 
 const { Option } = Select;
 
@@ -192,9 +196,15 @@ const DevicesPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 className="page-title">
-        设备管理
-      </h1>
+      <div className="page-header">
+        <Title level={2}>
+          <LaptopOutlined style={{ marginRight: 8 }} />
+          设备管理
+        </Title>
+        <Paragraph type="secondary">
+          管理所有连接的设备，监控设备状态和安全状况
+        </Paragraph>
+      </div>
 
       {/* 统计卡片 - 响应式布局 */}
       <Row gutter={[16, 16]} style={{ marginBottom: isMobile ? 16 : 20 }}>

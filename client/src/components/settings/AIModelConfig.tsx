@@ -16,7 +16,6 @@ import {
   App,
 } from 'antd';
 import {
-  RobotOutlined,
   SettingOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -24,7 +23,7 @@ import {
 } from '@ant-design/icons';
 import { aiModelApi } from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Password } = Input;
 const { Option } = Select;
 
@@ -187,7 +186,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
   }
 
   return (
-    <Card>
+    <div>
       <Form
         form={form}
         layout="vertical"
@@ -195,10 +194,6 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
         initialValues={config || {}}
       >
         <div style={{ marginBottom: '24px' }}>
-          <Title level={4}>
-            <RobotOutlined style={{ marginRight: '8px' }} />
-            AI模型配置
-          </Title>
           <Text type="secondary">
             配置外部AI模型的API密钥和参数，用于威胁检测和智能分析
           </Text>
@@ -297,7 +292,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
           </Space>
         </Form.Item>
       </Form>
-    </Card>
+    </div>
   );
 };
 

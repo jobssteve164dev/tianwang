@@ -63,6 +63,40 @@ code {
   line-height: 1.2;
 }
 
+/* 统一页面头部样式 */
+.page-header {
+  margin-bottom: 32px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.page-header .ant-typography {
+  margin-bottom: 8px;
+}
+
+.page-header .ant-typography h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+}
+
+.page-header .ant-typography .anticon {
+  color: #1890ff;
+}
+
+.page-header .ant-typography .ant-typography-secondary {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
 /* 紧凑布局样式 - 优化PC端响应式，充分利用屏幕空间 */
 .compact-layout {
   padding: 24px; /* 恢复适当的边距 */
@@ -535,15 +569,7 @@ code {
   background: transparent;
 }
 
-.security-rules-page .page-header {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
+
 
 .security-rules-page .ant-card {
   background: rgba(255, 255, 255, 0.95);
@@ -644,15 +670,7 @@ code {
   background: transparent;
 }
 
-.settings-page .page-header {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
+
 
 .settings-page .ant-card {
   background: rgba(255, 255, 255, 0.95);

@@ -59,9 +59,15 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="fade-in-up">
-      <h1 className="page-title">
-        安全态势概览
-      </h1>
+      <div className="page-header">
+        <Title level={2}>
+          <DashboardOutlined style={{ marginRight: 8 }} />
+          安全态势概览
+        </Title>
+        <Paragraph type="secondary">
+          实时监控系统安全状态，查看威胁趋势和设备统计信息
+        </Paragraph>
+      </div>
 
       {/* 核心指标卡片 - 使用Ant Design的Row/Col系统 */}
       <Row gutter={[20, 20]} style={{ marginBottom: isMobile ? 16 : 24 }}>
