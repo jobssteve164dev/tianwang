@@ -31,7 +31,7 @@ class AnalysisRequest(BaseModel):
     analysis_types: List[str] = ["anomaly", "malware", "network", "behavior"]
 
 class TrainingRequest(BaseModel):
-    model_name: str
+    training_model_name: str
     training_data: List[Dict[str, Any]]
 
 class LLMAnalysisRequest(BaseModel):
@@ -206,14 +206,14 @@ async def train_model(request: TrainingRequest, background_tasks: BackgroundTask
         # 在后台执行训练
         background_tasks.add_task(
             _train_model_background,
-            request.model_name,
+            request.training_model_name,
             request.training_data
         )
         
         return {
             "success": True,
-            "message": f"模型 {request.model_name} 训练已开始",
-            "model_name": request.model_name,
+            "message": f"模型 {request.training_model_name} 训练已开始",
+            "model_name": request.training_model_name,
             "training_samples": len(request.training_data)
         }
         
