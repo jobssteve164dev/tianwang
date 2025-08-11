@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Tabs,
@@ -76,7 +76,7 @@ const SettingsPage: React.FC = () => {
   const [form] = Form.useForm();
 
   // 加载配置
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       const response = await notificationApi.getConfig();
@@ -92,10 +92,10 @@ const SettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]);
 
   // 保存配置
-  const handleSave = async (values: any) => {
+  const handleSave = useCallback(async (values: any) => {
     try {
       setSaving(true);
       const response = await notificationApi.updateConfig(values);
@@ -111,10 +111,10 @@ const SettingsPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [loadConfig]);
 
   // 测试通知
-  const handleTest = async (type: string) => {
+  const handleTest = useCallback(async (type: string) => {
     const recipient = form.getFieldValue(`${type}.testRecipient`);
     if (!recipient) {
       message.error('请输入测试接收者');
@@ -138,11 +138,12 @@ const SettingsPage: React.FC = () => {
     } finally {
       setTesting(false);
     }
-  };
+  }, [form]);
 
   useEffect(() => {
     loadConfig();
-  }, [loadConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
