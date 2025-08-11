@@ -636,4 +636,164 @@ code {
 .security-rules-page .ant-modal-close:hover {
   background: rgba(255, 255, 255, 0.2);
   color: white;
+}
+
+/* 设置页面样式 */
+.settings-page {
+  padding: 24px;
+  background: transparent;
+}
+
+.settings-page .page-header {
+  margin-bottom: 32px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.settings-page .ant-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.settings-page .ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.settings-page .ant-card-head {
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  background: rgba(102, 126, 234, 0.02);
+  border-radius: 16px 16px 0 0;
+}
+
+.settings-page .ant-card-head-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-page .ant-form-item-label > label {
+  font-weight: 500;
+  color: #333;
+}
+
+.settings-page .ant-input,
+.settings-page .ant-input-number,
+.settings-page .ant-input-password {
+  border-radius: 8px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.settings-page .ant-input:hover,
+.settings-page .ant-input-number:hover,
+.settings-page .ant-input-password:hover {
+  border-color: #667eea;
+}
+
+.settings-page .ant-input:focus,
+.settings-page .ant-input-number:focus,
+.settings-page .ant-input-password:focus,
+.settings-page .ant-input-focused,
+.settings-page .ant-input-number-focused,
+.settings-page .ant-input-password-focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.settings-page .ant-switch {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.settings-page .ant-switch-checked {
+  background: #52c41a;
+}
+
+.settings-page .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.settings-page .ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.settings-page .ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.settings-page .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.settings-page .ant-tabs-tab {
+  border-radius: 8px 8px 0 0;
+  transition: all 0.3s ease;
+}
+
+.settings-page .ant-tabs-tab:hover {
+  color: #667eea;
+}
+
+.settings-page .ant-tabs-tab-active {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+}
+
+.settings-page .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.settings-page .ant-alert {
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.settings-page .ant-tag {
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border: none;
+}
+
+.settings-page .ant-divider {
+  margin: 32px 0;
+  border-color: rgba(102, 126, 234, 0.1);
+}
+
+/* 响应式设置页面 */
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 16px;
+  }
+  
+  .settings-page .page-header {
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .settings-page .ant-card {
+    margin-bottom: 16px;
+  }
+  
+  .settings-page .ant-row {
+    margin: 0 !important;
+  }
+  
+  .settings-page .ant-col {
+    padding: 0 !important;
+  }
 } 

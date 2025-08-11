@@ -431,6 +431,21 @@ export const securityRulesApi = {
   }),
 };
 
+// 通知配置管理API
+export const notificationApi = {
+  getConfig: () => request('/notifications/config'),
+  updateConfig: (config: any) => request('/notifications/config', {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  }),
+  sendTestNotification: (data: { type: string; recipient: string }) => 
+    request('/notifications/test', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getStatus: () => request('/notifications/status'),
+};
+
 // 默认导出所有API
 export default {
   auth: authAPI,
@@ -441,4 +456,5 @@ export default {
   system: systemAPI,
   registrationCode: registrationCodeApi,
   securityRules: securityRulesApi,
+  notification: notificationApi,
 }; 
