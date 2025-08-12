@@ -194,32 +194,39 @@ check_dependencies() {
 check_dependencies_installed() {
     local missing_deps=()
     local need_install=false
+    local force_install=${1:-false}
     
     # 检查根目录依赖 - 使用更智能的检查方法
-    if [ ! -d "node_modules" ]; then
-        missing_deps+=("根目录依赖")
-        need_install=true
-    elif [ ! -f "package-lock.json" ] || [ "package.json" -nt "package-lock.json" ]; then
-        missing_deps+=("根目录依赖(package.json已更新)")
-        need_install=true
+    if [ -f "package.json" ]; then
+        if [ ! -d "node_modules" ] || [ ! "$(ls -A node_modules 2>/dev/null)" ]; then
+            missing_deps+=("根目录依赖")
+            need_install=true
+        elif [ -f "package-lock.json" ] && [ "package.json" -nt "package-lock.json" ]; then
+            missing_deps+=("根目录依赖(package.json已更新)")
+            need_install=true
+        fi
     fi
     
     # 检查服务端依赖
-    if [ ! -d "server/node_modules" ]; then
-        missing_deps+=("服务端依赖")
-        need_install=true
-    elif [ ! -f "server/package-lock.json" ] || [ "server/package.json" -nt "server/package-lock.json" ]; then
-        missing_deps+=("服务端依赖(package.json已更新)")
-        need_install=true
+    if [ -f "server/package.json" ]; then
+        if [ ! -d "server/node_modules" ] || [ ! "$(ls -A server/node_modules 2>/dev/null)" ]; then
+            missing_deps+=("服务端依赖")
+            need_install=true
+        elif [ -f "server/package-lock.json" ] && [ "server/package.json" -nt "server/package-lock.json" ]; then
+            missing_deps+=("服务端依赖(package.json已更新)")
+            need_install=true
+        fi
     fi
     
     # 检查客户端依赖
-    if [ ! -d "client/node_modules" ]; then
-        missing_deps+=("客户端依赖")
-        need_install=true
-    elif [ ! -f "client/package-lock.json" ] || [ "client/package.json" -nt "client/package-lock.json" ]; then
-        missing_deps+=("客户端依赖(package.json已更新)")
-        need_install=true
+    if [ -f "client/package.json" ]; then
+        if [ ! -d "client/node_modules" ] || [ ! "$(ls -A client/node_modules 2>/dev/null)" ]; then
+            missing_deps+=("客户端依赖")
+            need_install=true
+        elif [ -f "client/package-lock.json" ] && [ "client/package.json" -nt "client/package-lock.json" ]; then
+            missing_deps+=("客户端依赖(package.json已更新)")
+            need_install=true
+        fi
     fi
     
     # 检查 AI 引擎依赖 - 使用更可靠的时间戳检查
@@ -232,7 +239,10 @@ check_dependencies_installed() {
     fi
     
     if [ "$need_install" = true ]; then
-        log_warning "发现需要安装的依赖: ${missing_deps[*]}"
+        # 只在非强制安装模式下显示警告
+        if [ "$force_install" != true ]; then
+            log_warning "发现需要安装的依赖: ${missing_deps[*]}"
+        fi
         return 1
     fi
     
@@ -245,20 +255,18 @@ install_dependencies() {
     log_step "安装依赖..."
     
     # 安装根目录依赖
-    if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ] || [ "package.json" -nt "package-lock.json" ]; then
-        if [ ! -d "node_modules" ]; then
+    if [ -f "package.json" ] && ( [ ! -d "node_modules" ] || [ ! "$(ls -A node_modules 2>/dev/null)" ] || ( [ -f "package-lock.json" ] && [ "package.json" -nt "package-lock.json" ] ) ); then
+        if [ ! -d "node_modules" ] || [ ! "$(ls -A node_modules 2>/dev/null)" ]; then
             log_info "安装根目录依赖..."
         else
             log_info "根目录package.json已更新，重新安装依赖..."
         fi
         npm install
-    else
-        log_info "根目录依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装服务端依赖
-    if [ ! -d "server/node_modules" ] || [ ! -f "server/package-lock.json" ] || [ "server/package.json" -nt "server/package-lock.json" ]; then
-        if [ ! -d "server/node_modules" ]; then
+    if [ -f "server/package.json" ] && ( [ ! -d "server/node_modules" ] || [ ! "$(ls -A server/node_modules 2>/dev/null)" ] || ( [ -f "server/package-lock.json" ] && [ "server/package.json" -nt "server/package-lock.json" ] ) ); then
+        if [ ! -d "server/node_modules" ] || [ ! "$(ls -A server/node_modules 2>/dev/null)" ]; then
             log_info "安装服务端依赖..."
         else
             log_info "服务端package.json已更新，重新安装依赖..."
@@ -266,13 +274,11 @@ install_dependencies() {
         cd server
         npm install
         cd ..
-    else
-        log_info "服务端依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装客户端依赖
-    if [ ! -d "client/node_modules" ] || [ ! -f "client/package-lock.json" ] || [ "client/package.json" -nt "client/package-lock.json" ]; then
-        if [ ! -d "client/node_modules" ]; then
+    if [ -f "client/package.json" ] && ( [ ! -d "client/node_modules" ] || [ ! "$(ls -A client/node_modules 2>/dev/null)" ] || ( [ -f "client/package-lock.json" ] && [ "client/package.json" -nt "client/package-lock.json" ] ) ); then
+        if [ ! -d "client/node_modules" ] || [ ! "$(ls -A client/node_modules 2>/dev/null)" ]; then
             log_info "安装客户端依赖..."
         else
             log_info "客户端package.json已更新，重新安装依赖..."
@@ -280,12 +286,10 @@ install_dependencies() {
         cd client
         npm install
         cd ..
-    else
-        log_info "客户端依赖已存在且为最新版本，跳过安装"
     fi
     
     # 安装 AI 引擎依赖
-    if [ -f "server/ai-engine/requirements.txt" ]; then
+    if [ -f "server/ai-engine/requirements.txt" ] && ( [ ! -d "server/ai-engine/venv" ] || [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv/pyvenv.cfg" ] ); then
         if [ ! -d "server/ai-engine/venv" ]; then
             cd server/ai-engine
             log_info "创建 AI 引擎虚拟环境..."
@@ -296,15 +300,13 @@ install_dependencies() {
             pip install -r requirements.txt
             deactivate
             cd ../..
-        elif [ "server/ai-engine/requirements.txt" -nt "server/ai-engine/venv/pyvenv.cfg" ]; then
+        else
             cd server/ai-engine
             log_info "AI引擎requirements.txt已更新，重新安装依赖..."
             source venv/bin/activate
             pip install -r requirements.txt
             deactivate
             cd ../..
-        else
-            log_info "AI 引擎依赖已存在且为最新版本，跳过安装"
         fi
     fi
     
@@ -558,14 +560,20 @@ start_services() {
     if [ -f "server/ai-engine/start.sh" ]; then
         log_info "启动 AI 引擎..."
         cd server/ai-engine
-        ./start.sh &
+        ./start.sh > logs/ai_engine.log 2>&1 &
+        AI_PID=$!
+        echo $AI_PID > .ai_engine.pid
         cd ../..
-        sleep 2
+        log_success "AI 引擎已启动 (PID: $AI_PID)"
     elif [ -f "server/ai-engine/src/main.py" ]; then
         log_info "启动 AI 引擎 (Python)..."
         cd server/ai-engine
+        
+        # 确保日志目录存在
+        mkdir -p logs
+        
         source venv/bin/activate
-        python src/main.py &
+        python -m src.main > logs/ai_engine.log 2>&1 &
         AI_PID=$!
         echo $AI_PID > .ai_engine.pid
         deactivate
@@ -577,13 +585,19 @@ start_services() {
     if [ -f "server/start.sh" ]; then
         log_info "启动服务端..."
         cd server
-        ./start.sh &
+        ./start.sh > logs/server.log 2>&1 &
+        SERVER_PID=$!
+        echo $SERVER_PID > .server.pid
         cd ..
-        sleep 2
+        log_success "服务端已启动 (PID: $SERVER_PID)"
     elif [ -f "server/src/index.js" ]; then
         log_info "启动服务端 (Node.js)..."
         cd server
-        npm start &
+        
+        # 确保日志目录存在
+        mkdir -p logs
+        
+        npm start > logs/server.log 2>&1 &
         SERVER_PID=$!
         echo $SERVER_PID > .server.pid
         cd ..
@@ -594,13 +608,19 @@ start_services() {
     if [ -f "client/start.sh" ]; then
         log_info "启动客户端..."
         cd client
-        ./start.sh &
+        ./start.sh > logs/client.log 2>&1 &
+        CLIENT_PID=$!
+        echo $CLIENT_PID > .client.pid
         cd ..
-        sleep 2
+        log_success "客户端已启动 (PID: $CLIENT_PID)"
     elif [ -f "client/package.json" ]; then
         log_info "启动客户端 (React)..."
         cd client
-        npm start &
+        
+        # 确保日志目录存在
+        mkdir -p logs
+        
+        PORT=3333 npm start > logs/client.log 2>&1 &
         CLIENT_PID=$!
         echo $CLIENT_PID > .client.pid
         cd ..
@@ -718,6 +738,7 @@ cleanup() {
     local process_patterns=(
         "node.*dev-logger-enhanced.js"
         "node.*server/src/index.js"
+        "node.*src/index.js"
         "node.*client/node_modules/.bin/react-scripts"
         "python.*server/ai-engine/src/main.py"
         "kafka-server-start"
@@ -914,6 +935,40 @@ cleanup() {
 cleanup_all_ports() {
     log_step "清理项目相关端口..."
     
+    # 首先清理项目相关的进程
+    log_info "清理项目相关进程..."
+    local process_patterns=(
+        "node.*dev-logger-enhanced.js"
+        "node.*server/src/index.js"
+        "node.*src/index.js"
+        "node.*client/node_modules/.bin/react-scripts"
+        "python.*server/ai-engine/src/main.py"
+        "kafka-server-start"
+        "kafka-topics"
+        "kafka-console-producer"
+        "kafka-console-consumer"
+    )
+    
+    for pattern in "${process_patterns[@]}"; do
+        local pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            log_info "发现匹配模式 '$pattern' 的进程: $pids"
+            for pid in $pids; do
+                if ps -p $pid > /dev/null; then
+                    local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "未知")
+                    log_info "终止进程 $pid ($process_name)..."
+                    kill $pid 2>/dev/null
+                    sleep 1
+                    if ps -p $pid > /dev/null; then
+                        log_warning "强制终止进程 $pid..."
+                        kill -9 $pid 2>/dev/null
+                    fi
+                fi
+            done
+        fi
+    done
+    
+    # 然后清理端口占用
     local ports=(8888 5555 3333 8889)
     local services=("AI引擎" "服务端" "客户端" "WebSocket")
     
@@ -977,8 +1032,8 @@ main() {
     if [ "$force_install" = true ]; then
         log_step "强制重新安装所有依赖..."
         install_dependencies
-    elif ! check_dependencies_installed; then
-        log_step "检测到缺失依赖，开始安装..."
+    elif ! check_dependencies_installed "$force_install"; then
+        log_step "检测到缺失依赖，自动安装..."
         install_dependencies
     else
         log_step "所有依赖已就绪，跳过安装步骤"

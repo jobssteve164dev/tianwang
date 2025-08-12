@@ -10,6 +10,9 @@
  * - 限制最大100000行，超出自动覆盖
  * - 随系统启动和关闭
  * - 每次启动时清理并生成新文件
+ * 
+ * 注意：此脚本只负责日志收集，不负责启动进程
+ * 进程启动由 dev.sh 脚本负责
  */
 
 const fs = require('fs');
@@ -73,6 +76,7 @@ class EnhancedDevLogger {
         this.writeLog('SYSTEM', `日志文件: ${this.logFile}`);
         this.writeLog('SYSTEM', `最大行数限制: ${this.maxLines.toLocaleString()}`);
         this.writeLog('SYSTEM', `WebSocket服务器: ws://localhost:8889`);
+        this.writeLog('SYSTEM', '注意：此脚本只负责日志收集，进程启动由 dev.sh 负责');
         this.writeLog('SYSTEM', '');
     }
     
@@ -112,32 +116,24 @@ class EnhancedDevLogger {
      * 启动WebSocket服务器收集浏览器日志
      */
     startWebSocketServer() {
-        const port = 8889;
+        this.wsServer = new WebSocket.Server({ port: 8889 });
         
-        this.wsServer = new WebSocket.Server({ port });
-        
-        this.wsServer.on('connection', (ws, req) => {
-            const clientId = req.headers['x-client-id'] || 'unknown';
+        this.wsServer.on('connection', (ws) => {
             this.browserClients.add(ws);
-            
-            this.writeLog('SYSTEM', `浏览器客户端连接: ${clientId}`);
+            this.writeLog('SYSTEM', '浏览器客户端已连接');
             
             ws.on('message', (message) => {
                 try {
-                    const data = JSON.parse(message.toString());
-                    this.writeLog('BROWSER', `${data.level || 'INFO'}: ${data.message}`);
-                    
-                    if (data.stack) {
-                        this.writeLog('BROWSER-STACK', data.stack);
-                    }
+                    const data = JSON.parse(message);
+                    this.writeLog('BROWSER', `${data.level || 'INFO'} | ${data.message || data}`);
                 } catch (error) {
-                    this.writeLog('BROWSER-RAW', message.toString());
+                    this.writeLog('BROWSER-ERROR', `消息解析失败: ${message}`);
                 }
             });
             
             ws.on('close', () => {
                 this.browserClients.delete(ws);
-                this.writeLog('SYSTEM', `浏览器客户端断开连接: ${clientId}`);
+                this.writeLog('SYSTEM', '浏览器客户端已断开');
             });
             
             ws.on('error', (error) => {
@@ -149,11 +145,11 @@ class EnhancedDevLogger {
             this.writeLog('SYSTEM-ERROR', `WebSocket服务器错误: ${error.message}`);
         });
         
-        this.writeLog('SYSTEM', `WebSocket服务器已启动 (端口: ${port})`);
+        this.writeLog('SYSTEM', 'WebSocket服务器已启动 (端口: 8889)');
     }
     
     /**
-     * 写入日志到文件
+     * 写入日志
      */
     writeLog(service, message) {
         if (!this.writeStream) return;
@@ -165,23 +161,7 @@ class EnhancedDevLogger {
         this.currentLines++;
         
         // 检查是否需要滚动日志
-        if (this.currentLines > this.maxLines) {
-            this.rolloverLog();
-        }
-    }
-
-    /**
-     * 写入日志到文件，不添加额外时间戳
-     */
-    writeLogWithoutTimestamp(service, message) {
-        if (!this.writeStream) return;
-
-        const logEntry = `[${service}] ${message}\n`;
-        this.writeStream.write(logEntry);
-        this.currentLines++;
-
-        // 检查是否需要滚动日志
-        if (this.currentLines > this.maxLines) {
+        if (this.currentLines >= this.maxLines) {
             this.rolloverLog();
         }
     }
@@ -190,12 +170,11 @@ class EnhancedDevLogger {
      * 滚动日志文件
      */
     rolloverLog() {
-        console.log(`日志行数达到限制 (${this.maxLines.toLocaleString()})，开始滚动...`);
+        if (this.writeStream) {
+            this.writeStream.end();
+        }
         
-        // 关闭当前流
-        this.writeStream.end();
-        
-        // 检查原文件是否存在，如果存在则重命名
+        // 备份当前日志文件
         if (fs.existsSync(this.logFile)) {
             const backupFile = this.logFile.replace('.log', `.log.${Date.now()}`);
             try {
@@ -226,7 +205,7 @@ class EnhancedDevLogger {
     }
 
     /**
-     * 启动AI引擎日志收集
+     * 启动AI引擎日志收集（只收集，不启动进程）
      */
     startAIEngineLogger() {
         const aiEngineDir = path.join(__dirname, '..', 'server', 'ai-engine');
@@ -238,49 +217,33 @@ class EnhancedDevLogger {
             fs.mkdirSync(logDir, { recursive: true });
         }
         
-        // 检查AI引擎主文件是否存在
-        const mainFile = path.join(aiEngineDir, 'src', 'main.py');
-        if (!fs.existsSync(mainFile)) {
-            this.writeLog('SYSTEM-ERROR', `AI引擎主文件不存在: ${mainFile}`);
-            this.writeLog('SYSTEM', '跳过AI引擎启动');
+        // 检查AI引擎日志文件是否存在
+        if (!fs.existsSync(logFile)) {
+            this.writeLog('SYSTEM', `AI引擎日志文件不存在: ${logFile}`);
+            this.writeLog('SYSTEM', '等待AI引擎启动并生成日志...');
             return;
         }
         
-        // 启动AI引擎进程
-        const aiProcess = spawn('python3', ['-m', 'src.main'], {
-            cwd: aiEngineDir,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env, PYTHONUNBUFFERED: '1' }
+        // 启动日志文件监控进程
+        const tailProcess = spawn('tail', ['-f', logFile], {
+            stdio: ['pipe', 'pipe', 'pipe']
         });
         
-        this.processes.set('ai-engine', aiProcess);
+        this.processes.set('ai-engine-log', tailProcess);
         
         // 收集stdout
-        aiProcess.stdout.on('data', (data) => {
+        tailProcess.stdout.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                this.writeLog('AI-ENGINE', line);
-            });
-        });
-        
-        // 收集stderr - 解析loguru格式的日志
-        aiProcess.stderr.on('data', (data) => {
-            const lines = data.toString().split('\n').filter(line => line.trim());
-            lines.forEach(line => {
-                // 1. 解析loguru格式的日志: "2025-08-11 07:36:13.869 | INFO     | src.services.ai_service:initialize:58 - AI服务初始化完成"
-                // 注意：loguru格式中级别后面可能有多个空格
+                // 解析loguru格式的日志
                 const loguruPattern = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \| (\w+)\s* \| (.+?)(?: - (.+))?$/;
                 const loguruMatch = line.match(loguruPattern);
                 
                 if (loguruMatch) {
-                    // 解析成功，提取各个部分
                     const [, timestamp, level, source, message] = loguruMatch;
-                    
-                    // 如果没有单独的消息部分，则整个source就是消息
                     const actualMessage = message || source;
                     const actualSource = message ? source : '';
                     
-                    // 根据日志级别确定服务标签
                     let serviceTag = 'AI-ENGINE';
                     if (level === 'ERROR' || level === 'CRITICAL') {
                         serviceTag = 'AI-ENGINE-ERROR';
@@ -290,7 +253,6 @@ class EnhancedDevLogger {
                         serviceTag = 'AI-ENGINE-DEBUG';
                     }
                     
-                    // 构建日志内容，不包含原始时间戳
                     let logContent = `${level}`;
                     if (actualSource) {
                         logContent += ` | ${actualSource}`;
@@ -299,119 +261,63 @@ class EnhancedDevLogger {
                         logContent += ` | ${actualMessage}`;
                     }
                     
-                    // 使用writeLog，让日志收集器添加统一的时间戳
                     this.writeLog(serviceTag, logContent);
-                    return;
+                } else {
+                    this.writeLog('AI-ENGINE', line);
                 }
-                
-                // 2. 解析uvicorn格式的日志: "INFO: Uvicorn running on http://0.0.0.0:8888 (Press CTRL+C to quit)"
-                // 只匹配标准的日志级别
-                const uvicornPattern = /^(INFO|ERROR|WARNING|DEBUG):\s*(.+)$/;
-                const uvicornMatch = line.match(uvicornPattern);
-                
-                if (uvicornMatch) {
-                    const [, level, message] = uvicornMatch;
-                    let serviceTag = 'AI-ENGINE';
-                    if (level === 'ERROR' || level === 'CRITICAL') {
-                        serviceTag = 'AI-ENGINE-ERROR';
-                    } else if (level === 'WARNING') {
-                        serviceTag = 'AI-ENGINE-WARN';
-                    } else if (level === 'DEBUG') {
-                        serviceTag = 'AI-ENGINE-DEBUG';
-                    }
-                    
-                    this.writeLog(serviceTag, `${level} | ${message}`);
-                    return;
-                }
-                
-                // 3. 解析Python warnings: "UserWarning: Field "model_name" has conflict with protected namespace "model_"."
-                // 匹配以Warning结尾的类型
-                const warningPattern = /^(\w+Warning):\s*(.+)$/;
-                const warningMatch = line.match(warningPattern);
-                
-                if (warningMatch) {
-                    const [, warningType, message] = warningMatch;
-                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${warningType} | ${message}`);
-                    return;
-                }
-                
-                // 4. 解析Python warnings的后续行: "You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`."
-                const warningLinePattern = /^(.+)$/;
-                const warningLineMatch = line.match(warningLinePattern);
-                
-                if (warningLineMatch && (line.includes('warning') || line.includes('Warning') || line.includes('resolve'))) {
-                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${line}`);
-                    return;
-                }
-                
-                // 5. 解析Python warnings的堆栈行: "  warnings.warn("
-                const stackPattern = /^\s+(.+)$/;
-                const stackMatch = line.match(stackPattern);
-                
-                if (stackMatch && (line.includes('warnings.warn') || line.includes('warn('))) {
-                    this.writeLog('AI-ENGINE-WARN', `WARNING | ${line.trim()}`);
-                    return;
-                }
-                
-                // 6. 无法解析的日志，按原样处理
-                this.writeLog('AI-ENGINE-RAW', line);
             });
         });
         
         // 处理进程退出
-        aiProcess.on('close', (code) => {
-            this.writeLog('SYSTEM', `AI引擎进程退出，退出码: ${code}`);
-            this.processes.delete('ai-engine');
+        tailProcess.on('close', (code) => {
+            this.writeLog('SYSTEM', `AI引擎日志监控进程退出，退出码: ${code}`);
+            this.processes.delete('ai-engine-log');
         });
         
         this.writeLog('SYSTEM', 'AI引擎日志收集已启动');
     }
     
     /**
-     * 启动服务端日志收集
+     * 启动服务端日志收集（只收集，不启动进程）
      */
     startServerLogger() {
         const serverDir = path.join(__dirname, '..', 'server');
+        const logFile = path.join(serverDir, 'logs', 'server.log');
         
-        // 启动服务端进程
-        const serverProcess = spawn('npm', ['start'], {
-            cwd: serverDir,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env, NODE_ENV: 'development' }
+        // 确保服务端日志目录存在
+        const logDir = path.dirname(logFile);
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        
+        // 检查服务端日志文件是否存在
+        if (!fs.existsSync(logFile)) {
+            this.writeLog('SYSTEM', `服务端日志文件不存在: ${logFile}`);
+            this.writeLog('SYSTEM', '等待服务端启动并生成日志...');
+            return;
+        }
+        
+        // 启动日志文件监控进程
+        const tailProcess = spawn('tail', ['-f', logFile], {
+            stdio: ['pipe', 'pipe', 'pipe']
         });
         
-        this.processes.set('server', serverProcess);
+        this.processes.set('server-log', tailProcess);
         
         // 收集stdout
-        serverProcess.stdout.on('data', (data) => {
+        tailProcess.stdout.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                // 清理ANSI颜色代码
                 const cleanLine = this.cleanAnsiCodes(line);
-                
-                // 解析服务器日志格式，清理重复时间戳
                 const parsedLine = this.parseServerLog(cleanLine);
                 this.writeLog('SERVER', parsedLine);
             });
         });
         
-        // 收集stderr
-        serverProcess.stderr.on('data', (data) => {
-            const lines = data.toString().split('\n').filter(line => line.trim());
-            lines.forEach(line => {
-                // 清理ANSI颜色代码
-                const cleanLine = this.cleanAnsiCodes(line);
-                
-                // 解析服务器日志格式，清理重复时间戳
-                const parsedLine = this.parseServerLog(cleanLine);
-                this.writeLog('SERVER-ERROR', parsedLine);
-            });
-        });
-        
         // 处理进程退出
-        serverProcess.on('close', (code) => {
-            this.writeLog('SYSTEM', `服务端进程退出，退出码: ${code}`);
-            this.processes.delete('server');
+        tailProcess.on('close', (code) => {
+            this.writeLog('SYSTEM', `服务端日志监控进程退出，退出码: ${code}`);
+            this.processes.delete('server-log');
         });
         
         this.writeLog('SYSTEM', '服务端日志收集已启动');
@@ -430,7 +336,6 @@ class EnhancedDevLogger {
             const [, time, level, service, rest] = match;
             
             // 进一步解析HTTP请求部分，移除HTTP日志中的时间戳
-            // 注意：状态码304等特殊情况下，响应大小可能是"-"而不是数字
             const httpPattern = /^(\d+\.\d+\.\d+\.\d+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s+([-\d]+)\s+"([^"]*)"\s+"([^"]*)"$/;
             const httpMatch = rest.match(httpPattern);
             
@@ -458,54 +363,56 @@ class EnhancedDevLogger {
     }
     
     /**
-     * 启动客户端日志收集
+     * 启动客户端日志收集（只收集，不启动进程）
      */
     startClientLogger() {
         const clientDir = path.join(__dirname, '..', 'client');
+        const logFile = path.join(clientDir, 'logs', 'client.log');
         
-        // 启动客户端进程
-        const clientProcess = spawn('npm', ['start'], {
-            cwd: clientDir,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env, PORT: '3333' }
+        // 确保客户端日志目录存在
+        const logDir = path.dirname(logFile);
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        
+        // 检查客户端日志文件是否存在
+        if (!fs.existsSync(logFile)) {
+            this.writeLog('SYSTEM', `客户端日志文件不存在: ${logFile}`);
+            this.writeLog('SYSTEM', '等待客户端启动并生成日志...');
+            return;
+        }
+        
+        // 启动日志文件监控进程
+        const tailProcess = spawn('tail', ['-f', logFile], {
+            stdio: ['pipe', 'pipe', 'pipe']
         });
         
-        this.processes.set('client', clientProcess);
+        this.processes.set('client-log', tailProcess);
         
         // 收集stdout
-        clientProcess.stdout.on('data', (data) => {
+        tailProcess.stdout.on('data', (data) => {
             const lines = data.toString().split('\n').filter(line => line.trim());
             lines.forEach(line => {
-                // 清理ANSI颜色代码
                 const cleanLine = this.cleanAnsiCodes(line);
                 this.writeLog('CLIENT', cleanLine);
             });
         });
         
-        // 收集stderr
-        clientProcess.stderr.on('data', (data) => {
-            const lines = data.toString().split('\n').filter(line => line.trim());
-            lines.forEach(line => {
-                // 清理ANSI颜色代码
-                const cleanLine = this.cleanAnsiCodes(line);
-                this.writeLog('CLIENT-ERROR', cleanLine);
-            });
-        });
-        
         // 处理进程退出
-        clientProcess.on('close', (code) => {
-            this.writeLog('SYSTEM', `客户端进程退出，退出码: ${code}`);
-            this.processes.delete('client');
+        tailProcess.on('close', (code) => {
+            this.writeLog('SYSTEM', `客户端日志监控进程退出，退出码: ${code}`);
+            this.processes.delete('client-log');
         });
         
         this.writeLog('SYSTEM', '客户端日志收集已启动');
     }
     
     /**
-     * 启动所有日志收集
+     * 启动所有日志收集（只收集，不启动进程）
      */
     startAllLoggers() {
         console.log('启动增强版开发环境日志收集器...');
+        console.log('注意：此脚本只负责日志收集，进程启动由 dev.sh 负责');
         
         // 启动各个服务的日志收集
         this.startAIEngineLogger();
@@ -515,7 +422,7 @@ class EnhancedDevLogger {
         console.log('所有日志收集器已启动');
         console.log(`日志文件: ${this.logFile}`);
         console.log('WebSocket服务器: ws://localhost:8889');
-        console.log('按 Ctrl+C 停止所有服务');
+        console.log('按 Ctrl+C 停止日志收集器');
     }
     
     /**
