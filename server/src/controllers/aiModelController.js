@@ -12,162 +12,116 @@ class AIModelController {
    */
   async getConfig(req, res) {
     try {
-      console.log('开始获取AI模型配置...');
+      console.log('🔍 开始获取AI模型配置...');
       
       // 确保数据库模型已初始化
       const { initializeModels } = models;
       const result = initializeModels();
-      
+
       // 如果数据库被跳过，直接返回默认配置
       if (!result || !result.models) {
         console.log('⚠️  Skipping database initialization in development mode');
-        // 在开发模式下，如果数据库未初始化，返回默认配置
-        const defaultConfig = {
-          openai: {
-            enabled: false,
-            api_key: '',
-            default_model: 'gpt-3.5-turbo',
-            models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-          },
-          claude: {
-            enabled: false,
-            api_key: '',
-            default_model: 'claude-3-haiku',
-            models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-          },
-          openrouter: {
-            enabled: false,
-            api_key: '',
-            default_model: 'openai/gpt-4',
-            models: [
-              'openai/gpt-4',
-              'anthropic/claude-3-haiku',
-              'google/gemini-pro',
-              'meta-llama/llama-2-70b-chat',
-              'mistralai/mixtral-8x7b-instruct'
-            ]
-          },
-          deepseek: {
-            enabled: false,
-            api_key: '',
-            default_model: 'deepseek-chat',
-            models: ['deepseek-chat', 'deepseek-coder']
-          }
-        };
-
-        console.log('返回默认配置');
-        return res.json({
-          success: true,
-          config: defaultConfig
-        });
-      }
-      
-      const SystemConfig = result.models.SystemConfig;
-      if (!SystemConfig) {
-        console.log('⚠️  SystemConfig model not available');
         // 返回默认配置
-        const defaultConfig = {
-          openai: {
-            enabled: false,
-            api_key: '',
-            default_model: 'gpt-3.5-turbo',
-            models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-          },
-          claude: {
-            enabled: false,
-            api_key: '',
-            default_model: 'claude-3-haiku',
-            models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-          },
-          openrouter: {
-            enabled: false,
-            api_key: '',
-            default_model: 'openai/gpt-4',
-            models: [
-              'openai/gpt-4',
-              'anthropic/claude-3-haiku',
-              'google/gemini-pro',
-              'meta-llama/llama-2-70b-chat',
-              'mistralai/mixtral-8x7b-instruct'
-            ]
-          },
-          deepseek: {
-            enabled: false,
-            api_key: '',
-            default_model: 'deepseek-chat',
-            models: ['deepseek-chat', 'deepseek-coder']
-          }
-        };
-
-        console.log('返回默认配置');
         return res.json({
           success: true,
-          config: defaultConfig
+          config: {
+            openai: {
+              enabled: false,
+              api_key: '',
+              default_model: 'gpt-3.5-turbo',
+              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
+            },
+            claude: {
+              enabled: false,
+              api_key: '',
+              default_model: 'claude-3-haiku',
+              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
+            },
+            openrouter: {
+              enabled: false,
+              api_key: '',
+              default_model: 'openai/gpt-4',
+              models: [
+                'openai/gpt-4',
+                'anthropic/claude-3-haiku',
+                'google/gemini-pro',
+                'meta-llama/llama-2-70b-chat',
+                'mistralai/mixtral-8x7b-instruct'
+              ]
+            },
+            deepseek: {
+              enabled: false,
+              api_key: '',
+              default_model: 'deepseek-chat',
+              models: ['deepseek-chat', 'deepseek-coder']
+            }
+          }
         });
       }
-      
-      const config = await SystemConfig.findOne({
+
+      const SystemConfig = models.SystemConfig;
+      if (!SystemConfig) {
+        throw new Error('SystemConfig model not initialized');
+      }
+
+      console.log('🔍 查询数据库中的AI模型配置...');
+      const systemConfig = await SystemConfig.findOne({
         where: { key: 'ai_model_config' }
       });
 
-      console.log('数据库查询结果:', config ? '找到配置' : '未找到配置');
-
-      if (!config) {
+      if (!systemConfig) {
+        console.log('🔍 未找到配置，返回默认配置');
         // 返回默认配置
-        const defaultConfig = {
-          openai: {
-            enabled: false,
-            api_key: '',
-            default_model: 'gpt-3.5-turbo',
-            models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-          },
-          claude: {
-            enabled: false,
-            api_key: '',
-            default_model: 'claude-3-haiku',
-            models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-          },
-          openrouter: {
-            enabled: false,
-            api_key: '',
-            default_model: 'openai/gpt-4',
-            models: [
-              'openai/gpt-4',
-              'anthropic/claude-3-haiku',
-              'google/gemini-pro',
-              'meta-llama/llama-2-70b-chat',
-              'mistralai/mixtral-8x7b-instruct'
-            ]
-          },
-          deepseek: {
-            enabled: false,
-            api_key: '',
-            default_model: 'deepseek-chat',
-            models: ['deepseek-chat', 'deepseek-coder']
-          }
-        };
-
-        console.log('返回默认配置');
         return res.json({
           success: true,
-          config: defaultConfig
+          config: {
+            openai: {
+              enabled: false,
+              api_key: '',
+              default_model: 'gpt-3.5-turbo',
+              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
+            },
+            claude: {
+              enabled: false,
+              api_key: '',
+              default_model: 'claude-3-haiku',
+              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
+            },
+            openrouter: {
+              enabled: false,
+              api_key: '',
+              default_model: 'openai/gpt-4',
+              models: [
+                'openai/gpt-4',
+                'anthropic/claude-3-haiku',
+                'google/gemini-pro',
+                'meta-llama/llama-2-70b-chat',
+                'mistralai/mixtral-8x7b-instruct'
+              ]
+            },
+            deepseek: {
+              enabled: false,
+              api_key: '',
+              default_model: 'deepseek-chat',
+              models: ['deepseek-chat', 'deepseek-coder']
+            }
+          }
         });
       }
 
-      console.log('开始解密配置...');
+      console.log('🔍 找到配置，解密API密钥...');
       // 解密API密钥
-      const configData = config.value;
-      const decryptedConfig = this.decryptApiKeys(configData);
+      const decryptedConfig = this.decryptApiKeys(systemConfig.value);
 
-      console.log('配置解密完成，返回结果');
+      console.log('🔍 返回解密后的配置');
       res.json({
         success: true,
         config: decryptedConfig
       });
 
     } catch (error) {
-      console.error('获取AI模型配置失败 - 详细错误:', error);
-      console.error('错误堆栈:', error.stack);
+      console.error('🔍 获取AI模型配置失败 - 详细错误:', error);
+      console.error('🔍 错误堆栈:', error.stack);
       
       // 使用更安全的错误处理
       try {
@@ -177,7 +131,47 @@ class AIModelController {
           name: error.name
         });
       } catch (logError) {
-        console.error('日志记录失败:', logError);
+        console.error('🔍 日志记录失败:', logError);
+      }
+      
+      // 如果是数据库表不存在，返回默认配置
+      if (error.message.includes('relation "system_configs" does not exist')) {
+        console.log('🔍 数据库表不存在，返回默认配置');
+        return res.json({
+          success: true,
+          config: {
+            openai: {
+              enabled: false,
+              api_key: '',
+              default_model: 'gpt-3.5-turbo',
+              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
+            },
+            claude: {
+              enabled: false,
+              api_key: '',
+              default_model: 'claude-3-haiku',
+              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
+            },
+            openrouter: {
+              enabled: false,
+              api_key: '',
+              default_model: 'openai/gpt-4',
+              models: [
+                'openai/gpt-4',
+                'anthropic/claude-3-haiku',
+                'google/gemini-pro',
+                'meta-llama/llama-2-70b-chat',
+                'mistralai/mixtral-8x7b-instruct'
+              ]
+            },
+            deepseek: {
+              enabled: false,
+              api_key: '',
+              default_model: 'deepseek-chat',
+              models: ['deepseek-chat', 'deepseek-coder']
+            }
+          }
+        });
       }
       
       res.status(500).json({
@@ -289,6 +283,28 @@ class AIModelController {
       }
 
       const externalApis = data.status?.external_apis || {};
+      
+      // 如果external_apis为空，返回默认统计
+      if (!externalApis || Object.keys(externalApis).length === 0) {
+        logger.warn('AI引擎返回的external_apis为空，返回默认统计');
+        const defaultStats = {
+          total_requests: 0,
+          total_cost: 0,
+          daily_cost: 0,
+          monthly_cost: 0,
+          providers: {
+            openai: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
+            claude: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
+            openrouter: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
+            deepseek: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 }
+          }
+        };
+        
+        return res.json({
+          success: true,
+          stats: defaultStats
+        });
+      }
       
       // 格式化统计数据
       const stats = {

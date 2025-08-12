@@ -136,17 +136,20 @@ router.get('/rules/statistics', protect, async (req, res) => {
     const data = await response.json();
     
     if (data.success) {
+      const status = data.status || {};
+      const metrics = status.metrics || {};
+      
       const stats = {
-        total_rules: data.status.rules_loaded || 0,
-        last_update: data.status.last_update_time,
+        total_rules: status.total_rules || 0,
+        last_update: metrics.last_update_time || status.timestamp,
         rule_types: {
-          sigma: 0,
-          suricata: 0,
-          yara: 0,
+          sigma: status.sigma_rules?.total_rules || 0,
+          suricata: status.suricata_rules?.total_rules || 0,
+          yara: status.yara_rules?.total_rules || 0,
           snort: 0
         },
-        matches_found: data.status.matches_found || 0,
-        false_positives: data.status.false_positives || 0
+        matches_found: metrics.matches_found || 0,
+        false_positives: metrics.false_positives || 0
       };
       
       res.json({

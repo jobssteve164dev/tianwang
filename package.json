@@ -15,6 +15,7 @@
     "dev:cleanup": "./scripts/dev-cleanup.sh",
     "dev:test": "./scripts/dev-test.sh",
     "dev:legacy": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "db:enable": "./scripts/enable-database.sh",
     "server:dev": "cd server && npm run dev",
     "client:dev": "cd client && npm run dev",
     "build": "npm run server:build && npm run client:build",
