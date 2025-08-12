@@ -1,0 +1,62 @@
+# Emerging Threats Open Ruleset - 天网安全系统
+# 包含常见的网络威胁检测规则
+
+# 恶意软件通信检测
+alert tcp any any -> any any (msg:"ET MALWARE Malicious Domain Request in TLS SNI"; flow:established,to_server; ssl.sni; content:"malware-c2.example.com"; nocase; sid:2025001; rev:1;)
+
+# 勒索软件通信检测
+alert tcp any any -> any any (msg:"ET MALWARE Ransomware C2 Communication"; flow:established,to_server; content:"POST"; http_method; content:"/api/encrypt"; http_uri; sid:2025002; rev:1;)
+
+# 后门通信检测
+alert tcp any any -> any any (msg:"ET MALWARE Backdoor Reverse Shell"; flow:established,to_server; content:"bash -i >& /dev/tcp/"; sid:2025003; rev:1;)
+
+# 信息窃取器检测
+alert tcp any any -> any any (msg:"ET MALWARE Info Stealer Data Exfiltration"; flow:established,to_server; content:"POST"; http_method; content:"/upload"; http_uri; content:"password"; http_client_body; sid:2025004; rev:1;)
+
+# 挖矿软件检测
+alert tcp any any -> any any (msg:"ET MALWARE Cryptocurrency Miner Pool Connection"; flow:established,to_server; content:"stratum+tcp://"; sid:2025005; rev:1;)
+
+# 网络扫描检测
+alert tcp any any -> any any (msg:"ET SCAN NMAP -sS window 1024"; flow:stateless; ack:0; window:1024; sid:2025006; rev:1;)
+
+# 暴力破解检测
+alert tcp any any -> any 22 (msg:"ET SCAN SSH Brute Force"; flow:established,to_server; content:"SSH"; sid:2025007; rev:1; threshold:type threshold, track by_src, count 5, seconds 60;)
+
+# SQL注入检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS SQL Injection Attempt"; flow:established,to_server; content:"' OR 1=1--"; http_client_body; sid:2025008; rev:1;)
+
+# XSS攻击检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS XSS Script Tag"; flow:established,to_server; content:"<script"; http_client_body; sid:2025009; rev:1;)
+
+# 文件上传攻击检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Suspicious File Upload"; flow:established,to_server; content:"POST"; http_method; content:"upload"; http_uri; content:".php"; http_client_body; sid:2025010; rev:1;)
+
+# 命令注入检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Command Injection"; flow:established,to_server; content:"|"; http_client_body; content:"cmd"; http_client_body; sid:2025011; rev:1;)
+
+# 目录遍历检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Directory Traversal"; flow:established,to_server; content:"../"; http_uri; sid:2025012; rev:1;)
+
+# 恶意文件下载检测
+alert tcp any any -> any any (msg:"ET MALWARE Malicious File Download"; flow:established,to_server; content:"GET"; http_method; content:".exe"; http_uri; sid:2025013; rev:1;)
+
+# 异常HTTP请求检测
+alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Suspicious HTTP Request"; flow:established,to_server; content:"GET"; http_method; content:"/admin"; http_uri; sid:2025014; rev:1;)
+
+# 异常DNS查询检测
+alert udp any any -> any 53 (msg:"ET MALWARE Suspicious DNS Query"; content:"|01 00 00 01 00 00 00 00 00 00|"; depth:10; offset:2; content:"malware"; nocase; sid:2025015; rev:1;)
+
+# 异常SMTP通信检测
+alert tcp any any -> any 25 (msg:"ET MALWARE Suspicious SMTP Communication"; flow:established,to_server; content:"MAIL FROM:"; sid:2025016; rev:1;)
+
+# 异常FTP通信检测
+alert tcp any any -> any 21 (msg:"ET MALWARE Suspicious FTP Communication"; flow:established,to_server; content:"USER"; sid:2025017; rev:1;)
+
+# 异常Telnet通信检测
+alert tcp any any -> any 23 (msg:"ET MALWARE Suspicious Telnet Communication"; flow:established,to_server; content:"login:"; sid:2025018; rev:1;)
+
+# 异常RDP通信检测
+alert tcp any any -> any 3389 (msg:"ET MALWARE Suspicious RDP Communication"; flow:established,to_server; sid:2025019; rev:1;)
+
+# 异常VNC通信检测
+alert tcp any any -> any 5900 (msg:"ET MALWARE Suspicious VNC Communication"; flow:established,to_server; sid:2025020; rev:1;)

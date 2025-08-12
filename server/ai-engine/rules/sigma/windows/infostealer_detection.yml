@@ -1,0 +1,31 @@
+title: Windows Info Stealer Detection
+id: 2025-004
+status: stable
+description: Detects information stealer activities on Windows systems
+author: Tianwang Security Team
+date: 2025/01/01
+modified: 2025/01/01
+tags:
+  - attack.credential_access
+  - attack.collection
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4663
+    ObjectName|contains:
+      - '\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\'
+      - '\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\'
+      - '\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\'
+      - '\\AppData\\Roaming\\Microsoft\\Windows\\Cookies\\'
+      - '\\AppData\\Roaming\\Microsoft\\Windows\\Credentials\\'
+  filter:
+    ObjectName|contains:
+      - '\\Program Files\\'
+      - '\\Program Files (x86)\\'
+  condition: selection and not filter
+falsepositives:
+  - Browser updates
+  - Legitimate credential access
+level: medium

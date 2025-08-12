@@ -1,0 +1,37 @@
+title: Windows Cryptocurrency Miner Detection
+id: 2025-005
+status: stable
+description: Detects cryptocurrency mining activities on Windows systems
+author: Tianwang Security Team
+date: 2025/01/01
+modified: 2025/01/01
+tags:
+  - attack.execution
+  - attack.persistence
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4688
+    CommandLine|contains:
+      - 'mining'
+      - 'miner'
+      - 'hashrate'
+      - 'difficulty'
+      - 'block'
+      - 'nonce'
+      - 'sha256'
+      - 'ethash'
+      - 'randomx'
+      - 'kawpow'
+      - 'xmr'
+      - 'monero'
+      - 'ethereum'
+      - 'bitcoin'
+      - 'pool'
+  condition: selection
+falsepositives:
+  - Legitimate cryptocurrency mining
+  - Blockchain applications
+level: medium

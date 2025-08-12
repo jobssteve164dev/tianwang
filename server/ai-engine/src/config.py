@@ -171,9 +171,23 @@ class AIEngineConfig(BaseSettings):
     }
     
     # 威胁情报配置
-    misp_url: str = ""
-    misp_api_key: str = ""
-    otx_api_key: str = ""
+    misp_url: str = "https://misp.example.com"  # 替换为真实的MISP服务器URL
+    misp_api_key: str = "your-misp-api-key-here"  # 替换为真实的MISP API密钥
+    otx_api_key: str = "your-otx-api-key-here"  # 替换为真实的OTX API密钥
+    
+    # MISP配置验证
+    @property
+    def misp_configured(self) -> bool:
+        """检查MISP是否已正确配置"""
+        return bool(self.misp_url and self.misp_api_key)
+    
+    @property
+    def misp_config(self) -> Dict[str, str]:
+        """获取MISP配置字典"""
+        return {
+            "misp_url": self.misp_url,
+            "misp_api_key": self.misp_api_key
+        }
     
     # 开源规则库配置
     rules_config: Dict[str, Dict[str, Any]] = {
@@ -237,5 +251,37 @@ def validate_config() -> bool:
     
     if not any(api_keys):
         print("警告: 未配置任何外部AI API密钥，将只使用本地模型")
+    
+    # 检查威胁情报配置
+    threat_intel_configured = False
+    
+    if config.misp_configured:
+        print("✅ MISP威胁情报配置完整")
+        threat_intel_configured = True
+    else:
+        print("⚠️  MISP配置不完整")
+        print("  请配置以下环境变量:")
+        print("    AI_MISP_URL=https://your-misp-instance.com")
+        print("    AI_MISP_API_KEY=your-misp-api-key")
+    
+    if config.otx_api_key:
+        print("✅ OTX威胁情报配置完整")
+        threat_intel_configured = True
+    else:
+        print("⚠️  OTX API密钥未配置")
+        print("  请配置环境变量: AI_OTX_API_KEY=your-otx-api-key")
+    
+    if not threat_intel_configured:
+        print("⚠️  警告: 未配置任何威胁情报源，威胁情报功能将不可用")
+        print("  系统将继续启动，但建议配置至少一个威胁情报源")
+    
+    # 检查规则目录
+    for rule_type, rule_config in config.rules_config.items():
+        if rule_config.get("enabled", False):
+            if "rules_path" in rule_config:
+                rule_path = rule_config["rules_path"]
+                if not os.path.exists(rule_path):
+                    os.makedirs(rule_path, exist_ok=True)
+                    print(f"创建规则目录: {rule_path}")
     
     return True 

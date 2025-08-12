@@ -85,19 +85,31 @@ class YaraRuleManager:
             
             # 创建临时目录
             with tempfile.TemporaryDirectory() as temp_dir:
-                # 克隆仓库
-                repo = git.Repo.clone_from(url, temp_dir, branch=branch, depth=1)
-                
-                # 复制规则文件
-                target_dir = os.path.join(self.rules_dir, source_name)
-                
-                if os.path.exists(target_dir):
-                    shutil.rmtree(target_dir)
-                
-                # 复制整个仓库内容，但只保留.yar和.yara文件
-                shutil.copytree(temp_dir, target_dir, ignore=shutil.ignore_patterns('*.git*'))
-                
-                # 清理非规则文件
+                try:
+                    # 克隆仓库
+                    repo = git.Repo.clone_from(url, temp_dir, branch=branch, depth=1)
+                    
+                    # 复制规则文件
+                    target_dir = os.path.join(self.rules_dir, source_name)
+                    
+                    if os.path.exists(target_dir):
+                        shutil.rmtree(target_dir)
+                    
+                    # 复制整个仓库内容，但只保留.yar和.yara文件
+                    shutil.copytree(temp_dir, target_dir, ignore=shutil.ignore_patterns('*.git*'))
+                    
+                    # 清理非规则文件
+                    await self._clean_non_rule_files(target_dir)
+                    
+                    logger.info(f"成功下载 {source_name} 规则源")
+                    return True
+                    
+                except git.exc.GitCommandError as e:
+                    logger.error(f"Git克隆失败 {source_name}: {e}")
+                    return False
+                except Exception as e:
+                    logger.error(f"下载 {source_name} 失败: {e}")
+                    return False
                 await self._cleanup_non_rule_files(target_dir)
                 
                 logger.info(f"成功下载 {source_name} 规则到 {target_dir}")
@@ -131,26 +143,77 @@ class YaraRuleManager:
         except Exception as e:
             logger.debug(f"清理非规则文件失败: {e}")
     
+    async def _clean_non_rule_files(self, directory: str):
+        """清理非规则文件"""
+        try:
+            for root, dirs, files in os.walk(directory):
+                # 删除非规则文件
+                for file in files:
+                    if not file.endswith(('.yar', '.yara')):
+                        file_path = os.path.join(root, file)
+                        try:
+                            os.remove(file_path)
+                        except Exception as e:
+                            logger.debug(f"删除文件失败 {file_path}: {e}")
+                
+                # 删除空目录
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    try:
+                        if not os.listdir(dir_path):  # 如果目录为空
+                            os.rmdir(dir_path)
+                    except Exception as e:
+                        logger.debug(f"删除空目录失败 {dir_path}: {e}")
+                        
+        except Exception as e:
+            logger.debug(f"清理非规则文件失败: {e}")
+    
     async def load_rules(self) -> int:
         """加载所有规则"""
         try:
             self.rules.clear()
             total_rules = 0
             
-            # 遍历所有规则目录
-            for source_name in os.listdir(self.rules_dir):
-                source_path = os.path.join(self.rules_dir, source_name)
-                if os.path.isdir(source_path):
-                    rules_count = await self._load_rules_from_directory(source_path, source_name)
-                    total_rules += rules_count
-                    logger.info(f"从 {source_name} 加载了 {rules_count} 条YARA规则")
+            # 首先尝试加载本地规则
+            if os.path.exists(self.rules_dir):
+                for source_name in os.listdir(self.rules_dir):
+                    source_path = os.path.join(self.rules_dir, source_name)
+                    if os.path.isdir(source_path):
+                        rules_count = await self._load_rules_from_directory(source_path, source_name)
+                        total_rules += rules_count
+                        logger.info(f"从 {source_name} 加载了 {rules_count} 条YARA规则")
+            
+            # 如果本地规则不足，尝试下载外部规则
+            if total_rules < 50:
+                logger.info("本地YARA规则数量不足，尝试下载外部规则...")
+                download_success = await self.download_rules()
+                if download_success:
+                    # 重新加载规则
+                    for source_name in os.listdir(self.rules_dir):
+                        source_path = os.path.join(self.rules_dir, source_name)
+                        if os.path.isdir(source_path):
+                            rules_count = await self._load_rules_from_directory(source_path, source_name)
+                            total_rules += rules_count
+                            logger.info(f"从 {source_name} 加载了 {rules_count} 条YARA规则")
+            
+            # 如果仍然没有规则，创建默认规则
+            if total_rules == 0:
+                logger.warning("未找到任何YARA规则，创建默认规则...")
+                await self._create_default_rules()
+                total_rules = await self._load_rules_from_directory(self.rules_dir, "default")
             
             logger.info(f"总共加载了 {total_rules} 条YARA规则")
             return total_rules
             
         except Exception as e:
             logger.error(f"加载YARA规则失败: {e}")
-            return 0
+            # 最后的回退：创建默认规则
+            try:
+                await self._create_default_rules()
+                return await self._load_rules_from_directory(self.rules_dir, "default")
+            except Exception as fallback_error:
+                logger.error(f"创建默认规则也失败: {fallback_error}")
+                return 0
     
     async def _load_rules_from_directory(self, directory: str, source_name: str) -> int:
         """从目录加载规则"""
@@ -448,4 +511,76 @@ class YaraRuleManager:
             
         except Exception as e:
             logger.error(f"更新YARA规则库失败: {e}")
-            return False 
+            return False
+    
+    async def _create_default_rules(self):
+        """创建默认的YARA规则"""
+        try:
+            default_rules = [
+                {
+                    "name": "Malware_Generic_Strings",
+                    "description": "通用恶意软件字符串检测",
+                    "strings": {
+                        "$s1": "cmd.exe /c",
+                        "$s2": "powershell.exe",
+                        "$s3": "rundll32.exe",
+                        "$s4": "regsvr32.exe",
+                        "$s5": "wscript.exe"
+                    },
+                    "condition": "any of ($s*)"
+                },
+                {
+                    "name": "Ransomware_Strings",
+                    "description": "勒索软件特征检测",
+                    "strings": {
+                        "$s1": "encrypted",
+                        "$s2": "ransom",
+                        "$s3": "bitcoin",
+                        "$s4": "wallet",
+                        "$s5": "payment"
+                    },
+                    "condition": "any of ($s*)"
+                },
+                {
+                    "name": "Backdoor_Strings",
+                    "description": "后门程序特征检测",
+                    "strings": {
+                        "$s1": "reverse shell",
+                        "$s2": "bind shell",
+                        "$s3": "meterpreter",
+                        "$s4": "beacon",
+                        "$s5": "c2"
+                    },
+                    "condition": "any of ($s*)"
+                }
+            ]
+            
+            # 确保默认规则目录存在
+            default_dir = os.path.join(self.rules_dir, "default")
+            os.makedirs(default_dir, exist_ok=True)
+            
+            # 创建默认规则文件
+            rule_file = os.path.join(default_dir, "default_rules.yar")
+            with open(rule_file, 'w', encoding='utf-8') as f:
+                for rule in default_rules:
+                    f.write(f"rule {rule['name']}\n")
+                    f.write("{\n")
+                    f.write("    meta:\n")
+                    f.write(f'        description = "{rule["description"]}"\n')
+                    f.write('        author = "Tianwang Security Team"\n')
+                    f.write("        severity = 3\n")
+                    f.write("        category = \"malware\"\n")
+                    f.write("    \n")
+                    f.write("    strings:\n")
+                    for var_name, string_value in rule["strings"].items():
+                        f.write(f'        {var_name} = "{string_value}" nocase\n')
+                    f.write("    \n")
+                    f.write(f"    condition:\n")
+                    f.write(f"        {rule['condition']}\n")
+                    f.write("}\n\n")
+            
+            logger.info("成功创建默认YARA规则")
+            
+        except Exception as e:
+            logger.error(f"创建默认YARA规则失败: {e}")
+            raise 

@@ -32,63 +32,51 @@ class MispManager:
     async def fetch_threat_intelligence(self, days: int = 7) -> bool:
         """获取威胁情报数据"""
         try:
-            if not self.misp_url or not self.api_key:
-                logger.warning("MISP配置不完整，使用模拟威胁情报数据")
-                await self._load_mock_iocs()
-                return True
+            # 检查配置完整性
+            if not self._is_config_valid():
+                logger.warning("MISP配置不完整，跳过威胁情报获取")
+                return True  # 返回True而不是False，避免阻止系统启动
+            
+            # 测试MISP连接
+            if not await self._test_misp_connection():
+                logger.warning("MISP连接失败，跳过威胁情报获取")
+                return True  # 返回True而不是False，避免阻止系统启动
             
             logger.info(f"正在从MISP获取最近 {days} 天的威胁情报...")
             
-            # 计算时间范围
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
+            # 获取事件列表
+            events = await self._fetch_misp_events(days)
+            if not events:
+                logger.warning("未获取到MISP事件数据")
+                return False
             
-            # 构建MISP API请求
-            headers = {
-                "Authorization": self.api_key,
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            }
+            # 提取事件ID
+            event_ids = [event.get("id") for event in events if event.get("id")]
+            if not event_ids:
+                logger.warning("未找到有效的事件ID")
+                return False
             
-            # 获取事件数据
-            search_params = {
-                "returnFormat": "json",
-                "type": "json",
-                "category": ["Network activity", "Payload delivery", "Artifacts dropped"],
-                "date_from": start_date.strftime("%Y-%m-%d"),
-                "date_to": end_date.strftime("%Y-%m-%d"),
-                "published": True
-            }
+            # 获取事件属性
+            attributes = await self._fetch_misp_attributes(event_ids)
+            if not attributes:
+                logger.warning("未获取到MISP属性数据")
+                return False
             
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.misp_url}/attributes/restSearch"
-                
-                async with session.post(url, headers=headers, json=search_params, timeout=60) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        await self._process_misp_data(data)
-                        logger.info("成功获取MISP威胁情报数据")
-                        return True
-                    else:
-                        logger.error(f"MISP API请求失败，状态码: {response.status}")
-                        # 回退到模拟数据
-                        await self._load_mock_iocs()
-                        return True
+            # 处理属性数据
+            await self._process_misp_attributes(attributes)
+            logger.info("成功获取MISP威胁情报数据")
+            return True
                         
         except Exception as e:
-            logger.error(f"获取MISP威胁情报失败: {e}")
-            # 回退到模拟数据
-            await self._load_mock_iocs()
-            return True
+            logger.warning(f"获取MISP威胁情报失败: {e}")
+            return True  # 返回True而不是False，避免阻止系统启动
     
-    async def _process_misp_data(self, data: Dict[str, Any]):
-        """处理MISP数据"""
+    async def _process_misp_attributes(self, attributes: List[Dict[str, Any]]):
+        """处理MISP属性数据"""
         try:
             # 清空现有IOC数据
             for ioc_type in self.iocs:
                 self.iocs[ioc_type].clear()
-            
-            attributes = data.get("response", {}).get("Attribute", [])
             
             for attr in attributes:
                 ioc_type = self._classify_ioc_type(attr.get("type", ""))
@@ -114,77 +102,78 @@ class MispManager:
             logger.info(f"处理了 {total_iocs} 个IOC指标")
             
         except Exception as e:
-            logger.error(f"处理MISP数据失败: {e}")
+            logger.error(f"处理MISP属性数据失败: {e}")
     
-    async def _load_mock_iocs(self):
-        """加载模拟威胁情报数据"""
+    async def _fetch_misp_events(self, days: int = 7) -> List[Dict[str, Any]]:
+        """从MISP获取事件数据"""
         try:
-            logger.info("加载模拟威胁情报数据...")
+            headers = {
+                "Authorization": self.api_key,
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
             
-            # 清空现有数据
-            for ioc_type in self.iocs:
-                self.iocs[ioc_type].clear()
+            # 计算时间范围
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
             
-            # 模拟IP威胁情报
-            malicious_ips = [
-                "192.168.100.100", "10.0.0.200", "172.16.1.50",
-                "203.0.113.100", "198.51.100.200", "192.0.2.150"
-            ]
+            # 获取事件列表
+            events_params = {
+                "returnFormat": "json",
+                "date_from": start_date.strftime("%Y-%m-%d"),
+                "date_to": end_date.strftime("%Y-%m-%d"),
+                "published": True,
+                "limit": 100  # 限制返回数量
+            }
             
-            for ip in malicious_ips:
-                self.iocs["ip"].append({
-                    "id": f"mock_ip_{hash(ip) % 10000}",
-                    "value": ip,
-                    "type": "ip-dst",
-                    "category": "Network activity",
-                    "comment": "Malicious IP address",
-                    "confidence": 0.8,
-                    "source": "mock",
-                    "created_at": datetime.now().isoformat()
-                })
+            async with aiohttp.ClientSession() as session:
+                events_url = f"{self.misp_url}/events/index"
+                async with session.post(events_url, headers=headers, json=events_params, timeout=60) as response:
+                    if response.status == 200:
+                        events_data = await response.json()
+                        return events_data.get("response", [])
+                    else:
+                        logger.warning(f"获取MISP事件失败，状态码: {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"获取MISP事件失败: {e}")
+            return []
+    
+    async def _fetch_misp_attributes(self, event_ids: List[str]) -> List[Dict[str, Any]]:
+        """从MISP获取属性数据"""
+        try:
+            headers = {
+                "Authorization": self.api_key,
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
             
-            # 模拟域名威胁情报
-            malicious_domains = [
-                "malware-c2.example.com", "phishing-site.fake",
-                "trojan-download.bad", "suspicious-domain.net"
-            ]
+            all_attributes = []
             
-            for domain in malicious_domains:
-                self.iocs["domain"].append({
-                    "id": f"mock_domain_{hash(domain) % 10000}",
-                    "value": domain,
-                    "type": "domain",
-                    "category": "Network activity",
-                    "comment": "Malicious domain",
-                    "confidence": 0.7,
-                    "source": "mock",
-                    "created_at": datetime.now().isoformat()
-                })
+            async with aiohttp.ClientSession() as session:
+                for event_id in event_ids:
+                    # 获取单个事件的属性
+                    attributes_params = {
+                        "returnFormat": "json",
+                        "eventid": event_id,
+                        "type": ["ip-dst", "ip-src", "domain", "url", "md5", "sha1", "sha256", "filename", "email-src", "email-dst"]
+                    }
+                    
+                    attributes_url = f"{self.misp_url}/attributes/restSearch"
+                    async with session.post(attributes_url, headers=headers, json=attributes_params, timeout=30) as response:
+                        if response.status == 200:
+                            attributes_data = await response.json()
+                            event_attributes = attributes_data.get("response", {}).get("Attribute", [])
+                            all_attributes.extend(event_attributes)
+                        else:
+                            logger.warning(f"获取事件 {event_id} 属性失败，状态码: {response.status}")
             
-            # 模拟文件哈希威胁情报
-            malicious_hashes = [
-                "d41d8cd98f00b204e9800998ecf8427e",
-                "5d41402abc4b2a76b9719d911017c592",
-                "098f6bcd4621d373cade4e832627b4f6"
-            ]
-            
-            for hash_value in malicious_hashes:
-                self.iocs["hash"].append({
-                    "id": f"mock_hash_{hash(hash_value) % 10000}",
-                    "value": hash_value,
-                    "type": "md5",
-                    "category": "Artifacts dropped",
-                    "comment": "Malicious file hash",
-                    "confidence": 0.9,
-                    "source": "mock",
-                    "created_at": datetime.now().isoformat()
-                })
-            
-            self.last_update = datetime.now()
-            logger.info("模拟威胁情报数据加载完成")
+            return all_attributes
             
         except Exception as e:
-            logger.error(f"加载模拟威胁情报数据失败: {e}")
+            logger.error(f"获取MISP属性失败: {e}")
+            return []
     
     def _classify_ioc_type(self, misp_type: str) -> Optional[str]:
         """分类IOC类型"""
@@ -434,4 +423,42 @@ class MispManager:
             
         except Exception as e:
             logger.error(f"更新威胁情报失败: {e}")
-            return False 
+            return False
+    
+    def _is_config_valid(self) -> bool:
+        """检查MISP配置是否有效"""
+        return bool(self.misp_url and self.api_key)
+    
+    async def _test_misp_connection(self) -> bool:
+        """测试MISP连接"""
+        try:
+            headers = {
+                "Authorization": self.api_key,
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                # 测试连接
+                test_url = f"{self.misp_url}/servers/getVersion"
+                async with session.get(test_url, headers=headers, timeout=10) as response:
+                    if response.status == 200:
+                        logger.info("MISP连接测试成功")
+                        return True
+                    else:
+                        logger.warning(f"MISP连接测试失败，状态码: {response.status}")
+                        return False
+                        
+        except Exception as e:
+            logger.warning(f"MISP连接测试失败: {e}")
+            return False
+    
+    def get_health_status(self) -> Dict[str, Any]:
+        """获取MISP健康状态"""
+        return {
+            "configured": self._is_config_valid(),
+            "connected": False,  # 需要实际测试
+            "last_update": self.last_update.isoformat() if self.last_update else None,
+            "ioc_count": sum(len(iocs) for iocs in self.iocs.values()),
+            "data_sources": list(set(ioc.get("source", "unknown") for iocs in self.iocs.values() for ioc in iocs))
+        } 

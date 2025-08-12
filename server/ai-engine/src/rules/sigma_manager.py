@@ -108,20 +108,46 @@ class SigmaRuleManager:
             self.rules.clear()
             total_rules = 0
             
-            # 遍历所有规则目录
-            for source_name in os.listdir(self.rules_dir):
-                source_path = os.path.join(self.rules_dir, source_name)
-                if os.path.isdir(source_path):
-                    rules_count = await self._load_rules_from_directory(source_path, source_name)
-                    total_rules += rules_count
-                    logger.info(f"从 {source_name} 加载了 {rules_count} 条Sigma规则")
+            # 首先尝试加载本地规则
+            if os.path.exists(self.rules_dir):
+                for source_name in os.listdir(self.rules_dir):
+                    source_path = os.path.join(self.rules_dir, source_name)
+                    if os.path.isdir(source_path):
+                        rules_count = await self._load_rules_from_directory(source_path, source_name)
+                        total_rules += rules_count
+                        logger.info(f"从 {source_name} 加载了 {rules_count} 条Sigma规则")
+            
+            # 如果本地规则不足，尝试下载外部规则
+            if total_rules < 5:
+                logger.info("本地Sigma规则数量不足，尝试下载外部规则...")
+                download_success = await self.download_rules()
+                if download_success:
+                    # 重新加载规则
+                    for source_name in os.listdir(self.rules_dir):
+                        source_path = os.path.join(self.rules_dir, source_name)
+                        if os.path.isdir(source_path):
+                            rules_count = await self._load_rules_from_directory(source_path, source_name)
+                            total_rules += rules_count
+                            logger.info(f"从 {source_name} 加载了 {rules_count} 条Sigma规则")
+            
+            # 如果仍然没有规则，创建默认规则
+            if total_rules == 0:
+                logger.warning("未找到任何Sigma规则，创建默认规则...")
+                await self._create_default_rules()
+                total_rules = await self._load_rules_from_directory(self.rules_dir, "default")
             
             logger.info(f"总共加载了 {total_rules} 条Sigma规则")
             return total_rules
             
         except Exception as e:
             logger.error(f"加载Sigma规则失败: {e}")
-            return 0
+            # 最后的回退：创建默认规则
+            try:
+                await self._create_default_rules()
+                return await self._load_rules_from_directory(self.rules_dir, "default")
+            except Exception as fallback_error:
+                logger.error(f"创建默认Sigma规则也失败: {fallback_error}")
+                return 0
     
     async def _load_rules_from_directory(self, directory: str, source_name: str) -> int:
         """从目录加载规则"""
@@ -378,4 +404,62 @@ class SigmaRuleManager:
             
         except Exception as e:
             logger.error(f"更新Sigma规则库失败: {e}")
-            return False 
+            return False
+    
+    async def _create_default_rules(self):
+        """创建默认的Sigma规则"""
+        try:
+            default_rules = [
+                {
+                    "title": "Default Malware Detection",
+                    "id": "2025-001",
+                    "status": "stable",
+                    "description": "Default malware detection rule",
+                    "level": "medium",
+                    "logsource": {
+                        "product": "windows",
+                        "service": "security"
+                    },
+                    "detection": {
+                        "selection": {
+                            "EventID": 4688,
+                            "CommandLine|contains": ["cmd.exe", "powershell.exe"]
+                        },
+                        "condition": "selection"
+                    }
+                },
+                {
+                    "title": "Default Suspicious Activity",
+                    "id": "2025-002",
+                    "status": "stable",
+                    "description": "Default suspicious activity detection",
+                    "level": "medium",
+                    "logsource": {
+                        "product": "windows",
+                        "service": "security"
+                    },
+                    "detection": {
+                        "selection": {
+                            "EventID": 4663,
+                            "ObjectName|contains": [".exe", ".dll"]
+                        },
+                        "condition": "selection"
+                    }
+                }
+            ]
+            
+            # 确保默认规则目录存在
+            default_dir = os.path.join(self.rules_dir, "default")
+            os.makedirs(default_dir, exist_ok=True)
+            
+            # 创建默认规则文件
+            for i, rule in enumerate(default_rules):
+                rule_file = os.path.join(default_dir, f"default_rule_{i+1}.yml")
+                with open(rule_file, 'w', encoding='utf-8') as f:
+                    yaml.dump(rule, f, default_flow_style=False, allow_unicode=True)
+            
+            logger.info("成功创建默认Sigma规则")
+            
+        except Exception as e:
+            logger.error(f"创建默认Sigma规则失败: {e}")
+            raise 

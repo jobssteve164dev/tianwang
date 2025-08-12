@@ -120,20 +120,46 @@ class SuricataRuleManager:
             self.rules.clear()
             total_rules = 0
             
-            # 遍历所有规则目录
-            for source_name in os.listdir(self.rules_dir):
-                source_path = os.path.join(self.rules_dir, source_name)
-                if os.path.isdir(source_path):
-                    rules_count = await self._load_rules_from_directory(source_path, source_name)
-                    total_rules += rules_count
-                    logger.info(f"从 {source_name} 加载了 {rules_count} 条规则")
+            # 首先尝试加载本地规则
+            if os.path.exists(self.rules_dir):
+                for source_name in os.listdir(self.rules_dir):
+                    source_path = os.path.join(self.rules_dir, source_name)
+                    if os.path.isdir(source_path):
+                        rules_count = await self._load_rules_from_directory(source_path, source_name)
+                        total_rules += rules_count
+                        logger.info(f"从 {source_name} 加载了 {rules_count} 条Suricata规则")
+            
+            # 如果本地规则不足，尝试下载外部规则
+            if total_rules < 10:
+                logger.info("本地Suricata规则数量不足，尝试下载外部规则...")
+                download_success = await self.download_rules()
+                if download_success:
+                    # 重新加载规则
+                    for source_name in os.listdir(self.rules_dir):
+                        source_path = os.path.join(self.rules_dir, source_name)
+                        if os.path.isdir(source_path):
+                            rules_count = await self._load_rules_from_directory(source_path, source_name)
+                            total_rules += rules_count
+                            logger.info(f"从 {source_name} 加载了 {rules_count} 条Suricata规则")
+            
+            # 如果仍然没有规则，创建默认规则
+            if total_rules == 0:
+                logger.warning("未找到任何Suricata规则，创建默认规则...")
+                await self._create_default_rules()
+                total_rules = await self._load_rules_from_directory(self.rules_dir, "default")
             
             logger.info(f"总共加载了 {total_rules} 条Suricata规则")
             return total_rules
             
         except Exception as e:
             logger.error(f"加载Suricata规则失败: {e}")
-            return 0
+            # 最后的回退：创建默认规则
+            try:
+                await self._create_default_rules()
+                return await self._load_rules_from_directory(self.rules_dir, "default")
+            except Exception as fallback_error:
+                logger.error(f"创建默认Suricata规则也失败: {fallback_error}")
+                return 0
     
     async def _load_rules_from_directory(self, directory: str, source_name: str) -> int:
         """从目录加载规则"""
@@ -387,4 +413,68 @@ class SuricataRuleManager:
             
         except Exception as e:
             logger.error(f"更新Suricata规则库失败: {e}")
-            return False 
+            return False
+    
+    async def _create_default_rules(self):
+        """创建默认的Suricata规则"""
+        try:
+            default_rules = [
+                {
+                    "action": "alert",
+                    "protocol": "tcp",
+                    "src_ip": "any",
+                    "src_port": "any",
+                    "direction": "->",
+                    "dst_ip": "any",
+                    "dst_port": "any",
+                    "options": {
+                        "msg": "Default Malware Detection",
+                        "content": "malware",
+                        "sid": "20250001"
+                    }
+                },
+                {
+                    "action": "alert",
+                    "protocol": "tcp",
+                    "src_ip": "any",
+                    "src_port": "any",
+                    "direction": "->",
+                    "dst_ip": "any",
+                    "dst_port": "any",
+                    "options": {
+                        "msg": "Default Suspicious Activity",
+                        "content": "suspicious",
+                        "sid": "20250002"
+                    }
+                },
+                {
+                    "action": "alert",
+                    "protocol": "tcp",
+                    "src_ip": "any",
+                    "src_port": "any",
+                    "direction": "->",
+                    "dst_ip": "any",
+                    "dst_port": "any",
+                    "options": {
+                        "msg": "Default Network Scan",
+                        "content": "scan",
+                        "sid": "20250003"
+                    }
+                }
+            ]
+            
+            # 确保默认规则目录存在
+            default_dir = os.path.join(self.rules_dir, "default")
+            os.makedirs(default_dir, exist_ok=True)
+            
+            # 创建默认规则文件
+            rule_file = os.path.join(default_dir, "default_rules.rules")
+            with open(rule_file, 'w', encoding='utf-8') as f:
+                for rule in default_rules:
+                    f.write(f"{rule['action']} {rule['protocol']} {rule['src_ip']} {rule['src_port']} {rule['direction']} {rule['dst_ip']} {rule['dst_port']} (msg:\"{rule['options']['msg']}\"; content:\"{rule['options']['content']}\"; sid:{rule['options']['sid']};)\n")
+            
+            logger.info("成功创建默认Suricata规则")
+            
+        except Exception as e:
+            logger.error(f"创建默认Suricata规则失败: {e}")
+            raise 

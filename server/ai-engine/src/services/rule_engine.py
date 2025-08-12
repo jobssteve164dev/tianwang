@@ -12,6 +12,7 @@ from ..rules.suricata_manager import SuricataRuleManager
 from ..rules.sigma_manager import SigmaRuleManager
 from ..rules.yara_manager import YaraRuleManager
 from ..rules.misp_manager import MispManager
+from ..rules.otx_manager import OtxManager
 
 class RuleEngine:
     """规则引擎"""
@@ -35,6 +36,12 @@ class RuleEngine:
             "api_key": config.misp_api_key
         }
         self.misp_manager = MispManager(misp_config)
+        
+        # 创建OTX配置字典
+        otx_config = {
+            "otx_api_key": config.otx_api_key
+        }
+        self.otx_manager = OtxManager(otx_config)
     
     async def initialize(self):
         """初始化规则引擎"""
@@ -56,8 +63,26 @@ class RuleEngine:
             if config.rules_config.get("yara", {}).get("enabled", False):
                 tasks.append(self.yara_manager.load_rules())
             
-            # 加载威胁情报
-            tasks.append(self.misp_manager.fetch_threat_intelligence())
+            # 加载威胁情报（可选，失败不影响启动）
+            threat_intel_tasks = []
+            
+            # 尝试加载MISP威胁情报
+            if config.misp_configured:
+                threat_intel_tasks.append(self.misp_manager.fetch_threat_intelligence())
+            else:
+                logger.warning("MISP配置不完整，跳过MISP威胁情报加载")
+            
+            # 尝试加载OTX威胁情报
+            if config.otx_api_key:
+                threat_intel_tasks.append(self.otx_manager.fetch_threat_intelligence())
+            else:
+                logger.warning("OTX API密钥未配置，跳过OTX威胁情报加载")
+            
+            # 如果没有配置任何威胁情报源，添加空任务
+            if not threat_intel_tasks:
+                threat_intel_tasks.append(asyncio.sleep(0))
+            
+            tasks.extend(threat_intel_tasks)
             
             # 并行执行所有初始化任务
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -100,8 +125,22 @@ class RuleEngine:
                 network_data = data.get("network", data)
                 tasks.append(self.suricata_manager.match_rule(network_data))
             
+            # 威胁情报检查（可选）
+            threat_intel_tasks = []
+            
             # MISP威胁情报检查
-            tasks.append(self._check_threat_intelligence(data))
+            if config.misp_configured:
+                threat_intel_tasks.append(self._check_misp_intelligence(data))
+            
+            # OTX威胁情报检查
+            if config.otx_api_key:
+                threat_intel_tasks.append(self._check_otx_intelligence(data))
+            
+            # 如果没有配置任何威胁情报源，添加空任务
+            if not threat_intel_tasks:
+                threat_intel_tasks.append(asyncio.sleep(0))
+            
+            tasks.extend(threat_intel_tasks)
             
             # 执行所有匹配任务
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -124,8 +163,8 @@ class RuleEngine:
             logger.error(f"规则匹配失败: {e}")
             return []
     
-    async def _check_threat_intelligence(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """检查威胁情报"""
+    async def _check_misp_intelligence(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """检查MISP威胁情报"""
         matches = []
         
         try:
@@ -146,7 +185,39 @@ class RuleEngine:
                     matches.extend(ioc_matches)
             
         except Exception as e:
-            logger.error(f"威胁情报检查失败: {e}")
+            logger.error(f"MISP威胁情报检查失败: {e}")
+        
+        return matches
+    
+    async def _check_otx_intelligence(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """检查OTX威胁情报"""
+        matches = []
+        
+        try:
+            # 检查网络数据中的IOC
+            if "network" in data:
+                network_data = data["network"]
+                for field in ["src_ip", "dst_ip", "domain", "url"]:
+                    if field in network_data:
+                        ioc_matches = await self.otx_manager.check_ioc(str(network_data[field]), field)
+                        matches.extend(ioc_matches)
+            
+            # 检查文件数据中的IOC
+            if "file" in data:
+                file_data = data["file"]
+                for field in ["md5", "sha1", "sha256", "filename"]:
+                    if field in file_data:
+                        ioc_matches = await self.otx_manager.check_ioc(str(file_data[field]), field)
+                        matches.extend(ioc_matches)
+            
+            # 检查其他可能的IOC字段
+            for field in ["ip", "domain", "url", "hash", "md5", "sha1", "sha256"]:
+                if field in data:
+                    ioc_matches = await self.otx_manager.check_ioc(str(data[field]), field)
+                    matches.extend(ioc_matches)
+            
+        except Exception as e:
+            logger.error(f"OTX威胁情报检查失败: {e}")
         
         return matches
     
@@ -162,6 +233,7 @@ class RuleEngine:
             sigma_stats = self.sigma_manager.get_statistics() if hasattr(self, 'sigma_manager') else {}
             yara_stats = self.yara_manager.get_statistics() if hasattr(self, 'yara_manager') else {}
             misp_stats = self.misp_manager.get_statistics() if hasattr(self, 'misp_manager') else {}
+            otx_stats = self.otx_manager.get_statistics() if hasattr(self, 'otx_manager') else {}
             
             return {
                 "service_status": "healthy" if self.is_healthy() else "unhealthy",
@@ -169,7 +241,8 @@ class RuleEngine:
                 "suricata_rules": suricata_stats,
                 "sigma_rules": sigma_stats,
                 "yara_rules": yara_stats,
-                "threat_intelligence": misp_stats,
+                "misp_intelligence": misp_stats,
+                "otx_intelligence": otx_stats,
                 "metrics": self.metrics,
                 "timestamp": datetime.now().isoformat()
             }
@@ -199,7 +272,10 @@ class RuleEngine:
                 tasks.append(self.yara_manager.update_rules())
             
             # 更新威胁情报
-            tasks.append(self.misp_manager.update_threat_intelligence())
+            if config.misp_configured:
+                tasks.append(self.misp_manager.update_threat_intelligence())
+            if config.otx_api_key:
+                tasks.append(self.otx_manager.update_threat_intelligence())
             
             # 执行所有更新任务
             results = await asyncio.gather(*tasks, return_exceptions=True)
