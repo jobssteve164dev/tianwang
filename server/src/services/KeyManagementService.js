@@ -310,13 +310,13 @@ class KeyManagementService {
           return { isValid: false, error: '连接密钥已过期' };
         }
         
-        // 验证签名
-        const data = `${Buffer.from(key, 'base64').toString('hex')}:${timestamp}`;
+        // 验证签名 - 使用与生成时相同的数据格式: key:timestamp (key是base64格式)
+        const data = `${key}:${timestamp}`;
         const isValid = this.verifySignature(data, signature);
         return { isValid, error: isValid ? null : '签名验证失败' };
       }
       
-      // 如果提供的是签名字符串和期望的密钥字符串（WebSocket连接场景）
+      // 如果提供的是两个完整的连接密钥字符串（WebSocket连接场景）
       if (typeof providedSignature === 'string' && typeof expectedKey === 'string') {
         logger.debug('处理字符串格式的连接密钥');
         try {
@@ -351,8 +351,7 @@ class KeyManagementService {
               return { isValid: false, error: '连接密钥已过期' };
             }
             
-            // 验证签名 - 使用正确的数据格式
-            // 数据格式应该是: key:timestamp (key是base64格式)
+            // 验证签名 - 使用与生成时相同的数据格式: key:timestamp (key是base64格式)
             const data = `${key}:${timestamp}`;
             logger.debug('准备验证签名:', {
               dataLength: data.length,
@@ -385,6 +384,36 @@ class KeyManagementService {
       return { isValid: false, error: '无效的密钥格式' };
     } catch (error) {
       logger.error('验证连接密钥失败:', error);
+      return { isValid: false, error: error.message };
+    }
+  }
+
+  // 验证两个完整的连接密钥字符串是否匹配（用于WebSocket验证）
+  verifyConnectionKeyMatch(providedKey, expectedKey) {
+    try {
+      logger.debug('开始验证连接密钥匹配:', {
+        providedKeyLength: providedKey?.length,
+        expectedKeyLength: expectedKey?.length,
+        providedKeyPreview: providedKey?.substring(0, 32) + '...',
+        expectedKeyPreview: expectedKey?.substring(0, 32) + '...'
+      });
+
+      if (!providedKey || !expectedKey) {
+        return { isValid: false, error: '缺少连接密钥' };
+      }
+
+      // 直接比较两个完整的连接密钥字符串
+      const isValid = providedKey === expectedKey;
+      
+      logger.debug('连接密钥匹配结果:', { 
+        isValid,
+        providedKey: providedKey.substring(0, 16) + '...',
+        expectedKey: expectedKey.substring(0, 16) + '...'
+      });
+      
+      return { isValid, error: isValid ? null : '连接密钥不匹配' };
+    } catch (error) {
+      logger.error('验证连接密钥匹配失败:', error);
       return { isValid: false, error: error.message };
     }
   }

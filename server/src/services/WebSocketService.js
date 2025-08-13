@@ -98,8 +98,9 @@ class WebSocketService {
         });
 
         try {
-          // 验证连接密钥 - 现在两者都是完整的连接密钥字符串
-          const keyValidation = keyManagementService.verifyConnectionKey(connectionKey, decoded.connectionKey);
+          // 验证连接密钥 - 比较客户端提供的连接密钥与JWT中存储的连接密钥
+          // 两者都应该是完整的连接密钥字符串格式：key:timestamp:signature
+          const keyValidation = keyManagementService.verifyConnectionKeyMatch(connectionKey, decoded.connectionKey);
           
           logger.debug('连接密钥验证结果:', {
             agentId: decoded.agentId,

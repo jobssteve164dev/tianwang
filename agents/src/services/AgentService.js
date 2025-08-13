@@ -520,8 +520,16 @@ class AgentService extends EventEmitter {
 
     // 连接到服务器
     async connect() {
+        // 如果没有认证token，先进行认证
         if (!this.authToken) {
-            throw new Error('未获取到认证token，请先注册代理');
+            logger.info('未获取到认证token，尝试重新认证');
+            try {
+                await this.authenticateAgent();
+                logger.info('重新认证成功，获取到新的连接密钥');
+            } catch (error) {
+                logger.error('重新认证失败:', error.message);
+                throw new Error('认证失败，无法建立连接');
+            }
         }
 
         return new Promise((resolve, reject) => {
@@ -634,6 +642,10 @@ class AgentService extends EventEmitter {
                 
                 // 只有在非正常关闭且未达到最大重连次数时才重连
                 if (code !== 1000 && this.reconnectAttempts < this.config.maxReconnectAttempts) {
+                    // 连接失败时，清除旧的认证信息，强制重新认证
+                    logger.info('连接失败，清除旧认证信息，准备重新认证');
+                    this.authToken = null;
+                    this.connectionKey = null;
                     this.scheduleReconnect();
                 } else if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
                     logger.error('达到最大重连次数，停止重连');
@@ -833,14 +845,22 @@ class AgentService extends EventEmitter {
         
         logger.info(`计划在 ${delay}ms 后重连 (尝试 ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
-        setTimeout(() => {
+        setTimeout(async () => {
             // 检查是否仍然需要重连
             if (!this.isConnected && this.reconnectAttempts <= this.config.maxReconnectAttempts) {
-                this.connect().catch(error => {
+                try {
+                    // 重连前清除旧的认证信息，强制重新认证
+                    logger.info('重连前清除旧认证信息，准备重新认证');
+                    this.authToken = null;
+                    this.connectionKey = null;
+                    
+                    await this.connect();
+                    logger.info('重连成功');
+                } catch (error) {
                     logger.error('重连失败:', error.message);
                     // 重连失败不增加重连次数，让scheduleReconnect继续处理
                     this.reconnectAttempts--;
-                });
+                }
             }
         }, delay);
     }
