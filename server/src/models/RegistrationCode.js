@@ -99,12 +99,35 @@ module.exports = (sequelize) => {
 
   // 实例方法：增加使用次数
   RegistrationCode.prototype.incrementUsage = function(agentId, deviceFingerprint) {
-    this.used_count += 1;
-    this.used_by.push({
-      agentId,
-      deviceFingerprint,
-      usedAt: new Date()
-    });
+    // 检查这个设备是否已经使用过这个注册码
+    const existingUsage = this.used_by.find(usage => 
+      usage.deviceFingerprint === deviceFingerprint || usage.agentId === agentId
+    );
+    
+    if (existingUsage) {
+      // 如果已经使用过，只更新使用时间，不增加计数
+      existingUsage.usedAt = new Date();
+      existingUsage.agentId = agentId; // 更新agentId（可能发生变化）
+      console.log('设备已使用过此注册码，更新使用时间:', { 
+        agentId, 
+        deviceFingerprint: deviceFingerprint?.substring(0, 16) + '...',
+        usedCount: this.used_count 
+      });
+    } else {
+      // 如果是新设备，增加使用次数
+      this.used_count += 1;
+      this.used_by.push({
+        agentId,
+        deviceFingerprint,
+        usedAt: new Date()
+      });
+      console.log('新设备使用注册码，增加使用次数:', { 
+        agentId, 
+        deviceFingerprint: deviceFingerprint?.substring(0, 16) + '...',
+        usedCount: this.used_count 
+      });
+    }
+    
     return this.save();
   };
 

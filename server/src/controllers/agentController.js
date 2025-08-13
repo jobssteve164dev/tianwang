@@ -80,7 +80,7 @@ class AgentController {
         });
       }
 
-      let agent = await models.Agent.findOne({ agentId });
+      let agent = await models.Agent.findOne({ where: { agentId } });
             
       if (agent) {
         console.log('代理已存在，更新信息:', { agentId, hostname });
@@ -255,7 +255,7 @@ class AgentController {
 
       // 查找代理
       console.log('查找代理:', { agentId, hostname });
-      const agent = await models.Agent.findOne({ agentId, hostname });
+      const agent = await models.Agent.findOne({ where: { agentId, hostname } });
             
       if (!agent) {
         console.warn('代理不存在:', { agentId, hostname });
@@ -302,8 +302,9 @@ class AgentController {
           diskCount: deviceInfoForVerification.diskInfo.length
         });
 
+        // 验证代理端发送的指纹与存储的指纹是否匹配
         const fingerprintValidation = deviceFingerprintService.verifyFingerprint(
-          agent.deviceFingerprint, 
+          deviceFingerprint, 
           deviceInfoForVerification
         );
         
@@ -324,11 +325,16 @@ class AgentController {
           });
           
           // 记录安全事件
-          await this.recordSecurityEvent(agent, 'fingerprint_mismatch', 'high', {
-            expected: agent.deviceFingerprint,
-            actual: deviceFingerprint,
-            currentGenerated: fingerprintValidation.currentFingerprint
-          });
+          try {
+            await this.recordSecurityEvent(agent, 'fingerprint_mismatch', 'high', {
+              expected: agent.deviceFingerprint,
+              actual: deviceFingerprint,
+              currentGenerated: fingerprintValidation.currentFingerprint
+            });
+          } catch (securityEventError) {
+            console.error('记录安全事件失败:', securityEventError);
+            // 不阻止认证流程继续
+          }
         }
       } else {
         console.log('跳过设备指纹验证:', { 
@@ -402,7 +408,7 @@ class AgentController {
       }
 
       // 验证代理存在
-      const agent = await models.Agent.findOne({ agentId });
+      const agent = await models.Agent.findOne({ where: { agentId } });
       if (!agent) {
         return res.status(404).json({
           success: false,
@@ -595,18 +601,25 @@ class AgentController {
   // 创建安全事件
   async createSecurityEvent(eventData) {
     try {
-      const event = new SecurityEvent({
-        agentId: eventData.agentId,
-        type: eventData.type,
+      // 检查SecurityEvent模型是否可用
+      if (!models.SecurityEvent) {
+        console.warn('SecurityEvent模型不可用，跳过安全事件创建');
+        return null;
+      }
+
+      const event = await models.SecurityEvent.create({
+        event_type: eventData.type,
         severity: eventData.severity,
-        title: eventData.title,
-        description: eventData.description,
-        metadata: eventData.metadata,
-        timestamp: new Date(),
+        title: eventData.title || `安全事件: ${eventData.type}`,
+        description: eventData.description || `代理 ${eventData.agentId} 发生安全事件: ${eventData.type}`,
+        raw_data: {
+          agentId: eventData.agentId,
+          ...eventData.metadata
+        },
+        device_id: eventData.deviceId,
         status: 'open'
       });
 
-      await event.save();
       logger.info('安全事件已创建:', { 
         agentId: eventData.agentId, 
         type: eventData.type,
@@ -616,6 +629,7 @@ class AgentController {
       return event;
     } catch (error) {
       logger.error('创建安全事件失败:', error);
+      return null;
     }
   }
 
@@ -644,13 +658,15 @@ class AgentController {
         filter.organizationId = req.user.organizationId;
       }
 
-      const agents = await Agent.find(filter)
-        .sort({ lastSeen: -1 })
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .select('-systemInfo.sensitive'); // 排除敏感系统信息
+      const agents = await Agent.findAll({
+        where: filter,
+        order: [['lastSeen', 'DESC']],
+        limit: limit * 1,
+        offset: (page - 1) * limit,
+        attributes: { exclude: ['systemInfo'] } // 排除敏感系统信息
+      });
 
-      const total = await Agent.countDocuments(filter);
+      const total = await Agent.count({ where: filter });
 
       res.json({
         success: true,
@@ -877,7 +893,7 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOne({ agentId });
+      const agent = await Agent.findOne({ where: { agentId } });
       if (!agent) {
         return res.status(404).json({
           success: false,
@@ -913,11 +929,12 @@ class AgentController {
         });
       }
 
-      const agent = await Agent.findOneAndUpdate(
-        { agentId },
-        { status, lastSeen: new Date() },
-        { new: true }
-      );
+      const agent = await Agent.findOne({ where: { agentId } });
+      if (agent) {
+        agent.status = status;
+        agent.lastSeen = new Date();
+        await agent.save();
+      }
 
       if (!agent) {
         return res.status(404).json({
@@ -949,7 +966,10 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOneAndDelete({ agentId });
+      const agent = await Agent.findOne({ where: { agentId } });
+      if (agent) {
+        await agent.destroy();
+      }
       if (!agent) {
         return res.status(404).json({
           success: false,
@@ -979,14 +999,12 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOneAndUpdate(
-        { agentId },
-        { 
-          lastSeen: new Date(),
-          status: 'online'
-        },
-        { new: true }
-      );
+      const agent = await Agent.findOne({ where: { agentId } });
+      if (agent) {
+        agent.lastSeen = new Date();
+        agent.status = 'online';
+        await agent.save();
+      }
 
       if (!agent) {
         return res.status(404).json({

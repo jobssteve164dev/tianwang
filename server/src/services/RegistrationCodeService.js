@@ -185,7 +185,31 @@ class RegistrationCodeService {
         };
       }
 
-      // 检查使用次数限制
+      // 检查设备指纹（如果设备信息提供）
+      if (deviceInfo.fingerprint) {
+        const fingerprintValidation = await this.validateDeviceFingerprint(code, deviceInfo.fingerprint);
+        if (!fingerprintValidation.isValid) {
+          return fingerprintValidation;
+        }
+        
+        // 如果是同一设备重复使用，允许通过
+        if (fingerprintValidation.isReuse) {
+          logger.info('同一设备重复使用注册码，允许通过:', { 
+            code, 
+            deviceFingerprint: deviceInfo.fingerprint.substring(0, 16) + '...' 
+          });
+          return {
+            isValid: true,
+            permissions: registrationCode.permissions,
+            description: registrationCode.description,
+            expiry: registrationCode.expiry,
+            remainingUses: registrationCode.max_uses - registrationCode.used_count,
+            isReuse: true
+          };
+        }
+      }
+
+      // 检查使用次数限制（仅对新设备）
       if (registrationCode.used_count >= registrationCode.max_uses) {
         logger.warn('注册码使用次数已达上限:', code);
         return {
@@ -205,13 +229,7 @@ class RegistrationCodeService {
         };
       }
 
-      // 检查设备指纹（如果设备信息提供）
-      if (deviceInfo.fingerprint) {
-        const fingerprintValidation = await this.validateDeviceFingerprint(code, deviceInfo.fingerprint);
-        if (!fingerprintValidation.isValid) {
-          return fingerprintValidation;
-        }
-      }
+
 
       logger.info('注册码验证成功:', { code, permissions: registrationCode.permissions });
 

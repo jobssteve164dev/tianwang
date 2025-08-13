@@ -8,7 +8,7 @@ async function testRegistration() {
         const agentService = new AgentService();
         
         // 设置注册码
-        const testRegistrationCode = 'TW-E978B457E33D003593A041854BEAADEE'; // 使用最新生成的注册码
+        const testRegistrationCode = 'TW-739884CF59B7ADA964AE7F845C1FF56D'; // 使用最新生成的注册码
         agentService.setRegistrationCode(testRegistrationCode);
         
         console.log('1. 设置注册码:', testRegistrationCode.substring(0, 8) + '...');

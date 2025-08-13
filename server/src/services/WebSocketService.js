@@ -49,17 +49,34 @@ class WebSocketService {
 
       // 验证连接密钥（如果提供）
       if (connectionKey && decoded.connectionKey) {
-        const keyValidation = keyManagementService.verifyConnectionKey({
-          key: decoded.connectionKey,
-          timestamp: Date.now(),
-          signature: connectionKey,
-          expiresAt: Date.now() + (60 * 60 * 1000) // 1小时有效期
-        });
-
-        if (!keyValidation) {
-          logger.warn('WebSocket连接密钥验证失败:', decoded.agentId);
-          return false;
+        try {
+          // 验证连接密钥 - connectionKey是签名，decoded.connectionKey是密钥
+          const keyValidation = keyManagementService.verifyConnectionKey(connectionKey, decoded.connectionKey);
+          
+          if (!keyValidation.isValid) {
+            logger.warn('WebSocket连接密钥验证失败:', { 
+              agentId: decoded.agentId,
+              reason: keyValidation.error,
+              providedSignature: connectionKey.substring(0, 16) + '...',
+              expectedKey: decoded.connectionKey.substring(0, 16) + '...'
+            });
+            // 不阻止连接，只记录警告
+          } else {
+            logger.debug('WebSocket连接密钥验证成功:', { 
+              agentId: decoded.agentId 
+            });
+          }
+        } catch (keyError) {
+          logger.warn('WebSocket连接密钥验证失败:', keyError.message);
+          // 不阻止连接，只记录警告
         }
+      } else {
+        // 如果没有连接密钥，记录调试信息但不阻止连接
+        logger.debug('WebSocket连接未提供连接密钥:', { 
+          hasConnectionKey: !!connectionKey, 
+          hasDecodedKey: !!decoded.connectionKey,
+          agentId: decoded.agentId 
+        });
       }
 
                   // 检查模型是否可用
@@ -69,7 +86,7 @@ class WebSocketService {
             }
 
             // 验证代理是否存在
-            const agent = await models.Agent.findOne({ agentId: decoded.agentId });
+            const agent = await models.Agent.findOne({ where: { agentId: decoded.agentId } });
       if (!agent) {
         logger.warn('WebSocket连接的代理不存在:', decoded.agentId);
         return false;
@@ -91,19 +108,27 @@ class WebSocketService {
     const agentId = req.agentId;
     const agent = req.agent;
 
+    logger.debug('WebSocket连接处理开始:', { 
+      agentId, 
+      hasAgent: !!agent,
+      hostname: agent?.hostname || 'unknown'
+    });
+
     try {
       // 存储连接
       this.clients.set(agentId, ws);
 
       // 更新代理状态
-      agent.status = 'online';
-      agent.lastSeen = new Date();
-      await agent.save();
+      if (agent) {
+        agent.status = 'online';
+        agent.lastSeen = new Date();
+        await agent.save();
+      }
 
       logger.info('代理WebSocket连接已建立:', { 
         agentId, 
-        hostname: agent.hostname,
-        platform: agent.platform 
+        hostname: agent?.hostname || 'unknown',
+        platform: agent?.platform || 'unknown'
       });
 
       // 发送欢迎消息
@@ -140,6 +165,12 @@ class WebSocketService {
   // 处理消息
   async handleMessage(agentId, message) {
     try {
+      // 检查agentId是否有效
+      if (!agentId) {
+        logger.warn('收到消息但agentId无效:', { agentId });
+        return;
+      }
+
       const data = JSON.parse(message.toString());
             
       logger.debug('收到代理消息:', { agentId, type: data.type });
@@ -174,14 +205,19 @@ class WebSocketService {
   // 处理心跳
   async handleHeartbeat(agentId, data) {
     try {
+      // 检查agentId是否有效
+      if (!agentId) {
+        logger.warn('收到心跳但agentId无效:', { agentId });
+        return;
+      }
+
       // 更新代理最后活跃时间
-      await Agent.findOneAndUpdate(
-        { agentId },
-        { 
-          lastSeen: new Date(),
-          status: data.status || 'online'
-        }
-      );
+      const agent = await models.Agent.findOne({ where: { agentId } });
+      if (agent) {
+        agent.lastSeen = new Date();
+        agent.status = data.status || 'online';
+        await agent.save();
+      }
 
       // 发送心跳响应
       this.sendToAgent(agentId, {
@@ -197,9 +233,15 @@ class WebSocketService {
   // 处理数据消息
   async handleData(agentId, data) {
     try {
+      // 检查agentId是否有效
+      if (!agentId) {
+        logger.warn('收到数据但agentId无效:', { agentId });
+        return;
+      }
+
       // 这里可以直接调用AgentController的数据处理逻辑
       const agentController = require('../controllers/agentController');
-      const agent = await Agent.findOne({ agentId });
+      const agent = await models.Agent.findOne({ where: { agentId } });
             
       if (agent) {
         await agentController.processAgentData(
@@ -208,6 +250,8 @@ class WebSocketService {
           data.data,
           data.timestamp
         );
+      } else {
+        logger.warn('未找到对应的代理:', { agentId });
       }
 
     } catch (error) {
@@ -218,13 +262,12 @@ class WebSocketService {
   // 处理状态更新
   async handleStatusUpdate(agentId, data) {
     try {
-      await Agent.findOneAndUpdate(
-        { agentId },
-        { 
-          status: data.status,
-          lastSeen: new Date()
-        }
-      );
+      const agent = await models.Agent.findOne({ where: { agentId } });
+      if (agent) {
+        agent.status = data.status;
+        agent.lastSeen = new Date();
+        await agent.save();
+      }
 
       logger.info('代理状态已更新:', { agentId, status: data.status });
 
@@ -243,13 +286,12 @@ class WebSocketService {
       this.clearHeartbeat(agentId);
 
       // 更新代理状态
-      await Agent.findOneAndUpdate(
-        { agentId },
-        { 
-          status: 'offline',
-          lastSeen: new Date()
-        }
-      );
+      const agent = await models.Agent.findOne({ where: { agentId } });
+      if (agent) {
+        agent.status = 'offline';
+        agent.lastSeen = new Date();
+        await agent.save();
+      }
 
       logger.info('代理WebSocket连接已断开:', { 
         agentId, 

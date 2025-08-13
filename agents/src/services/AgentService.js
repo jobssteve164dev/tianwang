@@ -520,7 +520,7 @@ class AgentService extends EventEmitter {
 
         return new Promise((resolve, reject) => {
             // 构建WebSocket URL，包含token和连接密钥
-            let wsUrl = `${this.config.serverUrl}/agents/${this.agentId}?token=${this.authToken}`;
+            let wsUrl = `${this.config.serverUrl}/ws?token=${this.authToken}`;
             
             // 如果有连接密钥，添加到URL中
             if (this.connectionKey && this.connectionKey.signature) {

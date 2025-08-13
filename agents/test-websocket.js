@@ -8,7 +8,7 @@ async function testWebSocketConnection() {
         const agentService = new AgentService();
         
         // 设置注册码
-        const testRegistrationCode = 'TW-E978B457E33D003593A041854BEAADEE';
+        const testRegistrationCode = 'TW-739884CF59B7ADA964AE7F845C1FF56D';
         agentService.setRegistrationCode(testRegistrationCode);
         
         console.log('1. 初始化代理服务...');

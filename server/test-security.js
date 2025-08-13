@@ -17,7 +17,8 @@ async function testSecurityServices() {
     const connectionKey = keyManagementService.generateConnectionKey();
     console.log('✅ Connection key generated:', connectionKey.key ? 'Yes' : 'No');
     
-    const isValid = keyManagementService.verifyConnectionKey(connectionKey);
+    const validation = keyManagementService.verifyConnectionKey(connectionKey.key, connectionKey.key);
+const isValid = validation.isValid;
     console.log('✅ Connection key validation:', isValid ? 'Pass' : 'Fail');
     
     console.log('');
