@@ -411,6 +411,46 @@ async function initializeServices() {
             } catch (connectError) {
                 logger.warn('服务器连接失败，将在后台重试:', connectError.message);
             }
+            
+            // 监听连接相关事件
+            agentService.on('connected', () => {
+                logger.info('代理已连接到服务器');
+                updateTrayMenu();
+            });
+            
+            agentService.on('disconnected', (data) => {
+                logger.warn('代理与服务器断开连接:', data);
+                updateTrayMenu();
+            });
+            
+            agentService.on('error', (error) => {
+                logger.error('代理连接错误:', error.message);
+                // 不显示错误对话框，避免干扰用户
+            });
+            
+            agentService.on('connection-refused', () => {
+                logger.error('服务器连接被拒绝，请检查服务器是否启动');
+                // 可以在这里显示系统通知
+                if (Notification.isSupported()) {
+                    new Notification({
+                        title: 'TianWang 连接错误',
+                        body: '无法连接到服务器，请检查服务器状态',
+                        icon: path.join(__dirname, '../assets/warning-icon.png')
+                    }).show();
+                }
+            });
+            
+            agentService.on('max-reconnect-reached', () => {
+                logger.error('达到最大重连次数，停止自动重连');
+                // 可以在这里显示系统通知
+                if (Notification.isSupported()) {
+                    new Notification({
+                        title: 'TianWang 连接失败',
+                        body: '无法连接到服务器，请检查网络和服务器状态',
+                        icon: path.join(__dirname, '../assets/error-icon.png')
+                    }).show();
+                }
+            });
         }
 
         // 更新托盘状态
@@ -806,12 +846,35 @@ process.on('uncaughtException', (error) => {
         return;
     }
     
+    // 忽略WebSocket相关的连接错误
+    if (error.code === 'ECONNREFUSED' || 
+        error.code === 'ENOTFOUND' || 
+        error.code === 'ETIMEDOUT' ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('ETIMEDOUT')) {
+        logger.warn('忽略网络连接错误:', error.message);
+        return;
+    }
+    
+    // 忽略WebSocket连接关闭错误
+    if (error.message.includes('WebSocket is not open') ||
+        error.message.includes('WebSocket connection is closed')) {
+        logger.warn('忽略WebSocket连接状态错误:', error.message);
+        return;
+    }
+    
     logger.error('未捕获的异常:', error);
     
     // 只在主进程存在且未退出时才显示错误对话框
     if (app && !isQuitting) {
         try {
-            dialog.showErrorBox('应用程序错误', `发生未知错误: ${error.message}`);
+            // 对于严重的错误才显示对话框
+            if (error.message.includes('ENOMEM') || 
+                error.message.includes('EACCES') ||
+                error.message.includes('EADDRINUSE')) {
+                dialog.showErrorBox('应用程序错误', `发生严重错误: ${error.message}`);
+            }
         } catch (dialogError) {
             logger.error('显示错误对话框失败:', dialogError);
         }
@@ -822,6 +885,24 @@ process.on('unhandledRejection', (reason, promise) => {
     // 忽略EPIPE相关的Promise拒绝
     if (reason && (reason.code === 'EPIPE' || reason.message?.includes('EPIPE'))) {
         logger.warn('忽略EPIPE Promise拒绝:', reason.message);
+        return;
+    }
+    
+    // 忽略网络连接相关的Promise拒绝
+    if (reason && (reason.code === 'ECONNREFUSED' || 
+                   reason.code === 'ENOTFOUND' || 
+                   reason.code === 'ETIMEDOUT' ||
+                   reason.message?.includes('ECONNREFUSED') ||
+                   reason.message?.includes('ENOTFOUND') ||
+                   reason.message?.includes('ETIMEDOUT'))) {
+        logger.warn('忽略网络连接Promise拒绝:', reason.message);
+        return;
+    }
+    
+    // 忽略WebSocket相关的Promise拒绝
+    if (reason && (reason.message?.includes('WebSocket is not open') ||
+                   reason.message?.includes('WebSocket connection is closed'))) {
+        logger.warn('忽略WebSocket连接Promise拒绝:', reason.message);
         return;
     }
     

@@ -54,39 +54,42 @@ class WebSocketService {
           const keyValidation = keyManagementService.verifyConnectionKey(connectionKey, decoded.connectionKey);
           
           if (!keyValidation.isValid) {
-            logger.warn('WebSocket连接密钥验证失败:', { 
+            logger.warn('WebSocket连接密钥验证失败，拒绝连接:', { 
               agentId: decoded.agentId,
               reason: keyValidation.error,
               providedSignature: connectionKey.substring(0, 16) + '...',
               expectedKey: decoded.connectionKey.substring(0, 16) + '...'
             });
-            // 不阻止连接，只记录警告
+            // 密钥验证失败，拒绝连接
+            return false;
           } else {
             logger.debug('WebSocket连接密钥验证成功:', { 
               agentId: decoded.agentId 
             });
           }
         } catch (keyError) {
-          logger.warn('WebSocket连接密钥验证失败:', keyError.message);
-          // 不阻止连接，只记录警告
+          logger.warn('WebSocket连接密钥验证失败，拒绝连接:', keyError.message);
+          // 密钥验证过程中发生错误，拒绝连接
+          return false;
         }
       } else {
-        // 如果没有连接密钥，记录调试信息但不阻止连接
-        logger.debug('WebSocket连接未提供连接密钥:', { 
+        // 如果没有连接密钥，记录调试信息并拒绝连接
+        logger.warn('WebSocket连接未提供连接密钥，拒绝连接:', { 
           hasConnectionKey: !!connectionKey, 
           hasDecodedKey: !!decoded.connectionKey,
           agentId: decoded.agentId 
         });
+        return false;
       }
 
-                  // 检查模型是否可用
-            if (!models.Agent) {
-              logger.warn('Database not available for agent verification');
-              return false;
-            }
+      // 检查模型是否可用
+      if (!models.Agent) {
+        logger.warn('Database not available for agent verification');
+        return false;
+      }
 
-            // 验证代理是否存在
-            const agent = await models.Agent.findOne({ where: { agentId: decoded.agentId } });
+      // 验证代理是否存在
+      const agent = await models.Agent.findOne({ where: { agentId: decoded.agentId } });
       if (!agent) {
         logger.warn('WebSocket连接的代理不存在:', decoded.agentId);
         return false;
@@ -141,7 +144,7 @@ class WebSocketService {
       // 设置心跳
       this.setupHeartbeat(agentId, ws);
 
-      // 设置消息处理
+      // 设置消息处理 - 使用闭包确保agentId正确传递
       ws.on('message', (message) => {
         this.handleMessage(agentId, message);
       });
@@ -172,6 +175,11 @@ class WebSocketService {
       }
 
       const data = JSON.parse(message.toString());
+      
+      // 确保消息中包含agentId
+      if (!data.agentId) {
+        data.agentId = agentId;
+      }
             
       logger.debug('收到代理消息:', { agentId, type: data.type });
 
@@ -217,6 +225,10 @@ class WebSocketService {
         agent.lastSeen = new Date();
         agent.status = data.status || 'online';
         await agent.save();
+        
+        logger.debug('代理心跳已处理:', { agentId, status: agent.status });
+      } else {
+        logger.warn('未找到对应的代理记录:', { agentId });
       }
 
       // 发送心跳响应
@@ -250,6 +262,8 @@ class WebSocketService {
           data.data,
           data.timestamp
         );
+        
+        logger.debug('代理数据已处理:', { agentId, dataType: data.dataType });
       } else {
         logger.warn('未找到对应的代理:', { agentId });
       }

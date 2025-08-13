@@ -300,11 +300,30 @@ class KeyManagementService {
         // 在WebSocket连接中，providedSignature是连接密钥的签名
         // expectedKey是连接密钥本身，我们需要验证签名是否正确
         try {
-          // 这里应该验证签名，但为了简化，暂时直接比较
-          // TODO: 实现正确的签名验证逻辑
-          const isValid = providedSignature === expectedKey;
-          return { isValid, error: isValid ? null : '签名验证失败' };
+          // 从连接密钥中提取信息并验证签名
+          // 连接密钥格式应该是: key:timestamp:signature
+          const parts = expectedKey.split(':');
+          if (parts.length >= 3) {
+            const key = parts[0];
+            const timestamp = parseInt(parts[1]);
+            const signature = parts[2];
+            
+            // 检查过期时间（1小时）
+            if (Date.now() > timestamp + (60 * 60 * 1000)) {
+              return { isValid: false, error: '连接密钥已过期' };
+            }
+            
+            // 验证签名
+            const data = `${key}:${timestamp}`;
+            const isValid = this.verifySignature(data, signature);
+            return { isValid, error: isValid ? null : '签名验证失败' };
+          } else {
+            // 如果格式不正确，尝试直接比较（向后兼容）
+            const isValid = providedSignature === expectedKey;
+            return { isValid, error: isValid ? null : '密钥格式不正确' };
+          }
         } catch (error) {
+          logger.error('验证连接密钥签名时出错:', error);
           return { isValid: false, error: '签名验证过程中发生错误' };
         }
       }

@@ -291,9 +291,11 @@ class AgentService extends EventEmitter {
                 hostname: os.hostname(),
                 platform: os.platform(),
                 arch: os.arch(),
+                // 标准化MAC地址 - 与服务器端保持一致
                 macAddresses: network
                     .filter(iface => iface && iface.mac && !iface.internal)
-                    .map(iface => iface.mac),
+                    .map(iface => iface.mac.toLowerCase().replace(/[:-]/g, ''))
+                    .sort(),
                 cpuInfo: {
                     model: cpu.brand || '',
                     cores: cpu.cores || 0,
@@ -304,20 +306,24 @@ class AgentService extends EventEmitter {
                     total: mem.total || 0,
                     type: 'Unknown'
                 },
+                // 标准化磁盘信息 - 与服务器端保持一致
                 diskInfo: disk
                     .filter(d => d && d.serial)
                     .map(d => ({
                         serial: d.serial || '',
                         model: d.model || '',
                         size: d.size || 0
-                    })),
+                    }))
+                    .sort((a, b) => a.serial.localeCompare(b.serial)),
+                // 标准化网络接口信息 - 与服务器端保持一致
                 networkInterfaces: network
                     .filter(iface => iface && iface.iface)
                     .map(iface => ({
                         name: iface.iface || '',
-                        mac: iface.mac || '',
+                        mac: iface.mac ? iface.mac.toLowerCase().replace(/[:-]/g, '') : '',
                         type: iface.type || ''
-                    })),
+                    }))
+                    .sort((a, b) => a.name.localeCompare(b.name)),
                 systemUuid: system.uuid || '',
                 biosInfo: {
                     vendor: system.manufacturer || '',
@@ -523,16 +529,56 @@ class AgentService extends EventEmitter {
             let wsUrl = `${this.config.serverUrl}/ws?token=${this.authToken}`;
             
             // 如果有连接密钥，添加到URL中
-            if (this.connectionKey && this.connectionKey.signature) {
-                wsUrl += `&connectionKey=${this.connectionKey.signature}`;
+            if (this.connectionKey) {
+                // 连接密钥应该是一个对象，包含key、timestamp、signature等字段
+                // 服务器端期望的是完整的连接密钥字符串，格式为: key:timestamp:signature
+                if (this.connectionKey.key && this.connectionKey.timestamp && this.connectionKey.signature) {
+                    const fullConnectionKey = `${this.connectionKey.key}:${this.connectionKey.timestamp}:${this.connectionKey.signature}`;
+                    wsUrl += `&connectionKey=${fullConnectionKey}`;
+                    logger.debug('使用完整连接密钥:', { 
+                        key: this.connectionKey.key.substring(0, 16) + '...',
+                        timestamp: this.connectionKey.timestamp,
+                        signature: this.connectionKey.signature.substring(0, 16) + '...'
+                    });
+                } else if (this.connectionKey.signature) {
+                    // 向后兼容：如果只有signature，使用signature作为连接密钥
+                    wsUrl += `&connectionKey=${this.connectionKey.signature}`;
+                    logger.warn('使用签名作为连接密钥（向后兼容）');
+                } else {
+                    logger.warn('连接密钥格式不正确，无法建立安全连接');
+                }
+            } else {
+                logger.warn('未提供连接密钥，连接可能被拒绝');
             }
             
             logger.info('连接到服务器...', { url: wsUrl });
             
+            // 如果已有连接，先关闭
+            if (this.ws) {
+                try {
+                    this.ws.close(1000, '重新连接');
+                } catch (error) {
+                    logger.warn('关闭旧连接时出错:', error.message);
+                }
+                this.ws = null;
+            }
+            
             this.ws = new WebSocket(wsUrl);
+
+            // 连接超时处理
+            const connectionTimeout = setTimeout(() => {
+                if (!this.isConnected) {
+                    logger.error('WebSocket连接超时');
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                    reject(new Error('连接超时'));
+                }
+            }, 15000); // 15秒超时
 
             this.ws.on('open', () => {
                 logger.info('WebSocket连接已建立');
+                clearTimeout(connectionTimeout);
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.startHeartbeat();
@@ -551,28 +597,50 @@ class AgentService extends EventEmitter {
             });
 
             this.ws.on('close', (code, reason) => {
-                logger.warn('WebSocket连接已关闭', { code, reason: reason.toString() });
+                clearTimeout(connectionTimeout);
+                logger.warn('WebSocket连接已关闭', { 
+                    code, 
+                    reason: reason.toString(),
+                    reconnectAttempts: this.reconnectAttempts,
+                    maxAttempts: this.config.maxReconnectAttempts
+                });
+                
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.emit('disconnected', { code, reason });
                 
-                if (code !== 1000) { // 非正常关闭
+                // 只有在非正常关闭且未达到最大重连次数时才重连
+                if (code !== 1000 && this.reconnectAttempts < this.config.maxReconnectAttempts) {
                     this.scheduleReconnect();
+                } else if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+                    logger.error('达到最大重连次数，停止重连');
+                    this.emit('max-reconnect-reached');
                 }
             });
 
             this.ws.on('error', (error) => {
+                clearTimeout(connectionTimeout);
                 logger.error('WebSocket连接错误:', error);
-                this.emit('error', error);
-                reject(error);
-            });
-
-            // 连接超时
-            setTimeout(() => {
-                if (!this.isConnected) {
-                    reject(new Error('连接超时'));
+                
+                // 处理特定的连接错误
+                if (error.code === 'ECONNREFUSED') {
+                    logger.error('服务器连接被拒绝，可能服务器未启动');
+                    this.emit('connection-refused');
+                } else if (error.code === 'ENOTFOUND') {
+                    logger.error('无法解析服务器地址');
+                    this.emit('host-not-found');
+                } else if (error.code === 'ETIMEDOUT') {
+                    logger.error('连接超时');
+                    this.emit('connection-timeout');
                 }
-            }, 10000);
+                
+                this.emit('error', error);
+                
+                // 只有在连接建立失败时才reject
+                if (!this.isConnected) {
+                    reject(error);
+                }
+            });
         });
     }
 
@@ -660,7 +728,7 @@ class AgentService extends EventEmitter {
         try {
             const data = JSON.stringify({
                 ...message,
-                agentId: this.agentId,
+                agentId: this.agentId, // 确保每个消息都包含agentId
                 timestamp: Date.now()
             });
             this.ws.send(data);
@@ -677,7 +745,8 @@ class AgentService extends EventEmitter {
         return this.sendMessage({
             type: 'data',
             dataType: type,
-            data: data
+            data: data,
+            agentId: this.agentId // 确保数据消息也包含agentId
         });
     }
 
@@ -686,7 +755,8 @@ class AgentService extends EventEmitter {
         return this.sendMessage({
             type: 'heartbeat',
             status: 'active',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            agentId: this.agentId // 确保心跳消息也包含agentId
         });
     }
 
@@ -728,18 +798,27 @@ class AgentService extends EventEmitter {
     scheduleReconnect() {
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             logger.error('达到最大重连次数，停止重连');
+            this.emit('max-reconnect-reached');
             return;
         }
 
         this.reconnectAttempts++;
-        const delay = this.config.reconnectInterval * this.reconnectAttempts;
+        const delay = Math.min(
+            this.config.reconnectInterval * Math.pow(1.5, this.reconnectAttempts - 1),
+            60000 // 最大延迟60秒
+        );
         
         logger.info(`计划在 ${delay}ms 后重连 (尝试 ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
         setTimeout(() => {
-            this.connect().catch(error => {
-                logger.error('重连失败:', error);
-            });
+            // 检查是否仍然需要重连
+            if (!this.isConnected && this.reconnectAttempts <= this.config.maxReconnectAttempts) {
+                this.connect().catch(error => {
+                    logger.error('重连失败:', error.message);
+                    // 重连失败不增加重连次数，让scheduleReconnect继续处理
+                    this.reconnectAttempts--;
+                });
+            }
         }, delay);
     }
 
@@ -748,9 +827,14 @@ class AgentService extends EventEmitter {
         logger.info('断开服务器连接');
         this.isConnected = false;
         this.stopHeartbeat();
+        this.reconnectAttempts = 0; // 重置重连次数
         
         if (this.ws) {
-            this.ws.close(1000, 'Client disconnect');
+            try {
+                this.ws.close(1000, 'Client disconnect');
+            } catch (error) {
+                logger.warn('关闭WebSocket连接时出错:', error.message);
+            }
             this.ws = null;
         }
     }

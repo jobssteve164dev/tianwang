@@ -302,26 +302,64 @@ class AgentController {
           diskCount: deviceInfoForVerification.diskInfo.length
         });
 
-        // 验证代理端发送的指纹与存储的指纹是否匹配
-        const fingerprintValidation = deviceFingerprintService.verifyFingerprint(
-          deviceFingerprint, 
-          deviceInfoForVerification
-        );
-        
-        console.log('设备指纹验证结果:', {
-          isValid: fingerprintValidation.isValid,
-          expected: agent.deviceFingerprint.substring(0, 16) + '...',
-          actual: deviceFingerprint.substring(0, 16) + '...',
-          currentGenerated: fingerprintValidation.currentFingerprint?.substring(0, 16) + '...'
+        // 生成当前设备指纹
+        console.log('开始生成设备指纹:', { 
+          hostname: deviceInfoForVerification.hostname, 
+          platform: deviceInfoForVerification.platform, 
+          arch: deviceInfoForVerification.arch 
         });
         
-        if (!fingerprintValidation.isValid) {
-          console.warn('设备指纹验证失败:', { 
+        const fingerprintValidation = deviceFingerprintService.generateFingerprint(deviceInfoForVerification);
+        
+        console.log('指纹数据构建完成:', {
+          hostname: fingerprintValidation.components.hostname,
+          platform: fingerprintValidation.components.platform,
+          macCount: fingerprintValidation.components.macAddresses.length,
+          diskCount: fingerprintValidation.components.diskInfo.length,
+          networkCount: fingerprintValidation.components.networkInterfaces.length
+        });
+        
+        console.log('设备指纹生成成功:', {
+          hostname: fingerprintValidation.components.hostname,
+          platform: fingerprintValidation.components.platform,
+          fingerprint: fingerprintValidation.fingerprint.substring(0, 16) + '...',
+          dataLength: JSON.stringify(fingerprintValidation.components).length
+        });
+
+        console.log('当前生成的指纹:', {
+          currentFingerprint: fingerprintValidation.fingerprint.substring(0, 16) + '...',
+          expectedFingerprint: agent.deviceFingerprint.substring(0, 16) + '...'
+        });
+
+        // 验证指纹
+        const fingerprintValidationResult = {
+          isValid: fingerprintValidation.fingerprint === agent.deviceFingerprint,
+          expected: agent.deviceFingerprint,
+          actual: deviceFingerprint,
+          currentGenerated: fingerprintValidation.fingerprint
+        };
+
+        console.log('设备指纹验证结果:', {
+          isValid: fingerprintValidationResult.isValid,
+          expected: fingerprintValidationResult.expected.substring(0, 16) + '...',
+          actual: fingerprintValidationResult.actual.substring(0, 16) + '...',
+          match: fingerprintValidationResult.isValid ? '匹配' : '不匹配'
+        });
+
+        console.log('设备指纹验证结果:', {
+          isValid: fingerprintValidationResult.isValid,
+          expected: fingerprintValidationResult.expected.substring(0, 16) + '...',
+          actual: fingerprintValidationResult.actual.substring(0, 16) + '...',
+          currentGenerated: fingerprintValidationResult.currentGenerated.substring(0, 16) + '...'
+        });
+
+        if (!fingerprintValidationResult.isValid) {
+          console.log('设备指纹验证失败:', {
             agentId, 
             hostname,
             expected: agent.deviceFingerprint.substring(0, 16) + '...',
             actual: deviceFingerprint.substring(0, 16) + '...',
-            currentGenerated: fingerprintValidation.currentFingerprint?.substring(0, 16) + '...'
+            currentGenerated: fingerprintValidation.fingerprint?.substring(0, 16) + '...'
           });
           
           // 记录安全事件
@@ -329,12 +367,25 @@ class AgentController {
             await this.recordSecurityEvent(agent, 'fingerprint_mismatch', 'high', {
               expected: agent.deviceFingerprint,
               actual: deviceFingerprint,
-              currentGenerated: fingerprintValidation.currentFingerprint
+              currentGenerated: fingerprintValidation.fingerprint
             });
           } catch (securityEventError) {
             console.error('记录安全事件失败:', securityEventError);
-            // 不阻止认证流程继续
           }
+          
+          // 设备指纹验证失败，拒绝认证
+          return res.status(401).json({
+            success: false,
+            message: '设备指纹验证失败',
+            error: 'DEVICE_FINGERPRINT_MISMATCH',
+            details: {
+              expected: agent.deviceFingerprint.substring(0, 16) + '...',
+              actual: deviceFingerprint.substring(0, 16) + '...',
+              currentGenerated: fingerprintValidation.fingerprint?.substring(0, 16) + '...'
+            }
+          });
+        } else {
+          console.log('设备指纹验证成功:', { agentId, hostname });
         }
       } else {
         console.log('跳过设备指纹验证:', { 
