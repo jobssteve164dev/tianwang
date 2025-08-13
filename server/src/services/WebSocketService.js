@@ -32,7 +32,8 @@ class WebSocketService {
     try {
       const query = url.parse(info.req.url, true).query;
       const token = query.token;
-      const connectionKey = query.connectionKey;
+      // 确保连接密钥正确解码
+      const connectionKey = query.connectionKey ? decodeURIComponent(query.connectionKey) : null;
 
       logger.debug('WebSocket验证开始:', {
         hasToken: !!token,

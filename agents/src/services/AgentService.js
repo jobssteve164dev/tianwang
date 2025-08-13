@@ -553,20 +553,27 @@ class AgentService extends EventEmitter {
                 // 服务器端期望的是完整的连接密钥字符串，格式为: key:timestamp:signature
                 if (this.connectionKey.key && this.connectionKey.timestamp && this.connectionKey.signature) {
                     const fullConnectionKey = `${this.connectionKey.key}:${this.connectionKey.timestamp}:${this.connectionKey.signature}`;
-                    wsUrl += `&connectionKey=${fullConnectionKey}`;
+                    // 对连接密钥进行URL编码，避免+号被解码为空格
+                    const encodedConnectionKey = encodeURIComponent(fullConnectionKey);
+                    wsUrl += `&connectionKey=${encodedConnectionKey}`;
                     logger.debug('使用完整连接密钥:', { 
                         key: this.connectionKey.key.substring(0, 16) + '...',
                         timestamp: this.connectionKey.timestamp,
                         signature: this.connectionKey.signature.substring(0, 16) + '...',
                         fullConnectionKeyLength: fullConnectionKey.length,
-                        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...'
+                        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...',
+                        encodedConnectionKeyLength: encodedConnectionKey.length,
+                        encodedConnectionKeyPreview: encodedConnectionKey.substring(0, 32) + '...'
                     });
                 } else if (this.connectionKey.signature) {
                     // 向后兼容：如果只有signature，使用signature作为连接密钥
-                    wsUrl += `&connectionKey=${this.connectionKey.signature}`;
+                    const encodedSignature = encodeURIComponent(this.connectionKey.signature);
+                    wsUrl += `&connectionKey=${encodedSignature}`;
                     logger.warn('使用签名作为连接密钥（向后兼容）:', {
                         signatureLength: this.connectionKey.signature.length,
-                        signaturePreview: this.connectionKey.signature.substring(0, 16) + '...'
+                        signaturePreview: this.connectionKey.signature.substring(0, 16) + '...',
+                        encodedSignatureLength: encodedSignature.length,
+                        encodedSignaturePreview: encodedSignature.substring(0, 16) + '...'
                     });
                 } else {
                     logger.warn('连接密钥格式不正确，无法建立安全连接:', {

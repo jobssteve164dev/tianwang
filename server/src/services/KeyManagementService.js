@@ -293,10 +293,10 @@ class KeyManagementService {
       logger.debug('开始验证连接密钥:', {
         providedSignatureType: typeof providedSignature,
         expectedKeyType: typeof expectedKey,
-        providedSignatureLength: providedSignature?.length,
-        expectedKeyLength: expectedKey?.length,
-        providedSignaturePreview: providedSignature?.substring(0, 32) + '...',
-        expectedKeyPreview: expectedKey?.substring(0, 32) + '...'
+        providedSignatureLength: typeof providedSignature === 'string' ? providedSignature?.length : 'N/A',
+        expectedKeyLength: typeof expectedKey === 'string' ? expectedKey?.length : 'N/A',
+        providedSignaturePreview: typeof providedSignature === 'string' ? providedSignature?.substring(0, 32) + '...' : 'N/A',
+        expectedKeyPreview: typeof expectedKey === 'string' ? expectedKey?.substring(0, 32) + '...' : 'N/A'
       });
 
       // 如果提供的是完整的连接密钥对象
