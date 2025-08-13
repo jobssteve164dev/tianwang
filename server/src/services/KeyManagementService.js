@@ -261,11 +261,22 @@ class KeyManagementService {
     try {
       const randomBytes = crypto.randomBytes(32);
       const timestamp = Date.now();
-      const data = `${randomBytes.toString('hex')}:${timestamp}`;
+      const key = randomBytes.toString('base64');
+      
+      // 使用正确的数据格式进行签名: key:timestamp (key是base64格式)
+      const data = `${key}:${timestamp}`;
       const signature = this.createSignature(data);
       
+      logger.debug('生成连接密钥详情:', {
+        keyLength: key.length,
+        timestamp,
+        signatureLength: signature.length,
+        dataFormat: 'key:timestamp',
+        keyFormat: 'base64'
+      });
+      
       return {
-        key: randomBytes.toString('base64'),
+        key,
         timestamp,
         signature,
         expiresAt: timestamp + (60 * 60 * 1000) // 1小时有效期
@@ -279,8 +290,18 @@ class KeyManagementService {
   // 验证连接密钥
   verifyConnectionKey(providedSignature, expectedKey) {
     try {
+      logger.debug('开始验证连接密钥:', {
+        providedSignatureType: typeof providedSignature,
+        expectedKeyType: typeof expectedKey,
+        providedSignatureLength: providedSignature?.length,
+        expectedKeyLength: expectedKey?.length,
+        providedSignaturePreview: providedSignature?.substring(0, 32) + '...',
+        expectedKeyPreview: expectedKey?.substring(0, 32) + '...'
+      });
+
       // 如果提供的是完整的连接密钥对象
       if (typeof providedSignature === 'object' && providedSignature.key) {
+        logger.debug('处理对象格式的连接密钥');
         const { key, timestamp, signature, expiresAt } = providedSignature;
         
         // 检查过期时间
@@ -297,29 +318,58 @@ class KeyManagementService {
       
       // 如果提供的是签名字符串和期望的密钥字符串（WebSocket连接场景）
       if (typeof providedSignature === 'string' && typeof expectedKey === 'string') {
-        // 在WebSocket连接中，providedSignature是连接密钥的签名
-        // expectedKey是连接密钥本身，我们需要验证签名是否正确
+        logger.debug('处理字符串格式的连接密钥');
         try {
-          // 从连接密钥中提取信息并验证签名
-          // 连接密钥格式应该是: key:timestamp:signature
-          const parts = expectedKey.split(':');
+          // 客户端发送的格式可能是: key:timestamp:signature
+          const parts = providedSignature.split(':');
+          logger.debug('解析连接密钥部分:', {
+            partsCount: parts.length,
+            parts: parts.map((part, index) => ({ index, length: part.length, preview: part.substring(0, 16) + '...' }))
+          });
+
           if (parts.length >= 3) {
             const key = parts[0];
             const timestamp = parseInt(parts[1]);
             const signature = parts[2];
             
+            logger.debug('连接密钥解析结果:', {
+              keyLength: key.length,
+              timestamp,
+              signatureLength: signature.length,
+              currentTime: Date.now(),
+              timeDiff: Date.now() - timestamp
+            });
+            
             // 检查过期时间（1小时）
             if (Date.now() > timestamp + (60 * 60 * 1000)) {
+              logger.warn('连接密钥已过期:', {
+                timestamp,
+                currentTime: Date.now(),
+                timeDiff: Date.now() - timestamp,
+                maxAge: 60 * 60 * 1000
+              });
               return { isValid: false, error: '连接密钥已过期' };
             }
             
-            // 验证签名
+            // 验证签名 - 使用正确的数据格式
+            // 数据格式应该是: key:timestamp (key是base64格式)
             const data = `${key}:${timestamp}`;
+            logger.debug('准备验证签名:', {
+              dataLength: data.length,
+              dataPreview: data.substring(0, 32) + '...',
+              signatureLength: signature.length,
+              keyFormat: 'base64',
+              dataFormat: 'key:timestamp'
+            });
+            
             const isValid = this.verifySignature(data, signature);
+            logger.debug('签名验证结果:', { isValid });
             return { isValid, error: isValid ? null : '签名验证失败' };
           } else {
             // 如果格式不正确，尝试直接比较（向后兼容）
+            logger.debug('连接密钥格式不正确，尝试直接比较');
             const isValid = providedSignature === expectedKey;
+            logger.debug('直接比较结果:', { isValid });
             return { isValid, error: isValid ? null : '密钥格式不正确' };
           }
         } catch (error) {
@@ -328,6 +378,10 @@ class KeyManagementService {
         }
       }
       
+      logger.warn('无效的密钥格式:', {
+        providedSignatureType: typeof providedSignature,
+        expectedKeyType: typeof expectedKey
+      });
       return { isValid: false, error: '无效的密钥格式' };
     } catch (error) {
       logger.error('验证连接密钥失败:', error);

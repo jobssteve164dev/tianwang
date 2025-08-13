@@ -530,6 +530,17 @@ class AgentService extends EventEmitter {
             
             // 如果有连接密钥，添加到URL中
             if (this.connectionKey) {
+                logger.debug('连接密钥对象详情:', {
+                    hasKey: !!this.connectionKey.key,
+                    hasTimestamp: !!this.connectionKey.timestamp,
+                    hasSignature: !!this.connectionKey.signature,
+                    keyLength: this.connectionKey.key?.length,
+                    timestamp: this.connectionKey.timestamp,
+                    signatureLength: this.connectionKey.signature?.length,
+                    keyPreview: this.connectionKey.key?.substring(0, 16) + '...',
+                    signaturePreview: this.connectionKey.signature?.substring(0, 16) + '...'
+                });
+
                 // 连接密钥应该是一个对象，包含key、timestamp、signature等字段
                 // 服务器端期望的是完整的连接密钥字符串，格式为: key:timestamp:signature
                 if (this.connectionKey.key && this.connectionKey.timestamp && this.connectionKey.signature) {
@@ -538,20 +549,32 @@ class AgentService extends EventEmitter {
                     logger.debug('使用完整连接密钥:', { 
                         key: this.connectionKey.key.substring(0, 16) + '...',
                         timestamp: this.connectionKey.timestamp,
-                        signature: this.connectionKey.signature.substring(0, 16) + '...'
+                        signature: this.connectionKey.signature.substring(0, 16) + '...',
+                        fullConnectionKeyLength: fullConnectionKey.length,
+                        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...'
                     });
                 } else if (this.connectionKey.signature) {
                     // 向后兼容：如果只有signature，使用signature作为连接密钥
                     wsUrl += `&connectionKey=${this.connectionKey.signature}`;
-                    logger.warn('使用签名作为连接密钥（向后兼容）');
+                    logger.warn('使用签名作为连接密钥（向后兼容）:', {
+                        signatureLength: this.connectionKey.signature.length,
+                        signaturePreview: this.connectionKey.signature.substring(0, 16) + '...'
+                    });
                 } else {
-                    logger.warn('连接密钥格式不正确，无法建立安全连接');
+                    logger.warn('连接密钥格式不正确，无法建立安全连接:', {
+                        connectionKey: this.connectionKey
+                    });
                 }
             } else {
                 logger.warn('未提供连接密钥，连接可能被拒绝');
             }
             
-            logger.info('连接到服务器...', { url: wsUrl });
+            logger.info('连接到服务器...', { 
+                url: wsUrl.substring(0, 100) + '...',
+                urlLength: wsUrl.length,
+                hasToken: wsUrl.includes('token='),
+                hasConnectionKey: wsUrl.includes('connectionKey=')
+            });
             
             // 如果已有连接，先关闭
             if (this.ws) {

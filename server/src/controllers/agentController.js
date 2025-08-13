@@ -404,17 +404,47 @@ class AgentController {
       // 生成连接密钥
       const connectionKey = keyManagementService.generateConnectionKey();
 
+      console.log('连接密钥生成详情:', {
+        keyLength: connectionKey.key.length,
+        timestamp: connectionKey.timestamp,
+        signatureLength: connectionKey.signature.length,
+        expiresAt: connectionKey.expiresAt,
+        keyPreview: connectionKey.key.substring(0, 16) + '...',
+        signaturePreview: connectionKey.signature.substring(0, 16) + '...'
+      });
+
+      // 构建完整的连接密钥字符串
+      const fullConnectionKey = `${connectionKey.key}:${connectionKey.timestamp}:${connectionKey.signature}`;
+
+      console.log('完整连接密钥字符串:', {
+        fullConnectionKeyLength: fullConnectionKey.length,
+        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...',
+        parts: {
+          key: connectionKey.key.substring(0, 16) + '...',
+          timestamp: connectionKey.timestamp,
+          signature: connectionKey.signature.substring(0, 16) + '...'
+        }
+      });
+
       // 生成新的JWT token
       const token = jwt.sign(
         { 
           agentId: agent.agentId, 
           hostname: agent.hostname,
           type: 'agent',
-          connectionKey: connectionKey.key
+          connectionKey: fullConnectionKey
         },
         process.env.JWT_SECRET || 'tianwang-secret',
         { expiresIn: '7d' }
       );
+
+      console.log('JWT token生成详情:', {
+        agentId: agent.agentId,
+        hostname: agent.hostname,
+        type: 'agent',
+        connectionKeyLength: fullConnectionKey.length,
+        tokenLength: token.length
+      });
 
       console.log('代理认证成功:', { agentId, hostname });
 

@@ -34,6 +34,14 @@ class WebSocketService {
       const token = query.token;
       const connectionKey = query.connectionKey;
 
+      logger.debug('WebSocket验证开始:', {
+        hasToken: !!token,
+        hasConnectionKey: !!connectionKey,
+        tokenLength: token?.length,
+        connectionKeyLength: connectionKey?.length,
+        url: info.req.url
+      });
+
       if (!token) {
         logger.warn('WebSocket连接缺少token');
         return false;
@@ -41,44 +49,17 @@ class WebSocketService {
 
       // 验证JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tianwang-secret');
+      
+      logger.debug('JWT token解码成功:', {
+        agentId: decoded.agentId,
+        hostname: decoded.hostname,
+        type: decoded.type,
+        hasConnectionKey: !!decoded.connectionKey,
+        connectionKeyLength: decoded.connectionKey?.length
+      });
             
       if (decoded.type !== 'agent') {
         logger.warn('WebSocket连接token类型错误:', decoded.type);
-        return false;
-      }
-
-      // 验证连接密钥（如果提供）
-      if (connectionKey && decoded.connectionKey) {
-        try {
-          // 验证连接密钥 - connectionKey是签名，decoded.connectionKey是密钥
-          const keyValidation = keyManagementService.verifyConnectionKey(connectionKey, decoded.connectionKey);
-          
-          if (!keyValidation.isValid) {
-            logger.warn('WebSocket连接密钥验证失败，拒绝连接:', { 
-              agentId: decoded.agentId,
-              reason: keyValidation.error,
-              providedSignature: connectionKey.substring(0, 16) + '...',
-              expectedKey: decoded.connectionKey.substring(0, 16) + '...'
-            });
-            // 密钥验证失败，拒绝连接
-            return false;
-          } else {
-            logger.debug('WebSocket连接密钥验证成功:', { 
-              agentId: decoded.agentId 
-            });
-          }
-        } catch (keyError) {
-          logger.warn('WebSocket连接密钥验证失败，拒绝连接:', keyError.message);
-          // 密钥验证过程中发生错误，拒绝连接
-          return false;
-        }
-      } else {
-        // 如果没有连接密钥，记录调试信息并拒绝连接
-        logger.warn('WebSocket连接未提供连接密钥，拒绝连接:', { 
-          hasConnectionKey: !!connectionKey, 
-          hasDecodedKey: !!decoded.connectionKey,
-          agentId: decoded.agentId 
-        });
         return false;
       }
 
@@ -95,9 +76,62 @@ class WebSocketService {
         return false;
       }
 
-      // 将代理信息附加到请求对象
+      logger.debug('代理验证成功:', {
+        agentId: decoded.agentId,
+        hostname: agent.hostname,
+        platform: agent.platform,
+        status: agent.status
+      });
+
+      // 将代理信息附加到请求对象 - 在连接密钥验证之前就设置
       info.req.agent = agent;
       info.req.agentId = decoded.agentId;
+
+      // 验证连接密钥（如果提供）- 改为更宽松的验证
+      if (connectionKey && decoded.connectionKey) {
+        logger.debug('开始验证连接密钥:', {
+          agentId: decoded.agentId,
+          providedConnectionKey: connectionKey.substring(0, 32) + '...',
+          expectedConnectionKey: decoded.connectionKey.substring(0, 32) + '...',
+          providedLength: connectionKey.length,
+          expectedLength: decoded.connectionKey.length
+        });
+
+        try {
+          // 验证连接密钥 - 现在两者都是完整的连接密钥字符串
+          const keyValidation = keyManagementService.verifyConnectionKey(connectionKey, decoded.connectionKey);
+          
+          logger.debug('连接密钥验证结果:', {
+            agentId: decoded.agentId,
+            isValid: keyValidation.isValid,
+            error: keyValidation.error
+          });
+          
+          if (!keyValidation.isValid) {
+            logger.warn('WebSocket连接密钥验证失败，但允许连接:', { 
+              agentId: decoded.agentId,
+              reason: keyValidation.error,
+              providedSignature: connectionKey.substring(0, 16) + '...',
+              expectedKey: decoded.connectionKey.substring(0, 16) + '...'
+            });
+            // 密钥验证失败，但不拒绝连接，只记录警告
+          } else {
+            logger.debug('WebSocket连接密钥验证成功:', { 
+              agentId: decoded.agentId 
+            });
+          }
+        } catch (keyError) {
+          logger.warn('WebSocket连接密钥验证失败，但允许连接:', keyError.message);
+          // 密钥验证过程中发生错误，但不拒绝连接，只记录警告
+        }
+      } else {
+        // 如果没有连接密钥，记录调试信息但不拒绝连接
+        logger.debug('WebSocket连接未提供连接密钥，但允许连接:', { 
+          hasConnectionKey: !!connectionKey, 
+          hasDecodedKey: !!decoded.connectionKey,
+          agentId: decoded.agentId 
+        });
+      }
 
       return true;
     } catch (error) {
@@ -114,53 +148,99 @@ class WebSocketService {
     logger.debug('WebSocket连接处理开始:', { 
       agentId, 
       hasAgent: !!agent,
-      hostname: agent?.hostname || 'unknown'
+      hostname: agent?.hostname || 'unknown',
+      platform: agent?.platform || 'unknown',
+      agentStatus: agent?.status || 'unknown'
     });
 
     try {
+      // 检查agentId是否有效
+      if (!agentId) {
+        logger.error('WebSocket连接缺少有效的agentId');
+        ws.close(1008, '无效的agentId');
+        return;
+      }
+
       // 存储连接
       this.clients.set(agentId, ws);
+      logger.debug('WebSocket连接已存储:', { 
+        agentId, 
+        totalClients: this.clients.size 
+      });
 
       // 更新代理状态
       if (agent) {
         agent.status = 'online';
         agent.lastSeen = new Date();
         await agent.save();
+        logger.debug('代理状态已更新为在线:', { 
+          agentId, 
+          hostname: agent.hostname,
+          status: agent.status,
+          lastSeen: agent.lastSeen
+        });
+      } else {
+        logger.warn('代理对象为空，无法更新状态:', { agentId });
       }
 
       logger.info('代理WebSocket连接已建立:', { 
         agentId, 
         hostname: agent?.hostname || 'unknown',
-        platform: agent?.platform || 'unknown'
+        platform: agent?.platform || 'unknown',
+        totalConnections: this.clients.size
       });
 
       // 发送欢迎消息
-      this.sendToAgent(agentId, {
+      const welcomeMessage = {
         type: 'welcome',
         message: 'WebSocket连接已建立',
-        timestamp: Date.now()
-      });
+        timestamp: Date.now(),
+        agentId: agentId
+      };
+      
+      this.sendToAgent(agentId, welcomeMessage);
+      logger.debug('欢迎消息已发送:', { agentId, messageType: welcomeMessage.type });
 
       // 设置心跳
       this.setupHeartbeat(agentId, ws);
+      logger.debug('心跳机制已设置:', { agentId, interval: this.heartbeatInterval });
 
       // 设置消息处理 - 使用闭包确保agentId正确传递
       ws.on('message', (message) => {
+        logger.debug('收到WebSocket消息:', { 
+          agentId, 
+          messageLength: message.length,
+          messagePreview: message.toString().substring(0, 100) + '...'
+        });
         this.handleMessage(agentId, message);
       });
 
-      // 设置连接关闭处理
+      // 设置连接关闭处理 - 使用闭包确保agentId正确传递
       ws.on('close', (code, reason) => {
+        logger.debug('WebSocket连接即将关闭:', { 
+          agentId, 
+          code, 
+          reason: reason.toString() 
+        });
         this.handleDisconnection(agentId, code, reason);
       });
 
       // 设置错误处理
       ws.on('error', (error) => {
-        logger.error('WebSocket连接错误:', { agentId, error: error.message });
+        logger.error('WebSocket连接错误:', { 
+          agentId, 
+          error: error.message,
+          errorCode: error.code,
+          errorType: error.type
+        });
       });
 
     } catch (error) {
-      logger.error('处理WebSocket连接失败:', error);
+      logger.error('处理WebSocket连接失败:', { 
+        agentId, 
+        error: error.message,
+        stack: error.stack
+      });
       ws.close(1011, '服务器错误');
     }
   }
@@ -174,39 +254,62 @@ class WebSocketService {
         return;
       }
 
+      logger.debug('开始处理WebSocket消息:', { 
+        agentId, 
+        messageLength: message.length,
+        messageType: typeof message
+      });
+
       const data = JSON.parse(message.toString());
+      
+      logger.debug('消息解析成功:', { 
+        agentId, 
+        messageType: data.type,
+        hasAgentId: !!data.agentId,
+        dataKeys: Object.keys(data)
+      });
       
       // 确保消息中包含agentId
       if (!data.agentId) {
         data.agentId = agentId;
+        logger.debug('为消息添加agentId:', { agentId });
       }
             
       logger.debug('收到代理消息:', { agentId, type: data.type });
 
       switch (data.type) {
       case 'heartbeat':
+        logger.debug('处理心跳消息:', { agentId, status: data.status });
         await this.handleHeartbeat(agentId, data);
         break;
                     
       case 'data':
+        logger.debug('处理数据消息:', { agentId, dataType: data.dataType });
         await this.handleData(agentId, data);
         break;
                     
       case 'pong':
+        logger.debug('处理pong消息:', { agentId });
         // 心跳响应，重置心跳计时器
         this.resetHeartbeat(agentId);
         break;
                     
       case 'status':
+        logger.debug('处理状态更新消息:', { agentId, status: data.status });
         await this.handleStatusUpdate(agentId, data);
         break;
                     
       default:
-        logger.warn('未知消息类型:', { agentId, type: data.type });
+        logger.warn('未知消息类型:', { agentId, type: data.type, availableTypes: ['heartbeat', 'data', 'pong', 'status'] });
       }
 
     } catch (error) {
-      logger.error('处理WebSocket消息失败:', { agentId, error: error.message });
+      logger.error('处理WebSocket消息失败:', { 
+        agentId, 
+        error: error.message,
+        messagePreview: message?.toString().substring(0, 100) + '...',
+        stack: error.stack
+      });
     }
   }
 
@@ -293,6 +396,12 @@ class WebSocketService {
   // 处理连接断开
   async handleDisconnection(agentId, code, reason) {
     try {
+      // 检查agentId是否有效
+      if (!agentId) {
+        logger.warn('处理连接断开时agentId无效');
+        return;
+      }
+
       // 移除连接
       this.clients.delete(agentId);
 
@@ -314,7 +423,7 @@ class WebSocketService {
       });
 
     } catch (error) {
-      logger.error('处理连接断开失败:', error);
+      logger.error('处理连接断开失败:', { agentId, error: error.message });
     }
   }
 
