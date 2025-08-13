@@ -1,16 +1,16 @@
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const models = require('../models');
+const { Op } = require('sequelize');
 
 class RegistrationCodeService {
   constructor() {
-    this.codeCache = new Map();
-    this.cacheExpiry = 60 * 60 * 1000; // 1小时缓存
     this.defaultExpiry = 24 * 60 * 60 * 1000; // 24小时默认过期时间
     this.maxUses = 1; // 默认每个注册码只能使用一次
   }
 
   // 生成注册码
-  generateRegistrationCode(options = {}) {
+  async generateRegistrationCode(options = {}) {
     try {
       const {
         prefix = 'TW',
@@ -46,12 +46,12 @@ class RegistrationCodeService {
         description,
         createdBy,
         isActive: true,
-        usedBy: [],
+        used_by: [],
         createdAt: new Date()
       };
 
-      // 缓存注册码
-      this.cacheCode(registrationCode);
+      // 保存到数据库
+      const savedCode = await this.saveToDatabase(registrationCode);
 
       logger.info('注册码生成成功:', { 
         code, 
@@ -59,7 +59,7 @@ class RegistrationCodeService {
         permissions 
       });
 
-      return registrationCode;
+      return savedCode;
     } catch (error) {
       logger.error('生成注册码失败:', error);
       throw error;
@@ -90,32 +90,71 @@ class RegistrationCodeService {
     }
   }
 
-  // 缓存注册码
-  cacheCode(registrationCode) {
-    this.codeCache.set(registrationCode.code, {
-      ...registrationCode,
-      cacheTimestamp: Date.now()
-    });
-
-    // 清理过期缓存
-    this.cleanupExpiredCache();
-  }
-
-  // 清理过期缓存
-  cleanupExpiredCache() {
-    const now = Date.now();
-    for (const [code, data] of this.codeCache.entries()) {
-      if (now > data.expiry || now - data.cacheTimestamp > this.cacheExpiry) {
-        this.codeCache.delete(code);
+  // 保存注册码到数据库
+  async saveToDatabase(registrationCode) {
+    try {
+      if (!models.RegistrationCode) {
+        logger.warn('数据库未初始化，注册码将保存到内存缓存');
+        // 如果数据库不可用，暂时保存到内存缓存
+        this.memoryCache = this.memoryCache || new Map();
+        this.memoryCache.set(registrationCode.code, {
+          ...registrationCode,
+          id: Date.now(),
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        return this.memoryCache.get(registrationCode.code);
       }
+
+      const savedCode = await models.RegistrationCode.create({
+        code: registrationCode.code,
+        signature: registrationCode.signature,
+        timestamp: registrationCode.timestamp,
+        expiry: registrationCode.expiry,
+        max_uses: registrationCode.max_uses || registrationCode.maxUses,
+        used_count: registrationCode.used_count || registrationCode.usedCount || 0,
+        permissions: registrationCode.permissions,
+        description: registrationCode.description,
+        created_by: registrationCode.created_by || registrationCode.createdBy,
+        is_active: registrationCode.is_active !== undefined ? registrationCode.is_active : (registrationCode.isActive !== undefined ? registrationCode.isActive : true),
+        used_by: registrationCode.used_by || []
+      });
+
+      return {
+        ...registrationCode,
+        id: savedCode.id,
+        created_at: savedCode.created_at,
+        updated_at: savedCode.updated_at
+      };
+    } catch (error) {
+      logger.error('保存注册码到数据库失败:', error);
+      throw error;
     }
   }
 
   // 验证注册码
   async validateRegistrationCode(code, deviceInfo = {}) {
     try {
-      // 从缓存获取注册码
-      const registrationCode = this.codeCache.get(code);
+      let registrationCode = null;
+
+      // 首先尝试从数据库获取注册码
+      if (models.RegistrationCode) {
+        try {
+          registrationCode = await models.RegistrationCode.findOne({
+            where: { code }
+          });
+        } catch (dbError) {
+          logger.warn('数据库查询失败，尝试从内存缓存获取:', dbError.message);
+        }
+      }
+
+      // 如果数据库不可用或查询失败，尝试从内存缓存获取
+      if (!registrationCode && this.memoryCache) {
+        registrationCode = this.memoryCache.get(code);
+        if (registrationCode) {
+          logger.info('从内存缓存获取注册码:', code);
+        }
+      }
       
       if (!registrationCode) {
         logger.warn('注册码不存在:', code);
@@ -137,7 +176,7 @@ class RegistrationCodeService {
       }
 
       // 检查是否已停用
-      if (!registrationCode.isActive) {
+      if (!registrationCode.is_active) {
         logger.warn('注册码已停用:', code);
         return {
           isValid: false,
@@ -147,7 +186,7 @@ class RegistrationCodeService {
       }
 
       // 检查使用次数限制
-      if (registrationCode.usedCount >= registrationCode.maxUses) {
+      if (registrationCode.used_count >= registrationCode.max_uses) {
         logger.warn('注册码使用次数已达上限:', code);
         return {
           isValid: false,
@@ -181,7 +220,7 @@ class RegistrationCodeService {
         permissions: registrationCode.permissions,
         description: registrationCode.description,
         expiry: registrationCode.expiry,
-        remainingUses: registrationCode.maxUses - registrationCode.usedCount
+        remainingUses: registrationCode.max_uses - registrationCode.used_count
       };
     } catch (error) {
       logger.error('验证注册码失败:', error);
@@ -193,10 +232,42 @@ class RegistrationCodeService {
     }
   }
 
+  // 增加注册码使用次数
+  async incrementCodeUsage(code, agentId, deviceFingerprint) {
+    try {
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
+      const registrationCode = await models.RegistrationCode.findOne({
+        where: { code }
+      });
+      
+      if (!registrationCode) {
+        logger.warn('注册码不存在，无法增加使用次数:', code);
+        return false;
+      }
+
+      await registrationCode.incrementUsage(agentId, deviceFingerprint);
+
+      logger.info('注册码使用次数已增加:', { code, usedCount: registrationCode.used_count });
+      return true;
+    } catch (error) {
+      logger.error('增加注册码使用次数失败:', error);
+      return false;
+    }
+  }
+
   // 验证设备指纹
   async validateDeviceFingerprint(code, fingerprint) {
     try {
-      const registrationCode = this.codeCache.get(code);
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
+      const registrationCode = await models.RegistrationCode.findOne({
+        where: { code }
+      });
       
       if (!registrationCode) {
         return {
@@ -207,7 +278,8 @@ class RegistrationCodeService {
       }
 
       // 检查是否已被其他设备使用
-      const existingDevice = registrationCode.usedBy.find(device => device.fingerprint === fingerprint);
+      const usedBy = registrationCode.used_by || [];
+      const existingDevice = usedBy.find(device => device.fingerprint === fingerprint);
       
       if (existingDevice) {
         // 同一设备重复使用
@@ -219,7 +291,7 @@ class RegistrationCodeService {
       }
 
       // 检查是否已被其他设备使用（如果限制单设备使用）
-      if (registrationCode.maxUses === 1 && registrationCode.usedBy.length > 0) {
+      if (registrationCode.max_uses === 1 && usedBy.length > 0) {
         return {
           isValid: false,
           error: '注册码已被其他设备使用',
@@ -245,7 +317,13 @@ class RegistrationCodeService {
   // 使用注册码
   async useRegistrationCode(code, deviceInfo) {
     try {
-      const registrationCode = this.codeCache.get(code);
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
+      const registrationCode = await models.RegistrationCode.findOne({
+        where: { code }
+      });
       
       if (!registrationCode) {
         return {
@@ -262,28 +340,18 @@ class RegistrationCodeService {
       }
 
       // 更新使用信息
-      registrationCode.usedCount++;
-      registrationCode.usedBy.push({
-        agentId: deviceInfo.agentId,
-        hostname: deviceInfo.hostname,
-        fingerprint: deviceInfo.fingerprint,
-        platform: deviceInfo.platform,
-        usedAt: new Date()
-      });
-
-      // 更新缓存
-      this.cacheCode(registrationCode);
+      await registrationCode.incrementUsage(deviceInfo.agentId, deviceInfo.fingerprint);
 
       logger.info('注册码使用成功:', { 
         code, 
         agentId: deviceInfo.agentId,
-        remainingUses: registrationCode.maxUses - registrationCode.usedCount 
+        remainingUses: registrationCode.getRemainingUses()
       });
 
       return {
         success: true,
         permissions: registrationCode.permissions,
-        remainingUses: registrationCode.maxUses - registrationCode.usedCount,
+        remainingUses: registrationCode.getRemainingUses(),
         expiry: registrationCode.expiry
       };
     } catch (error) {
@@ -297,12 +365,12 @@ class RegistrationCodeService {
   }
 
   // 批量生成注册码
-  generateBatchRegistrationCodes(count, options = {}) {
+  async generateBatchRegistrationCodes(count, options = {}) {
     try {
       const codes = [];
       
       for (let i = 0; i < count; i++) {
-        const code = this.generateRegistrationCode(options);
+        const code = await this.generateRegistrationCode(options);
         codes.push(code);
       }
 
@@ -316,9 +384,15 @@ class RegistrationCodeService {
   }
 
   // 停用注册码
-  disableRegistrationCode(code) {
+  async disableRegistrationCode(code) {
     try {
-      const registrationCode = this.codeCache.get(code);
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
+      const registrationCode = await models.RegistrationCode.findOne({
+        where: { code }
+      });
       
       if (!registrationCode) {
         return {
@@ -328,8 +402,7 @@ class RegistrationCodeService {
         };
       }
 
-      registrationCode.isActive = false;
-      this.cacheCode(registrationCode);
+      await registrationCode.disable();
 
       logger.info('注册码已停用:', code);
 
@@ -348,9 +421,15 @@ class RegistrationCodeService {
   }
 
   // 延长注册码有效期
-  extendRegistrationCode(code, additionalExpiry) {
+  async extendRegistrationCode(code, additionalExpiry) {
     try {
-      const registrationCode = this.codeCache.get(code);
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
+      const registrationCode = await models.RegistrationCode.findOne({
+        where: { code }
+      });
       
       if (!registrationCode) {
         return {
@@ -360,8 +439,7 @@ class RegistrationCodeService {
         };
       }
 
-      registrationCode.expiry += additionalExpiry;
-      this.cacheCode(registrationCode);
+      await registrationCode.extendExpiry(additionalExpiry);
 
       logger.info('注册码有效期已延长:', { 
         code, 
@@ -383,38 +461,13 @@ class RegistrationCodeService {
   }
 
   // 获取注册码统计信息
-  getRegistrationCodeStats() {
+  async getRegistrationCodeStats() {
     try {
-      const stats = {
-        total: 0,
-        active: 0,
-        expired: 0,
-        disabled: 0,
-        used: 0,
-        unused: 0
-      };
-
-      const now = Date.now();
-
-      for (const [code, data] of this.codeCache.entries()) {
-        stats.total++;
-        
-        if (!data.isActive) {
-          stats.disabled++;
-        } else if (now > data.expiry) {
-          stats.expired++;
-        } else {
-          stats.active++;
-        }
-
-        if (data.usedCount > 0) {
-          stats.used++;
-        } else {
-          stats.unused++;
-        }
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
       }
 
-      return stats;
+      return await models.RegistrationCode.getStats();
     } catch (error) {
       logger.error('获取注册码统计信息失败:', error);
       return null;
@@ -422,46 +475,56 @@ class RegistrationCodeService {
   }
 
   // 获取注册码列表
-  getRegistrationCodes(filters = {}) {
+  async getRegistrationCodes(filters = {}) {
     try {
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
+      }
+
       const {
         status = 'all', // all, active, expired, disabled
         createdBy = null,
         limit = 100
       } = filters;
 
-      const codes = [];
+      const whereClause = {};
       const now = Date.now();
 
-      for (const [code, data] of this.codeCache.entries()) {
-        // 状态过滤
-        if (status !== 'all') {
-          if (status === 'active' && (!data.isActive || now > data.expiry)) continue;
-          if (status === 'expired' && now <= data.expiry) continue;
-          if (status === 'disabled' && data.isActive) continue;
+      // 状态过滤
+      if (status !== 'all') {
+        if (status === 'active') {
+          whereClause.is_active = true;
+          whereClause.expiry = { [Op.gt]: now };
+        } else if (status === 'expired') {
+          whereClause.expiry = { [Op.lte]: now };
+        } else if (status === 'disabled') {
+          whereClause.is_active = false;
         }
-
-        // 创建者过滤
-        if (createdBy && data.createdBy !== createdBy) continue;
-
-        codes.push({
-          code: data.code,
-          status: this.getCodeStatus(data, now),
-          permissions: data.permissions,
-          description: data.description,
-          createdBy: data.createdBy,
-          createdAt: data.createdAt,
-          expiry: data.expiry,
-          usedCount: data.usedCount,
-          maxUses: data.maxUses,
-          remainingUses: data.maxUses - data.usedCount
-        });
       }
 
-      // 按创建时间排序
-      codes.sort((a, b) => b.createdAt - a.createdAt);
+      // 创建者过滤
+      if (createdBy) {
+        whereClause.created_by = createdBy;
+      }
 
-      return codes.slice(0, limit);
+      const codes = await models.RegistrationCode.findAll({
+        where: whereClause,
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit)
+      });
+
+      return codes.map(code => ({
+        code: code.code,
+        status: this.getCodeStatus(code, now),
+        permissions: code.permissions,
+        description: code.description,
+        createdBy: code.created_by,
+        createdAt: code.created_at,
+        expiry: code.expiry,
+        usedCount: code.used_count,
+        maxUses: code.max_uses,
+        remainingUses: code.getRemainingUses()
+      }));
     } catch (error) {
       logger.error('获取注册码列表失败:', error);
       return [];
@@ -470,30 +533,27 @@ class RegistrationCodeService {
 
   // 获取注册码状态
   getCodeStatus(registrationCode, now = Date.now()) {
-    if (!registrationCode.isActive) {
+    if (!registrationCode.is_active) {
       return 'disabled';
     }
     if (now > registrationCode.expiry) {
       return 'expired';
     }
-    if (registrationCode.usedCount >= registrationCode.maxUses) {
+    if (registrationCode.used_count >= registrationCode.max_uses) {
       return 'exhausted';
     }
     return 'active';
   }
 
   // 清理过期注册码
-  cleanupExpiredCodes() {
+  async cleanupExpiredCodes() {
     try {
-      const now = Date.now();
-      let cleanedCount = 0;
-
-      for (const [code, data] of this.codeCache.entries()) {
-        if (now > data.expiry) {
-          this.codeCache.delete(code);
-          cleanedCount++;
-        }
+      if (!models.RegistrationCode) {
+        throw new Error('RegistrationCode model not available');
       }
+
+      const result = await models.RegistrationCode.cleanupExpired();
+      const cleanedCount = result[0]?.count || 0;
 
       logger.info('清理过期注册码完成:', { cleanedCount });
       return cleanedCount;
@@ -504,16 +564,24 @@ class RegistrationCodeService {
   }
 
   // 获取服务状态
-  getStatus() {
-    return {
-      initialized: true,
-      cacheStats: {
-        size: this.codeCache.size,
-        expiry: this.cacheExpiry
-      },
-      codeStats: this.getRegistrationCodeStats(),
-      timestamp: Date.now()
-    };
+  async getStatus() {
+    try {
+      const codeStats = await this.getRegistrationCodeStats();
+      return {
+        initialized: true,
+        databaseConnected: !!models.RegistrationCode,
+        codeStats: codeStats,
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      logger.error('获取服务状态失败:', error);
+      return {
+        initialized: false,
+        databaseConnected: false,
+        error: error.message,
+        timestamp: Date.now()
+      };
+    }
   }
 }
 

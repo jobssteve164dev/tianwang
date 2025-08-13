@@ -33,8 +33,8 @@ class OtxManager:
         """获取威胁情报数据"""
         try:
             if not self.api_key:
-                logger.error("OTX API密钥未配置，无法获取威胁情报数据")
-                return False
+                logger.warning("OTX API密钥未配置，跳过OTX威胁情报获取")
+                return True  # 返回True避免阻塞启动
             
             logger.info(f"正在从OTX获取最近 {days} 天的威胁情报...")
             
@@ -42,7 +42,7 @@ class OtxManager:
             pulses = await self._fetch_pulses(days)
             if not pulses:
                 logger.warning("未获取到OTX脉冲数据")
-                return False
+                return True  # 返回True避免阻塞启动
             
             # 处理脉冲数据
             await self._process_pulses(pulses)
@@ -50,8 +50,8 @@ class OtxManager:
             return True
             
         except Exception as e:
-            logger.error(f"获取OTX威胁情报失败: {e}")
-            return False
+            logger.warning(f"获取OTX威胁情报失败: {e}")
+            return True  # 返回True避免阻塞启动
     
     async def _fetch_pulses(self, days: int = 7) -> List[Dict[str, Any]]:
         """获取OTX脉冲数据"""
@@ -69,7 +69,7 @@ class OtxManager:
             params = {
                 "limit": 100,
                 "modified_since": start_date.isoformat(),
-                "include_inactive": False
+                "include_inactive": "false"
             }
             
             async with aiohttp.ClientSession() as session:
@@ -83,7 +83,7 @@ class OtxManager:
                         return []
                         
         except Exception as e:
-            logger.error(f"获取OTX脉冲失败: {e}")
+            logger.warning(f"获取OTX脉冲失败: {e}")
             return []
     
     async def _process_pulses(self, pulses: List[Dict[str, Any]]):
@@ -264,3 +264,17 @@ class OtxManager:
             "ioc_count": sum(len(iocs) for iocs in self.iocs.values()),
             "data_sources": ["otx"]
         }
+    
+    async def update_threat_intelligence(self) -> bool:
+        """更新威胁情报数据"""
+        try:
+            logger.info("开始更新OTX威胁情报...")
+            success = await self.fetch_threat_intelligence()
+            if success:
+                logger.info("OTX威胁情报更新成功")
+            else:
+                logger.warning("OTX威胁情报更新失败")
+            return success
+        except Exception as e:
+            logger.warning(f"更新OTX威胁情报失败: {e}")
+            return True  # 返回True避免阻塞更新流程

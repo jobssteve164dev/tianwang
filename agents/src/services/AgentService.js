@@ -154,9 +154,18 @@ class AgentService extends EventEmitter {
     // 注册代理到服务器
     async registerAgent(registrationCode = null) {
         try {
+            console.log('开始代理注册...', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                hasRegistrationCode: !!(registrationCode || this.registrationCode)
+            });
+
             // 生成设备指纹
             if (!this.deviceFingerprint) {
+                console.log('生成设备指纹...');
                 this.deviceFingerprint = await this.generateDeviceFingerprint();
+            } else {
+                console.log('使用现有设备指纹:', this.deviceFingerprint.substring(0, 16) + '...');
             }
 
             const agentInfo = {
@@ -171,7 +180,22 @@ class AgentService extends EventEmitter {
                 deviceFingerprint: this.deviceFingerprint
             };
 
+            console.log('发送代理注册请求:', {
+                agentId: agentInfo.agentId,
+                hostname: agentInfo.hostname,
+                platform: agentInfo.platform,
+                hasFingerprint: !!agentInfo.deviceFingerprint,
+                fingerprint: agentInfo.deviceFingerprint?.substring(0, 16) + '...'
+            });
+
             const response = await axios.post(`${this.config.apiUrl}/agents/register`, agentInfo);
+            
+            console.log('代理注册成功:', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                hasToken: !!response.data.token,
+                hasConnectionKey: !!response.data.connectionKey
+            });
             
             // 保存认证信息
             this.authToken = response.data.token;
@@ -181,8 +205,17 @@ class AgentService extends EventEmitter {
             logger.info('代理注册成功', { agentId: this.agentId });
             return response.data;
         } catch (error) {
+            console.error('代理注册失败:', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                error: error.message,
+                status: error.response?.status,
+                data: error.response?.data
+            });
+
             if (error.response?.status === 409) {
                 // 代理已存在，尝试获取token
+                console.log('代理已存在，尝试重新认证...');
                 logger.info('代理已存在，尝试重新认证...');
                 return await this.authenticateAgent();
             }
@@ -193,10 +226,23 @@ class AgentService extends EventEmitter {
     // 代理认证
     async authenticateAgent() {
         try {
+            console.log('开始代理认证...', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                hasFingerprint: !!this.deviceFingerprint
+            });
+
             const response = await axios.post(`${this.config.apiUrl}/agents/auth`, {
                 agentId: this.agentId,
                 hostname: os.hostname(),
                 deviceFingerprint: this.deviceFingerprint
+            });
+            
+            console.log('代理认证成功:', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                hasToken: !!response.data.token,
+                hasConnectionKey: !!response.data.connectionKey
             });
             
             // 保存认证信息
@@ -206,6 +252,13 @@ class AgentService extends EventEmitter {
             
             return response.data;
         } catch (error) {
+            console.error('代理认证失败:', {
+                agentId: this.agentId,
+                hostname: os.hostname(),
+                error: error.message,
+                status: error.response?.status,
+                data: error.response?.data
+            });
             logger.error('代理认证失败:', error);
             throw error;
         }
@@ -214,6 +267,7 @@ class AgentService extends EventEmitter {
     // 生成设备指纹
     async generateDeviceFingerprint() {
         try {
+            console.log('代理端开始生成设备指纹...');
             const si = require('systeminformation');
             
             const [cpu, mem, osInfo, network, disk, system] = await Promise.all([
@@ -225,7 +279,14 @@ class AgentService extends EventEmitter {
                 si.system()
             ]);
 
-            // 构建设备指纹数据
+            console.log('系统信息获取完成:', {
+                hostname: os.hostname(),
+                platform: os.platform(),
+                networkCount: network.length,
+                diskCount: disk.length
+            });
+
+            // 构建设备指纹数据 - 与服务器端保持一致
             const deviceInfo = {
                 hostname: os.hostname(),
                 platform: os.platform(),
@@ -265,19 +326,38 @@ class AgentService extends EventEmitter {
                 }
             };
 
-            // 生成指纹哈希
+            console.log('设备信息构建完成:', {
+                hostname: deviceInfo.hostname,
+                platform: deviceInfo.platform,
+                macCount: deviceInfo.macAddresses.length,
+                diskCount: deviceInfo.diskInfo.length,
+                networkCount: deviceInfo.networkInterfaces.length
+            });
+
+            // 生成指纹哈希 - 与服务器端使用相同的算法
             const crypto = require('crypto');
             const dataString = JSON.stringify(deviceInfo, Object.keys(deviceInfo).sort());
             const hash = crypto.createHash('sha256');
             hash.update(dataString);
+            const fingerprint = hash.digest('hex');
             
-            return hash.digest('hex');
+            console.log('设备指纹生成成功:', {
+                hostname: deviceInfo.hostname,
+                platform: deviceInfo.platform,
+                fingerprint: fingerprint.substring(0, 16) + '...',
+                dataLength: dataString.length
+            });
+            
+            return fingerprint;
         } catch (error) {
+            console.error('生成设备指纹失败:', error);
             logger.error('生成设备指纹失败:', error);
             // 返回基于基本信息的简单指纹
             const basicInfo = `${os.hostname()}-${os.platform()}-${os.arch()}`;
             const crypto = require('crypto');
-            return crypto.createHash('sha256').update(basicInfo).digest('hex');
+            const fallbackFingerprint = crypto.createHash('sha256').update(basicInfo).digest('hex');
+            console.log('使用备用指纹:', { basicInfo, fingerprint: fallbackFingerprint.substring(0, 16) + '...' });
+            return fallbackFingerprint;
         }
     }
 
@@ -286,15 +366,70 @@ class AgentService extends EventEmitter {
         const si = require('systeminformation');
         
         try {
-            const [cpu, mem, osInfo, network] = await Promise.all([
+            console.log('获取系统信息...');
+            const [cpu, mem, osInfo, network, disk, system] = await Promise.all([
                 si.cpu(),
                 si.mem(),
                 si.osInfo(),
-                si.networkInterfaces()
+                si.networkInterfaces(),
+                si.diskLayout(),
+                si.system()
             ]);
 
-            // 安全地提取系统信息，避免循环引用
-            const safeSystemInfo = {
+            console.log('系统信息获取完成:', {
+                hostname: os.hostname(),
+                platform: os.platform(),
+                networkCount: network.length,
+                diskCount: disk.length
+            });
+
+            // 构建与设备指纹生成一致的系统信息结构
+            const systemInfo = {
+                // 基础系统信息
+                hostname: os.hostname(),
+                platform: os.platform(),
+                arch: os.arch(),
+                
+                // 硬件信息
+                macAddresses: network
+                    .filter(iface => iface && iface.mac && !iface.internal)
+                    .map(iface => iface.mac),
+                cpuInfo: {
+                    model: cpu.brand || '',
+                    cores: cpu.cores || 0,
+                    architecture: os.arch(),
+                    vendor: cpu.manufacturer || ''
+                },
+                memoryInfo: {
+                    total: mem.total || 0,
+                    type: 'Unknown'
+                },
+                diskInfo: disk
+                    .filter(d => d && d.serial)
+                    .map(d => ({
+                        serial: d.serial || '',
+                        model: d.model || '',
+                        size: d.size || 0
+                    })),
+                
+                // 网络信息
+                networkInterfaces: network
+                    .filter(iface => iface && iface.iface)
+                    .map(iface => ({
+                        name: iface.iface || '',
+                        mac: iface.mac || '',
+                        type: iface.type || ''
+                    })),
+                
+                // 系统标识
+                systemUuid: system.uuid || '',
+                biosInfo: {
+                    vendor: system.manufacturer || '',
+                    version: system.version || '',
+                    releaseDate: ''
+                },
+
+                // 兼容性字段（保持向后兼容）
                 cpu: {
                     manufacturer: cpu.manufacturer || '',
                     brand: cpu.brand || '',
@@ -313,12 +448,7 @@ class AgentService extends EventEmitter {
                     kernel: osInfo.kernel || '',
                     arch: osInfo.arch || ''
                 },
-                network: []
-            };
-
-            // 安全地处理网络接口信息
-            if (Array.isArray(network)) {
-                safeSystemInfo.network = network
+                network: network
                     .filter(iface => iface && !iface.internal)
                     .map(iface => ({
                         iface: iface.iface || '',
@@ -326,14 +456,33 @@ class AgentService extends EventEmitter {
                         mac: iface.mac || '',
                         ip4: iface.ip4 || '',
                         ip6: iface.ip6 || ''
-                    }));
-            }
+                    }))
+            };
 
-            return safeSystemInfo;
+            console.log('系统信息构建完成:', {
+                hostname: systemInfo.hostname,
+                platform: systemInfo.platform,
+                macCount: systemInfo.macAddresses.length,
+                diskCount: systemInfo.diskInfo.length,
+                networkCount: systemInfo.networkInterfaces.length
+            });
+
+            return systemInfo;
         } catch (error) {
+            console.error('获取系统信息失败:', error);
             logger.error('获取系统信息失败:', error);
             // 返回基本的系统信息
             return {
+                hostname: os.hostname(),
+                platform: os.platform(),
+                arch: os.arch(),
+                macAddresses: [],
+                cpuInfo: { model: '', cores: 0, architecture: os.arch(), vendor: '' },
+                memoryInfo: { total: 0, type: 'Unknown' },
+                diskInfo: [],
+                networkInterfaces: [],
+                systemUuid: '',
+                biosInfo: { vendor: '', version: '', releaseDate: '' },
                 cpu: { manufacturer: '', brand: '', cores: 0, physicalCores: 0, speed: 0 },
                 memory: { total: 0, available: 0 },
                 os: { platform: os.platform(), distro: '', release: '', kernel: '', arch: os.arch() },
@@ -607,7 +756,7 @@ class AgentService extends EventEmitter {
     }
 
     // 获取连接状态
-    isConnected() {
+    getConnectionStatus() {
         return this.isConnected;
     }
 

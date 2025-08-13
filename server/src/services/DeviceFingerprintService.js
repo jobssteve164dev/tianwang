@@ -10,6 +10,12 @@ class DeviceFingerprintService {
   // 生成设备指纹
   generateFingerprint(deviceInfo) {
     try {
+      console.log('开始生成设备指纹:', { 
+        hostname: deviceInfo.hostname, 
+        platform: deviceInfo.platform,
+        arch: deviceInfo.arch 
+      });
+
       const {
         hostname,
         platform,
@@ -23,7 +29,7 @@ class DeviceFingerprintService {
         biosInfo
       } = deviceInfo;
 
-      // 构建指纹数据
+      // 构建指纹数据 - 与代理端保持一致
       const fingerprintData = {
         // 基础系统信息
         hostname: hostname || '',
@@ -44,16 +50,28 @@ class DeviceFingerprintService {
         biosInfo: this.normalizeBiosInfo(biosInfo)
       };
 
-      // 生成指纹哈希
-      const fingerprint = this.hashFingerprintData(fingerprintData);
+      console.log('指纹数据构建完成:', {
+        hostname: fingerprintData.hostname,
+        platform: fingerprintData.platform,
+        macCount: fingerprintData.macAddresses.length,
+        diskCount: fingerprintData.diskInfo.length,
+        networkCount: fingerprintData.networkInterfaces.length
+      });
+
+      // 生成指纹哈希 - 使用与代理端相同的算法
+      const dataString = JSON.stringify(fingerprintData, Object.keys(fingerprintData).sort());
+      const hash = crypto.createHash('sha256');
+      hash.update(dataString);
+      const fingerprint = hash.digest('hex');
       
       // 缓存指纹
       this.cacheFingerprint(fingerprint, deviceInfo);
 
-      logger.debug('设备指纹生成成功:', { 
+      console.log('设备指纹生成成功:', { 
         hostname, 
         platform, 
-        fingerprint: fingerprint.substring(0, 16) + '...' 
+        fingerprint: fingerprint.substring(0, 16) + '...',
+        dataLength: dataString.length
       });
 
       return {
@@ -62,6 +80,7 @@ class DeviceFingerprintService {
         timestamp: Date.now()
       };
     } catch (error) {
+      console.error('生成设备指纹失败:', error);
       logger.error('生成设备指纹失败:', error);
       throw error;
     }
@@ -187,16 +206,28 @@ class DeviceFingerprintService {
   // 验证设备指纹
   verifyFingerprint(fingerprint, deviceInfo) {
     try {
+      console.log('开始验证设备指纹:', {
+        providedFingerprint: fingerprint.substring(0, 16) + '...',
+        hostname: deviceInfo.hostname,
+        platform: deviceInfo.platform
+      });
+
       // 生成当前设备指纹
       const currentFingerprint = this.generateFingerprint(deviceInfo);
+      
+      console.log('当前生成的指纹:', {
+        currentFingerprint: currentFingerprint.fingerprint.substring(0, 16) + '...',
+        expectedFingerprint: fingerprint.substring(0, 16) + '...'
+      });
       
       // 比较指纹
       const isValid = currentFingerprint.fingerprint === fingerprint;
       
-      logger.debug('设备指纹验证:', { 
+      console.log('设备指纹验证结果:', { 
         isValid, 
         expected: fingerprint.substring(0, 16) + '...',
-        actual: currentFingerprint.fingerprint.substring(0, 16) + '...'
+        actual: currentFingerprint.fingerprint.substring(0, 16) + '...',
+        match: isValid ? '完全匹配' : '不匹配'
       });
 
       return {
@@ -206,6 +237,7 @@ class DeviceFingerprintService {
         timestamp: Date.now()
       };
     } catch (error) {
+      console.error('验证设备指纹失败:', error);
       logger.error('验证设备指纹失败:', error);
       return {
         isValid: false,

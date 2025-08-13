@@ -14,6 +14,7 @@ const ThreatRule = require('./ThreatRule');
 const SecurityEvent = require('./SecurityEvent');
 const AlertPolicy = require('./AlertPolicy');
 const SystemConfig = require('./SystemConfig');
+const RegistrationCode = require('./RegistrationCode');
 
 // 延迟初始化模型
 let sequelize = null;
@@ -21,27 +22,38 @@ let models = null;
 
 function initializeModels() {
   if (!sequelize) {
-    sequelize = getSequelize();
+    try {
+      sequelize = getSequelize();
+    } catch (error) {
+      console.warn('⚠️ 数据库未初始化，模型暂时不可用:', error.message);
+      return { sequelize: null, models: null };
+    }
   }
   
   if (!models && sequelize) {
-    models = {
-      User: User(sequelize),
-      Organization: Organization(sequelize),
-      Device: Device(sequelize),
-      Agent: Agent(sequelize),
-      ThreatRule: ThreatRule(sequelize),
-      SecurityEvent: SecurityEvent(sequelize),
-      AlertPolicy: AlertPolicy(sequelize),
-      SystemConfig: SystemConfig(sequelize)
-    };
+    try {
+      models = {
+        User: User(sequelize),
+        Organization: Organization(sequelize),
+        Device: Device(sequelize),
+        Agent: Agent(sequelize),
+        ThreatRule: ThreatRule(sequelize),
+        SecurityEvent: SecurityEvent(sequelize),
+        AlertPolicy: AlertPolicy(sequelize),
+        SystemConfig: SystemConfig(sequelize),
+        RegistrationCode: RegistrationCode(sequelize)
+      };
 
-    // 设置模型关联关系
-    Object.keys(models).forEach(modelName => {
-      if (models[modelName].associate) {
-        models[modelName].associate(models);
-      }
-    });
+      // 设置模型关联关系
+      Object.keys(models).forEach(modelName => {
+        if (models[modelName].associate) {
+          models[modelName].associate(models);
+        }
+      });
+    } catch (error) {
+      console.error('❌ 模型初始化失败:', error.message);
+      return { sequelize, models: null };
+    }
   }
   
   return { sequelize, models };
@@ -85,5 +97,9 @@ module.exports = {
   get SystemConfig() { 
     const result = initializeModels();
     return result.models ? result.models.SystemConfig : null;
+  },
+  get RegistrationCode() { 
+    const result = initializeModels();
+    return result.models ? result.models.RegistrationCode : null;
   }
 }; 

@@ -64,7 +64,8 @@ function createMainWindow() {
 
     // 加载应用界面
     if (isDev) {
-        mainWindow.loadURL('http://localhost:3000');
+        // 在开发模式下，直接加载构建的HTML文件
+        mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
         mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
@@ -470,7 +471,7 @@ ipcMain.handle('get-monitoring-status', async () => {
         return {
             system: systemMonitor?.isRunning() || false,
             network: networkMonitor?.isRunning() || false,
-            connected: agentService?.isConnected ? agentService.isConnected() : false,
+            connected: agentService?.getConnectionStatus ? agentService.getConnectionStatus() : false,
             firewall: firewallService?.isEnabled || false
         };
     } catch (error) {

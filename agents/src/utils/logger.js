@@ -28,7 +28,20 @@ const consoleFormat = winston.format.combine(
     winston.format.printf(({ timestamp, level, message, ...meta }) => {
         let msg = `${timestamp} [${level}]: ${message}`;
         if (Object.keys(meta).length > 0) {
-            msg += '\n' + JSON.stringify(meta, null, 2);
+            try {
+                // 安全地序列化meta对象，避免循环引用
+                const safeMeta = JSON.parse(JSON.stringify(meta, (key, value) => {
+                    if (typeof value === 'object' && value !== null) {
+                        if (value.constructor && value.constructor.name !== 'Object' && value.constructor.name !== 'Array') {
+                            return `[${value.constructor.name}]`;
+                        }
+                    }
+                    return value;
+                }));
+                msg += '\n' + JSON.stringify(safeMeta, null, 2);
+            } catch (error) {
+                msg += '\n[无法序列化的对象]';
+            }
         }
         return msg;
     })
