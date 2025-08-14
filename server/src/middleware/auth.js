@@ -44,6 +44,55 @@ const authenticate = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, config.jwt.secret);
       
+      // 检查是否为代理token
+      if (decoded.type === 'agent') {
+        // 代理认证 - 验证代理是否存在且在线
+        if (!models.Agent) {
+          return res.status(503).json({
+            error: 'Database not available',
+            code: 'DB_UNAVAILABLE'
+          });
+        }
+        
+        const agent = await models.Agent.findOne({
+          where: { agent_id: decoded.agentId }
+        });
+        
+        if (!agent) {
+          return res.status(401).json({
+            error: 'Invalid agent token - agent not found',
+            code: 'AGENT_NOT_FOUND'
+          });
+        }
+        
+        if (agent.status !== 'online') {
+          return res.status(401).json({
+            error: 'Agent is not online',
+            code: 'AGENT_OFFLINE'
+          });
+        }
+        
+        // 为代理请求创建模拟用户（具有管理员权限）
+        req.user = {
+          id: 'agent-' + decoded.agentId,
+          username: 'agent',
+          email: 'agent@tianwang.com',
+          role: 'admin',
+          organization_id: agent.organization_id || '1',
+          status: 'active',
+          isLocked: () => false,
+          isAgent: true,
+          agentId: decoded.agentId
+        };
+        req.userId = 'agent-' + decoded.agentId;
+        req.organizationId = agent.organization_id || '1';
+        req.agentId = decoded.agentId;
+        
+        logger.debug('代理认证成功:', { agentId: decoded.agentId, hostname: decoded.hostname });
+        return next();
+      }
+      
+      // 用户认证逻辑
       // 检查模型是否可用
       if (!models.User) {
         return res.status(503).json({
