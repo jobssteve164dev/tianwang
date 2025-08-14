@@ -112,10 +112,87 @@ class FirewallService extends EventEmitter {
 
     // 解析现有规则
     parseExistingRules(output) {
-        // 这里可以根据不同平台的输出格式解析现有规则
-        // 简化实现，只记录规则数量
-        const lines = output.split('\n').filter(line => line.trim().length > 0);
-        logger.info(`发现 ${lines.length} 条现有防火墙规则`);
+        try {
+            const lines = output.split('\n').filter(line => line.trim().length > 0);
+            let tianwangRules = 0;
+            
+            // 解析不同平台的规则输出
+            switch (this.platform) {
+                case 'win32':
+                    // Windows防火墙规则格式
+                    lines.forEach(line => {
+                        if (line.includes('tianwang_block_') && line.includes('Block')) {
+                            tianwangRules++;
+                            // 提取IP地址和规则ID
+                            const ipMatch = line.match(/RemoteIP:\s*([^\s]+)/);
+                            const ruleMatch = line.match(/Rule Name:\s*([^\s]+)/);
+                            if (ipMatch && ruleMatch) {
+                                const ip = ipMatch[1];
+                                const ruleId = ruleMatch[1];
+                                this.blockedIPs.add(ip);
+                                this.rules.set(ruleId, {
+                                    ip,
+                                    reason: 'Existing rule',
+                                    platform: this.platform,
+                                    timestamp: Date.now(),
+                                    duration: this.config.blockDuration
+                                });
+                            }
+                        }
+                    });
+                    break;
+                    
+                case 'linux':
+                    // Linux iptables规则格式
+                    lines.forEach(line => {
+                        if (line.includes('tianwang_block_') && line.includes('DROP')) {
+                            tianwangRules++;
+                            // 提取IP地址
+                            const ipMatch = line.match(/--source\s+([^\s]+)/);
+                            if (ipMatch) {
+                                const ip = ipMatch[1];
+                                const ruleId = `existing_rule_${tianwangRules}`;
+                                this.blockedIPs.add(ip);
+                                this.rules.set(ruleId, {
+                                    ip,
+                                    reason: 'Existing rule',
+                                    platform: this.platform,
+                                    timestamp: Date.now(),
+                                    duration: this.config.blockDuration
+                                });
+                            }
+                        }
+                    });
+                    break;
+                    
+                case 'darwin':
+                    // macOS pfctl规则格式
+                    lines.forEach(line => {
+                        if (line.includes('block drop from') && line.includes('tianwang')) {
+                            tianwangRules++;
+                            // 提取IP地址
+                            const ipMatch = line.match(/from\s+([^\s]+)\s+to/);
+                            if (ipMatch) {
+                                const ip = ipMatch[1];
+                                const ruleId = `existing_rule_${tianwangRules}`;
+                                this.blockedIPs.add(ip);
+                                this.rules.set(ruleId, {
+                                    ip,
+                                    reason: 'Existing rule',
+                                    platform: this.platform,
+                                    timestamp: Date.now(),
+                                    duration: this.config.blockDuration
+                                });
+                            }
+                        }
+                    });
+                    break;
+            }
+            
+            logger.info(`加载了 ${tianwangRules} 条现有的TianWang防火墙规则`);
+        } catch (error) {
+            logger.error('解析现有防火墙规则失败:', error);
+        }
     }
 
     // 阻止IP地址
@@ -140,15 +217,6 @@ class FirewallService extends EventEmitter {
             const ruleId = await this.addBlockRule(ip, reason);
             
             if (ruleId) {
-                this.blockedIPs.add(ip);
-                this.rules.set(ruleId, {
-                    ip,
-                    reason,
-                    timestamp: Date.now(),
-                    duration: duration || this.config.blockDuration,
-                    ruleId
-                });
-
                 // 设置自动解除阻止
                 if (duration || this.config.blockDuration > 0) {
                     const timeout = duration || this.config.blockDuration;
@@ -187,8 +255,6 @@ class FirewallService extends EventEmitter {
             }
 
             if (ruleId && await this.removeBlockRule(ruleId, ip)) {
-                this.blockedIPs.delete(ip);
-                this.rules.delete(ruleId);
                 this.emit('ip-unblocked', { ip, reason, ruleId });
                 return true;
             }
@@ -221,7 +287,21 @@ class FirewallService extends EventEmitter {
 
         const result = await this.executeCommand(command);
         if (result.success) {
+            // 将规则存储到Map中，用于统计
+            this.rules.set(ruleId, {
+                ip,
+                reason,
+                platform: this.platform,
+                command,
+                timestamp: Date.now(),
+                duration: this.config.blockDuration
+            });
+            
+            // 添加到阻止IP集合
+            this.blockedIPs.add(ip);
+            
             logger.debug(`防火墙规则已添加: ${ruleId}`);
+            this.emit('rule-added', { ruleId, ip, reason });
             return ruleId;
         } else {
             throw new Error(`添加防火墙规则失败: ${result.error}`);
@@ -249,7 +329,14 @@ class FirewallService extends EventEmitter {
 
         const result = await this.executeCommand(command);
         if (result.success) {
+            // 从Map中移除规则
+            this.rules.delete(ruleId);
+            
+            // 从阻止IP集合中移除
+            this.blockedIPs.delete(ip);
+            
             logger.debug(`防火墙规则已移除: ${ruleId}`);
+            this.emit('rule-removed', { ruleId, ip });
             return true;
         } else {
             logger.error(`移除防火墙规则失败: ${result.error}`);

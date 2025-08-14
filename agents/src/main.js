@@ -615,6 +615,26 @@ ipcMain.handle('firewall-get-statistics', async () => {
     }
 });
 
+// 获取服务器规则统计
+ipcMain.handle('get-server-rule-statistics', async () => {
+    try {
+        logger.info('IPC: 开始获取服务器规则统计...');
+        
+        if (agentService) {
+            logger.info('IPC: 代理服务已初始化，调用getServerRuleStatistics...');
+            const result = await agentService.getServerRuleStatistics();
+            logger.info('IPC: 获取服务器规则统计结果:', result);
+            return result;
+        } else {
+            logger.error('IPC: 代理服务未初始化');
+            return { success: false, error: '代理服务未初始化' };
+        }
+    } catch (error) {
+        logger.error('IPC: 获取服务器规则统计失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('firewall-enable-auto-block', async () => {
     try {
         if (firewallService) {

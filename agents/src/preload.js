@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     firewallEnableAutoBlock: () => ipcRenderer.invoke('firewall-enable-auto-block'),
     firewallDisableAutoBlock: () => ipcRenderer.invoke('firewall-disable-auto-block'),
     
+    // 服务器规则统计
+    getServerRuleStatistics: () => ipcRenderer.invoke('get-server-rule-statistics'),
+    
     // 事件监听
     onSystemData: (callback) => {
         ipcRenderer.on('system-data', (event, data) => callback(data));

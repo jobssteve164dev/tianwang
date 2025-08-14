@@ -996,6 +996,87 @@ class AgentService extends EventEmitter {
             hasConnectionKey: !!this.connectionKey
         };
     }
+
+    // 获取服务器规则统计
+    async getServerRuleStatistics() {
+        try {
+            logger.info('开始获取服务器规则统计...');
+            logger.info('当前认证状态:', {
+                hasAuthToken: !!this.authToken,
+                authTokenLength: this.authToken?.length,
+                authTokenPreview: this.authToken ? this.authToken.substring(0, 20) + '...' : 'null',
+                agentId: this.agentId,
+                isConnected: this.isConnected
+            });
+            
+            if (!this.config.apiUrl) {
+                logger.error('API URL未配置');
+                throw new Error('API URL未配置');
+            }
+
+            // 如果没有认证token，尝试重新认证
+            if (!this.authToken) {
+                logger.warn('未找到认证token，尝试重新认证...');
+                try {
+                    await this.authenticateAgent();
+                    logger.info('重新认证成功，现在有认证token');
+                } catch (authError) {
+                    logger.error('重新认证失败:', authError);
+                    throw new Error('无法获取认证token');
+                }
+            }
+
+            logger.info('API URL:', this.config.apiUrl);
+            logger.info('认证Token:', this.authToken ? '已设置' : '未设置');
+
+            const url = `${this.config.apiUrl}/security/rules/statistics`;
+            logger.info('请求URL:', url);
+
+            const response = await axios.get(url, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                timeout: 10000
+            });
+
+            logger.info('服务器响应状态:', response.status);
+            logger.info('服务器响应数据:', JSON.stringify(response.data, null, 2));
+
+            if (response.data.success) {
+                logger.info('获取服务器规则统计成功:', response.data.data);
+                return {
+                    success: true,
+                    data: response.data.data
+                };
+            } else {
+                logger.error('服务器返回错误:', response.data.message);
+                throw new Error(response.data.message || '获取规则统计失败');
+            }
+        } catch (error) {
+            logger.error('获取服务器规则统计失败:', error);
+            logger.error('错误详情:', {
+                message: error.message,
+                code: error.code,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            return {
+                success: false,
+                error: error.message,
+                data: {
+                    total_rules: 0,
+                    rule_types: {
+                        sigma: 0,
+                        suricata: 0,
+                        yara: 0,
+                        snort: 0
+                    },
+                    matches_found: 0,
+                    false_positives: 0
+                }
+            };
+        }
+    }
 }
 
 module.exports = AgentService; 

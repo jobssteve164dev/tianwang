@@ -903,12 +903,15 @@ const htmlContent = `<!DOCTYPE html>
                 const status = await window.electronAPI.getMonitoringStatus();
                 updateMonitoringStatus(status);
                 
+                // 初始化防火墙统计
+                await updateFirewallStatistics();
+                
                 // 设置事件监听
                 setupEventListeners();
                 
-                addLog('系统初始化完成', 'success');
+                addLog('✅ 系统初始化完成', 'success');
             } catch (error) {
-                addLog('初始化失败: ' + error.message, 'error');
+                addLog('系统初始化失败: ' + error.message, 'error');
             }
         }
 
@@ -989,6 +992,17 @@ const htmlContent = `<!DOCTYPE html>
                 // 更新威胁计数器
                 const threatCount = document.getElementById('threat-count');
                 threatCount.textContent = parseInt(threatCount.textContent) + 1;
+            });
+
+            // IP阻止/解除阻止监听
+            window.electronAPI.onIPBlocked((ip) => {
+                addLog('IP ' + ip + ' 已被阻止', 'warning');
+                updateFirewallStatistics(); // 实时更新阻止IP数量
+            });
+
+            window.electronAPI.onIPUnblocked((ip) => {
+                addLog('IP ' + ip + ' 已解除阻止', 'info');
+                updateFirewallStatistics(); // 实时更新阻止IP数量
             });
         }
 
@@ -1442,6 +1456,15 @@ const htmlContent = `<!DOCTYPE html>
             }
         }, 10000);
 
+        // 定期更新防火墙统计
+        setInterval(async () => {
+            try {
+                await updateFirewallStatistics();
+            } catch (error) {
+                console.error('防火墙统计更新失败:', error);
+            }
+        }, 10000); // 每10秒更新一次
+
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initialize);
 
@@ -1690,6 +1713,55 @@ const htmlContent = `<!DOCTYPE html>
                 }
             } catch (error) {
                 addLog('导出事件失败: ' + error.message, 'error');
+            }
+        }
+
+        // 更新防火墙统计
+        async function updateFirewallStatistics() {
+            try {
+                console.log('前端: 开始更新防火墙统计...');
+                
+                // 获取服务器规则统计
+                console.log('前端: 调用getServerRuleStatistics...');
+                const result = await window.electronAPI.getServerRuleStatistics();
+                console.log('前端: 服务器规则统计结果:', result);
+                
+                if (result.success) {
+                    const stats = result.data;
+                    console.log('前端: 解析统计数据:', stats);
+                    console.log('前端: 总规则数:', stats.total_rules);
+                    
+                    document.getElementById('firewall-rules').textContent = stats.total_rules || 0;
+                    console.log('前端: 已更新防火墙规则显示为:', stats.total_rules || 0);
+                    
+                    // 阻止IP数量保持使用本地防火墙统计
+                    console.log('前端: 获取本地防火墙统计...');
+                    const localResult = await window.electronAPI.firewallGetStatistics();
+                    console.log('前端: 本地防火墙统计结果:', localResult);
+                    
+                    if (localResult.success) {
+                        document.getElementById('blocked-ips').textContent = localResult.data.blockedIPs || 0;
+                        console.log('前端: 已更新阻止IP显示为:', localResult.data.blockedIPs || 0);
+                    }
+                } else {
+                    console.error('前端: 获取服务器规则统计失败:', result.error);
+                    // 如果服务器获取失败，使用本地防火墙统计作为备选
+                    console.log('前端: 使用本地防火墙统计作为备选...');
+                    const localResult = await window.electronAPI.firewallGetStatistics();
+                    console.log('前端: 备选本地防火墙统计结果:', localResult);
+                    
+                    if (localResult.success) {
+                        document.getElementById('firewall-rules').textContent = localResult.data.totalRules || 0;
+                        document.getElementById('blocked-ips').textContent = localResult.data.blockedIPs || 0;
+                        console.log('前端: 备选方案已更新显示');
+                    }
+                }
+            } catch (error) {
+                console.error('前端: 获取防火墙统计失败:', error);
+                // 错误时显示0
+                document.getElementById('firewall-rules').textContent = '0';
+                document.getElementById('blocked-ips').textContent = '0';
+                console.log('前端: 错误时显示0');
             }
         }
     </script>
