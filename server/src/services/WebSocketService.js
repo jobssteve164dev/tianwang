@@ -41,15 +41,31 @@ class WebSocketService {
       const query = url.parse(info.req.url, true).query;
       const token = query.token;
       // 确保连接密钥正确解码
-      const connectionKey = query.connectionKey ? decodeURIComponent(query.connectionKey) : null;
+      const rawConnectionKey = query.connectionKey;
+      const connectionKey = rawConnectionKey ? decodeURIComponent(rawConnectionKey) : null;
 
       logger.debug('WebSocket验证开始:', {
         hasToken: !!token,
         hasConnectionKey: !!connectionKey,
         tokenLength: token?.length,
         connectionKeyLength: connectionKey?.length,
+        rawConnectionKeyLength: rawConnectionKey?.length,
         url: info.req.url
       });
+
+      // 增加URL解码调试信息
+      if (rawConnectionKey && connectionKey) {
+        logger.debug('URL解码调试:', {
+          rawConnectionKey: rawConnectionKey.substring(0, 50) + '...',
+          decodedConnectionKey: connectionKey.substring(0, 50) + '...',
+          rawLength: rawConnectionKey.length,
+          decodedLength: connectionKey.length,
+          hasPlusInRaw: rawConnectionKey.includes('+'),
+          hasPlusInDecoded: connectionKey.includes('+'),
+          hasSpaceInRaw: rawConnectionKey.includes(' '),
+          hasSpaceInDecoded: connectionKey.includes(' ')
+        });
+      }
 
       if (!token) {
         logger.warn('WebSocket连接缺少token');

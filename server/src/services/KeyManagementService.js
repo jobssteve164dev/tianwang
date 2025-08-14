@@ -404,13 +404,34 @@ class KeyManagementService {
 
       // 直接比较两个完整的连接密钥字符串
       const isValid = providedKey === expectedKey;
-      
-      logger.debug('连接密钥匹配结果:', { 
+
+      // 增加详细的调试信息
+      logger.debug('连接密钥详细比较:', {
+        isValid,
+        providedKeyFull: providedKey,
+        expectedKeyFull: expectedKey,
+        providedKeyLength: providedKey.length,
+        expectedKeyLength: expectedKey.length,
+        // 逐字符比较前50个字符
+        first50CharsMatch: providedKey.substring(0, 50) === expectedKey.substring(0, 50),
+        first50Provided: providedKey.substring(0, 50),
+        first50Expected: expectedKey.substring(0, 50),
+        // 检查是否有不可见字符
+        providedKeyHasSpaces: providedKey.includes(' '),
+        expectedKeyHasSpaces: expectedKey.includes(' '),
+        providedKeyHasPlus: providedKey.includes('+'),
+        expectedKeyHasPlus: expectedKey.includes('+'),
+        // 检查编码问题
+        providedKeyEncoded: encodeURIComponent(providedKey),
+        expectedKeyEncoded: encodeURIComponent(expectedKey)
+      });
+
+      logger.debug('连接密钥匹配结果:', {
         isValid,
         providedKey: providedKey.substring(0, 16) + '...',
         expectedKey: expectedKey.substring(0, 16) + '...'
       });
-      
+
       return { isValid, error: isValid ? null : '连接密钥不匹配' };
     } catch (error) {
       logger.error('验证连接密钥匹配失败:', error);
