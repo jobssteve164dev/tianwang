@@ -19,6 +19,7 @@ import {
 import { notificationApi } from '../../services/api';
 import AIModelConfig from '../../components/settings/AIModelConfig';
 import AIUsageStats from '../../components/settings/AIUsageStats';
+import ThreatIntelligenceConfig from '../../components/settings/ThreatIntelligenceConfig';
 
 const { Title, Paragraph } = Typography;
 
@@ -365,6 +366,24 @@ const SettingsPage: React.FC = () => {
           }
         >
           <AIUsageStats refreshTrigger={refreshTrigger} />
+        </Card>
+      )
+    },
+    {
+      key: 'threat-intelligence',
+      label: '威胁情报配置',
+      children: (
+        <Card
+          title={
+            <Space>
+              <SettingOutlined />
+              威胁情报配置
+            </Space>
+          }
+        >
+          <ThreatIntelligenceConfig 
+            onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
+          />
         </Card>
       )
     }

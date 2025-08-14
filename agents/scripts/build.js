@@ -260,27 +260,36 @@ const htmlContent = `<!DOCTYPE html>
             flex: 1;
             padding: 16px 20px;
             overflow-y: auto;
+            overflow-x: hidden;
             font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 11px;
             line-height: 1.5;
             background: #000000;
+            scrollbar-width: thin;
+            scrollbar-color: #444444 #0a0a0a;
         }
 
         .logs-container::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
 
         .logs-container::-webkit-scrollbar-track {
-            background: #111111;
+            background: #0a0a0a;
+            border-radius: 4px;
         }
 
         .logs-container::-webkit-scrollbar-thumb {
-            background: #333333;
-            border-radius: 3px;
+            background: #444444;
+            border-radius: 4px;
+            border: 1px solid #222222;
         }
 
         .logs-container::-webkit-scrollbar-thumb:hover {
-            background: #555555;
+            background: #666666;
+        }
+
+        .logs-container::-webkit-scrollbar-corner {
+            background: #0a0a0a;
         }
 
         /* 标签页样式 */
@@ -317,10 +326,17 @@ const htmlContent = `<!DOCTYPE html>
             display: none;
             flex: 1;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .tab-content.active {
             display: flex;
+        }
+
+        /* 事件列表标签页特殊样式 */
+        #events-tab {
+            height: calc(100vh - 200px);
+            overflow: hidden;
         }
 
         /* 事件列表样式 */
@@ -333,6 +349,8 @@ const htmlContent = `<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-height: 400px;
+            max-height: 600px;
         }
 
         .events-header {
@@ -378,24 +396,33 @@ const htmlContent = `<!DOCTYPE html>
         .events-list {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 0;
+            scrollbar-width: thin;
+            scrollbar-color: #444444 #0a0a0a;
         }
 
         .events-list::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
 
         .events-list::-webkit-scrollbar-track {
-            background: #111111;
+            background: #0a0a0a;
+            border-radius: 4px;
         }
 
         .events-list::-webkit-scrollbar-thumb {
-            background: #333333;
-            border-radius: 3px;
+            background: #444444;
+            border-radius: 4px;
+            border: 1px solid #222222;
         }
 
         .events-list::-webkit-scrollbar-thumb:hover {
-            background: #555555;
+            background: #666666;
+        }
+
+        .events-list::-webkit-scrollbar-corner {
+            background: #0a0a0a;
         }
 
         .event-item {
@@ -1078,18 +1105,22 @@ const htmlContent = `<!DOCTYPE html>
             const style = document.createElement('style');
             style.textContent = 
                 '.settings-dialog::-webkit-scrollbar {' +
-                '    width: 6px;' +
+                '    width: 8px;' +
                 '}' +
                 '.settings-dialog::-webkit-scrollbar-track {' +
-                '    background: #111111;' +
-                '    border-radius: 3px;' +
+                '    background: #0a0a0a;' +
+                '    border-radius: 4px;' +
                 '}' +
                 '.settings-dialog::-webkit-scrollbar-thumb {' +
-                '    background: #333333;' +
-                '    border-radius: 3px;' +
+                '    background: #444444;' +
+                '    border-radius: 4px;' +
+                '    border: 1px solid #222222;' +
                 '}' +
                 '.settings-dialog::-webkit-scrollbar-thumb:hover {' +
-                '    background: #444444;' +
+                '    background: #666666;' +
+                '}' +
+                '.settings-dialog::-webkit-scrollbar-corner {' +
+                '    background: #0a0a0a;' +
                 '}';
             document.head.appendChild(style);
             settingsContent.classList.add('settings-dialog');

@@ -468,6 +468,19 @@ export const aiModelApi = {
     }),
 };
 
+// 威胁情报配置管理API
+export const threatIntelligenceApi = {
+  getConfig: () => request('/threat-intelligence/config'),
+  updateConfig: (data: any) => request('/threat-intelligence/config', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  testConnection: (source: 'misp' | 'otx') => request(`/threat-intelligence/test/${source}`, {
+    method: 'POST',
+  }),
+  getStatus: () => request('/threat-intelligence/status'),
+};
+
 // 默认导出所有API
 export default {
   auth: authAPI,
@@ -480,4 +493,5 @@ export default {
   securityRules: securityRulesApi,
   notification: notificationApi,
   aiModel: aiModelApi,
+  threatIntelligence: threatIntelligenceApi,
 }; 
