@@ -18,7 +18,15 @@ class WebSocketService {
     this.wss = new WebSocket.Server({
       server,
       path: '/ws',
-      verifyClient: this.verifyClient.bind(this)
+      verifyClient: async (info, callback) => {
+        try {
+          const isValid = await this.verifyClient(info);
+          callback(isValid);
+        } catch (error) {
+          logger.error('WebSocket验证过程中发生错误:', error);
+          callback(false);
+        }
+      }
     });
 
     this.wss.on('connection', this.handleConnection.bind(this));

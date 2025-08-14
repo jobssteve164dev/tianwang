@@ -796,7 +796,7 @@ class AgentService extends EventEmitter {
     sendHeartbeat() {
         return this.sendMessage({
             type: 'heartbeat',
-            status: 'active',
+            status: 'online',
             timestamp: Date.now(),
             agentId: this.agentId // 确保心跳消息也包含agentId
         });
