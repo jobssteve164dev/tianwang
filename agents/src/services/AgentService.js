@@ -770,6 +770,20 @@ class AgentService extends EventEmitter {
     sendMessage(message) {
         if (!this.isConnected || !this.ws) {
             logger.warn('连接未建立，消息将被缓存');
+            
+            // 记录连接失败事件
+            if (global.eventService) {
+                global.eventService.recordEvent({
+                    type: 'message_failed',
+                    level: 'warning',
+                    title: '消息发送失败',
+                    description: '连接未建立，消息将被缓存',
+                    data: { messageType: message.type },
+                    status: 'pending',
+                    tags: ['websocket', 'connection', 'cached']
+                });
+            }
+            
             this.bufferData(message);
             return false;
         }
@@ -781,9 +795,37 @@ class AgentService extends EventEmitter {
                 timestamp: Date.now()
             });
             this.ws.send(data);
+            
+            // 记录发送成功事件（排除心跳消息）
+            if (global.eventService && message.type !== 'heartbeat') {
+                global.eventService.recordEvent({
+                    type: 'message_sent',
+                    level: 'success',
+                    title: '消息发送成功',
+                    description: `成功发送${message.type}类型消息`,
+                    data: { messageType: message.type, messageSize: data.length },
+                    status: 'sent',
+                    tags: ['websocket', 'message', 'success']
+                });
+            }
+            
             return true;
         } catch (error) {
             logger.error('发送消息失败:', error);
+            
+            // 记录发送失败事件
+            if (global.eventService) {
+                global.eventService.recordEvent({
+                    type: 'message_failed',
+                    level: 'error',
+                    title: '消息发送失败',
+                    description: `发送${message.type}消息时发生错误: ${error.message}`,
+                    data: { messageType: message.type, error: error.message },
+                    status: 'failed',
+                    tags: ['websocket', 'error', 'send_failed']
+                });
+            }
+            
             this.bufferData(message);
             return false;
         }
@@ -791,12 +833,27 @@ class AgentService extends EventEmitter {
 
     // 发送数据到服务器
     sendData(type, data) {
-        return this.sendMessage({
+        const message = {
             type: 'data',
             dataType: type,
             data: data,
             agentId: this.agentId // 确保数据消息也包含agentId
-        });
+        };
+        
+        // 记录事件（如果事件服务可用）
+        if (global.eventService) {
+            global.eventService.recordEvent({
+                type: 'data_sent',
+                level: 'info',
+                title: `发送${type}数据`,
+                description: `向服务器发送${type}类型数据`,
+                data: { type, dataSize: JSON.stringify(data).length },
+                status: 'pending',
+                tags: ['data', type, 'outbound']
+            });
+        }
+        
+        return this.sendMessage(message);
     }
 
     // 发送心跳

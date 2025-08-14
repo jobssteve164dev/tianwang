@@ -9,6 +9,7 @@ const SystemMonitor = require('./services/SystemMonitor');
 const NetworkMonitor = require('./services/NetworkMonitor');
 const SecurityService = require('./services/SecurityService');
 const FirewallService = require('./services/FirewallService');
+const EventService = require('./services/EventService');
 
 // 配置存储
 const store = new Store();
@@ -21,6 +22,7 @@ let systemMonitor = null;
 let networkMonitor = null;
 let securityService = null;
 let firewallService = null;
+let eventService = null;
 let settingsWindow = null; // 新增：设置窗口
 
 // 应用程序是否已准备就绪
@@ -56,7 +58,9 @@ function createMainWindow() {
             enableRemoteModule: false,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, '../assets/icon.png'),
+        icon: process.platform === 'darwin' 
+            ? path.join(__dirname, '../assets/icon.icns') 
+            : path.join(__dirname, '../assets/icon.png'),
         show: false,
         titleBarStyle: 'hiddenInset',
         frame: true
@@ -218,8 +222,24 @@ function createTray() {
         console.log('=== 开始创建菜单栏图标 ===');
         logger.info('=== 开始创建菜单栏图标 ===');
         
-        // 创建简单的图标
-        const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAbwAAAG8B8aLcQwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3Njape.org5vuPBoAAAB9SURBVDiNY2AYBYMRMDIyMjAyMjL8//+f4f///wwsDAwMDP///2f4//8/AwMDA8P///8ZGBgYGP7//8/AwMDA8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+///P8P//f4b///8z/P//n+H///8M////Z/j//z8DAwMDw////xn+//8/AAAb8QABn5Qj5QAAAABJRU5ErkJggg==');
+        // 根据操作系统选择合适的图标
+        let iconPath;
+        if (process.platform === 'darwin') {
+            // macOS 使用专用的菜单栏图标以获得最佳显示效果
+            iconPath = path.join(__dirname, '../assets/macos-tray-icon.png');
+        } else {
+            // 其他平台使用标准图标
+            iconPath = path.join(__dirname, '../assets/tray-icon.png');
+        }
+        
+        // 创建图标
+        const icon = nativeImage.createFromPath(iconPath);
+        
+        // 确保图标大小适合托盘显示
+        if (process.platform === 'darwin') {
+            // macOS 托盘图标推荐大小为 16x16 或 32x32
+            icon.setTemplateImage(false); // 确保图标不会被系统模板化
+        }
         
         console.log('图标创建成功');
         logger.info('图标创建成功');
@@ -387,6 +407,25 @@ async function initializeServices() {
             autoBlock: false, // 默认关闭自动阻止
             blockDuration: 3600000, // 1小时
             whitelistIPs: ['127.0.0.1', '::1', '192.168.1.1', '10.0.0.1']
+        });
+
+        // 初始化事件服务
+        eventService = new EventService();
+        
+        // 设置全局事件服务，供其他服务使用
+        global.eventService = eventService;
+        
+        // 监听事件服务的事件
+        eventService.on('event-recorded', (event) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('event-recorded', event);
+            }
+        });
+        
+        eventService.on('event-updated', (event) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('event-updated', event);
+            }
         });
 
         // 监听防火墙事件
@@ -749,6 +788,102 @@ ipcMain.handle('get-connection-info', async () => {
             hasDeviceFingerprint: false,
             hasConnectionKey: false
         };
+    }
+});
+
+// 事件管理相关IPC处理
+ipcMain.handle('get-events', async (event, filters = {}) => {
+    try {
+        if (eventService) {
+            return { success: true, data: eventService.getEvents(filters) };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('获取事件列表失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('get-event-stats', async () => {
+    try {
+        if (eventService) {
+            return { success: true, data: eventService.getEventStats() };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('获取事件统计失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('update-event-status', async (event, eventId, status, feedback) => {
+    try {
+        if (eventService) {
+            const result = eventService.updateEventStatus(eventId, status, feedback);
+            return { success: !!result, data: result };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('更新事件状态失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('mark-event-feedback', async (event, eventId, feedback) => {
+    try {
+        if (eventService) {
+            const result = eventService.markEventFeedback(eventId, feedback);
+            return { success: !!result, data: result };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('标记事件反馈失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('clear-old-events', async (event, days = 30) => {
+    try {
+        if (eventService) {
+            const removedCount = eventService.clearOldEvents(days);
+            return { success: true, data: { removedCount } };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('清除旧事件失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('export-events', async (event, format = 'json') => {
+    try {
+        if (eventService) {
+            const data = eventService.exportEvents(format);
+            return { success: true, data };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('导出事件失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('get-event-filters', async () => {
+    try {
+        if (eventService) {
+            return {
+                success: true,
+                data: {
+                    types: eventService.getEventTypes(),
+                    levels: eventService.getEventLevels(),
+                    statuses: eventService.getEventStatuses()
+                }
+            };
+        }
+        return { success: false, error: '事件服务未初始化' };
+    } catch (error) {
+        logger.error('获取事件过滤器失败:', error);
+        return { success: false, error: error.message };
     }
 });
 

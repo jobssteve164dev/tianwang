@@ -62,6 +62,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getRegistrationCode: () => ipcRenderer.invoke('get-registration-code'),
     getConnectionInfo: () => ipcRenderer.invoke('get-connection-info'),
     
+    // 事件管理
+    getEvents: (filters) => ipcRenderer.invoke('get-events', filters),
+    getEventStats: () => ipcRenderer.invoke('get-event-stats'),
+    updateEventStatus: (eventId, status, feedback) => ipcRenderer.invoke('update-event-status', eventId, status, feedback),
+    markEventFeedback: (eventId, feedback) => ipcRenderer.invoke('mark-event-feedback', eventId, feedback),
+    clearOldEvents: (days) => ipcRenderer.invoke('clear-old-events', days),
+    exportEvents: (format) => ipcRenderer.invoke('export-events', format),
+    getEventFilters: () => ipcRenderer.invoke('get-event-filters'),
+    
+    // 事件监听
+    onEventRecorded: (callback) => {
+        ipcRenderer.on('event-recorded', (event, data) => callback(data));
+    },
+    onEventUpdated: (callback) => {
+        ipcRenderer.on('event-updated', (event, data) => callback(data));
+    },
+    
     // 移除监听器
     removeAllListeners: (channel) => {
         ipcRenderer.removeAllListeners(channel);
