@@ -283,6 +283,277 @@ const htmlContent = `<!DOCTYPE html>
             background: #555555;
         }
 
+        /* 标签页样式 */
+        .tab-container {
+            display: flex;
+            background: #0a0a0a;
+            border-bottom: 1px solid #333333;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #888888;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button:hover {
+            color: #ffffff;
+            background: #1a1a1a;
+        }
+
+        .tab-button.active {
+            color: #00ff88;
+            border-bottom-color: #00ff88;
+            background: #0a0a0a;
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* 事件列表样式 */
+        .events-container {
+            flex: 1;
+            margin: 0 30px 20px;
+            background: #111111;
+            border-radius: 8px;
+            border: 1px solid #333333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .events-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid #333333;
+            background: #0a0a0a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .events-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .events-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-select {
+            padding: 4px 8px;
+            background: #222222;
+            border: 1px solid #333333;
+            color: #ffffff;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .search-input {
+            padding: 4px 8px;
+            background: #222222;
+            border: 1px solid #333333;
+            color: #ffffff;
+            border-radius: 4px;
+            font-size: 11px;
+            width: 120px;
+        }
+
+        .events-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .events-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .events-list::-webkit-scrollbar-track {
+            background: #111111;
+        }
+
+        .events-list::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 3px;
+        }
+
+        .events-list::-webkit-scrollbar-thumb:hover {
+            background: #555555;
+        }
+
+        .event-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #222222;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .event-item:hover {
+            background: #1a1a1a;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .event-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #ffffff;
+            flex: 1;
+        }
+
+        .event-timestamp {
+            font-size: 11px;
+            color: #666666;
+            margin-left: 12px;
+        }
+
+        .event-meta {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .event-type {
+            padding: 2px 6px;
+            background: #333333;
+            color: #ffffff;
+            border-radius: 3px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .event-level {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .event-level.error { background: #3a1a1a; color: #ff4444; }
+        .event-level.warning { background: #3a3a1a; color: #ffaa00; }
+        .event-level.info { background: #1a1a3a; color: #4444ff; }
+        .event-level.success { background: #1a3a1a; color: #00ff88; }
+
+        .event-status {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .event-status.pending { background: #3a3a1a; color: #ffaa00; }
+        .event-status.sent { background: #1a3a1a; color: #00ff88; }
+        .event-status.failed { background: #3a1a1a; color: #ff4444; }
+        .event-status.acknowledged { background: #1a1a3a; color: #4444ff; }
+
+        .event-description {
+            font-size: 12px;
+            color: #cccccc;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .event-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .event-tag {
+            padding: 1px 4px;
+            background: #222222;
+            color: #888888;
+            border-radius: 2px;
+            font-size: 9px;
+        }
+
+        .event-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .event-action-btn {
+            padding: 4px 8px;
+            background: #222222;
+            border: 1px solid #333333;
+            color: #ffffff;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .event-action-btn:hover {
+            background: #333333;
+            border-color: #444444;
+        }
+
+        .event-feedback {
+            margin-top: 8px;
+            padding: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #cccccc;
+        }
+
+        .event-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: #333333;
+            margin: 0 30px 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .event-stat-card {
+            background: #111111;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .event-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+
+        .event-stat-label {
+            font-size: 10px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .log-entry {
             margin-bottom: 6px;
             padding: 2px 0;
@@ -484,31 +755,39 @@ const htmlContent = `<!DOCTYPE html>
                 <p>AI驱动的实时威胁检测与防护系统</p>
             </div>
             
-            <div class="status-grid">
-                <div class="status-card">
-                    <h3><span class="status-indicator status-offline" id="connection-status"></span>连接状态</h3>
-                    <div class="status-value" id="connection-text">离线</div>
-                    <div class="status-detail">与服务器连接状态</div>
-                </div>
-                
-                <div class="status-card">
-                    <h3><span class="status-indicator status-offline" id="monitor-status"></span>监控状态</h3>
-                    <div class="status-value" id="monitor-text">已停止</div>
-                    <div class="status-detail">系统监控运行状态</div>
-                </div>
-                
-                <div class="status-card">
-                    <h3><span class="status-indicator status-online" id="system-status"></span>系统状态</h3>
-                    <div class="status-value">正常</div>
-                    <div class="status-detail">系统运行状态</div>
-                </div>
-                
-                <div class="status-card">
-                    <h3>🔒 安全状态</h3>
-                    <div class="status-value" id="security-status">安全</div>
-                    <div class="status-detail">威胁检测状态</div>
-                </div>
+            <!-- 标签页导航 -->
+            <div class="tab-container">
+                <button class="tab-button active" onclick="switchTab('dashboard')">监控面板</button>
+                <button class="tab-button" onclick="switchTab('events')">事件列表</button>
             </div>
+            
+            <!-- 监控面板标签页 -->
+            <div id="dashboard-tab" class="tab-content active">
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3><span class="status-indicator status-offline" id="connection-status"></span>连接状态</h3>
+                        <div class="status-value" id="connection-text">离线</div>
+                        <div class="status-detail">与服务器连接状态</div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3><span class="status-indicator status-offline" id="monitor-status"></span>监控状态</h3>
+                        <div class="status-value" id="monitor-text">已停止</div>
+                        <div class="status-detail">系统监控运行状态</div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3><span class="status-indicator status-online" id="system-status"></span>系统状态</h3>
+                        <div class="status-value">正常</div>
+                        <div class="status-detail">系统运行状态</div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3>🔒 安全状态</h3>
+                        <div class="status-value" id="security-status">安全</div>
+                        <div class="status-detail">威胁检测状态</div>
+                    </div>
+                </div>
             
             <div class="metric-grid">
                 <div class="metric-card">
@@ -547,6 +826,61 @@ const htmlContent = `<!DOCTYPE html>
             
             <div class="footer">
                 <p>TianWang AI Security Monitoring System v1.0.0</p>
+            </div>
+        </div>
+        
+        <!-- 事件列表标签页 -->
+        <div id="events-tab" class="tab-content">
+            <!-- 事件统计 -->
+            <div class="event-stats">
+                <div class="event-stat-card">
+                    <div class="event-stat-value" id="total-events">0</div>
+                    <div class="event-stat-label">总事件数</div>
+                </div>
+                <div class="event-stat-card">
+                    <div class="event-stat-value" id="today-events">0</div>
+                    <div class="event-stat-label">今日事件</div>
+                </div>
+                <div class="event-stat-card">
+                    <div class="event-stat-value" id="error-events">0</div>
+                    <div class="event-stat-label">错误事件</div>
+                </div>
+                <div class="event-stat-card">
+                    <div class="event-stat-value" id="pending-events">0</div>
+                    <div class="event-stat-label">待处理</div>
+                </div>
+            </div>
+            
+            <!-- 事件列表 -->
+            <div class="events-container">
+                <div class="events-header">
+                    <span class="events-title">事件列表</span>
+                    <div class="events-controls">
+                        <select class="filter-select" id="type-filter" onchange="filterEvents()">
+                            <option value="all">所有类型</option>
+                        </select>
+                        <select class="filter-select" id="level-filter" onchange="filterEvents()">
+                            <option value="all">所有级别</option>
+                            <option value="error">错误</option>
+                            <option value="warning">警告</option>
+                            <option value="info">信息</option>
+                            <option value="success">成功</option>
+                        </select>
+                        <select class="filter-select" id="status-filter" onchange="filterEvents()">
+                            <option value="all">所有状态</option>
+                            <option value="pending">待处理</option>
+                            <option value="sent">已发送</option>
+                            <option value="failed">失败</option>
+                            <option value="acknowledged">已确认</option>
+                        </select>
+                        <input type="text" class="search-input" id="search-input" placeholder="搜索事件..." onkeyup="filterEvents()">
+                        <button class="event-action-btn" onclick="clearOldEvents()">清理旧事件</button>
+                        <button class="event-action-btn" onclick="exportEvents()">导出</button>
+                    </div>
+                </div>
+                <div class="events-list" id="events-list">
+                    <!-- 事件列表将通过JavaScript动态生成 -->
+                </div>
             </div>
         </div>
     </div>
@@ -636,6 +970,17 @@ const htmlContent = `<!DOCTYPE html>
             // 网络数据监听
             window.electronAPI.onNetworkData((data) => {
                 addLog('收到网络数据: ' + (data.interfaces?.length || 0) + ' 个接口', 'info');
+            });
+            
+            // 事件监听
+            window.electronAPI.onEventRecorded((event) => {
+                addEventToList(event);
+                updateEventStats();
+            });
+            
+            window.electronAPI.onEventUpdated((event) => {
+                updateEventInList(event);
+                updateEventStats();
             });
             
             // 安全威胁监听
@@ -1088,8 +1433,265 @@ const htmlContent = `<!DOCTYPE html>
             }
         }, 5000);
 
+        // 定期更新事件统计
+        setInterval(async () => {
+            try {
+                updateEventStats();
+            } catch (error) {
+                console.error('事件统计更新失败:', error);
+            }
+        }, 10000);
+
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initialize);
+
+        // ===== 事件列表相关函数 =====
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 移除所有标签页按钮的active状态
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 显示选中的标签页
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // 激活对应的按钮
+            event.target.classList.add('active');
+            
+            // 如果切换到事件列表，加载事件数据
+            if (tabName === 'events') {
+                loadEvents();
+                updateEventStats();
+            }
+        }
+
+        // 加载事件列表
+        async function loadEvents() {
+            try {
+                const filters = getEventFilters();
+                const result = await window.electronAPI.getEvents(filters);
+                
+                if (result.success) {
+                    renderEvents(result.data);
+                    updateEventTypeFilters();
+                } else {
+                    addLog('加载事件列表失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                addLog('加载事件列表失败: ' + error.message, 'error');
+            }
+        }
+
+        // 获取事件过滤器
+        function getEventFilters() {
+            return {
+                type: document.getElementById('type-filter').value,
+                level: document.getElementById('level-filter').value,
+                status: document.getElementById('status-filter').value,
+                search: document.getElementById('search-input').value,
+                sortBy: 'timestamp-desc'
+            };
+        }
+
+        // 渲染事件列表
+        function renderEvents(events) {
+            const eventsList = document.getElementById('events-list');
+            eventsList.innerHTML = '';
+            
+            if (events.length === 0) {
+                eventsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666666;">暂无事件</div>';
+                return;
+            }
+            
+            events.forEach(event => {
+                const eventElement = createEventElement(event);
+                eventsList.appendChild(eventElement);
+            });
+        }
+
+        // 创建事件元素
+        function createEventElement(event) {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event-item';
+            eventDiv.id = 'event-' + event.id;
+            
+            const timestamp = new Date(event.timestamp).toLocaleString('zh-CN');
+            
+            eventDiv.innerHTML = \`
+                <div class="event-header">
+                    <div class="event-title">\${event.title}</div>
+                    <div class="event-timestamp">\${timestamp}</div>
+                </div>
+                <div class="event-meta">
+                    <span class="event-type">\${event.type}</span>
+                    <span class="event-level \${event.level}">\${event.level}</span>
+                    <span class="event-status \${event.status}">\${getStatusText(event.status)}</span>
+                </div>
+                <div class="event-description">\${event.description}</div>
+                <div class="event-tags">
+                    \${event.tags.map(tag => \`<span class="event-tag">\${tag}</span>\`).join('')}
+                </div>
+                <div class="event-actions">
+                    <button class="event-action-btn" onclick="markEventFeedback('\${event.id}', '已处理')">标记已处理</button>
+                    <button class="event-action-btn" onclick="markEventFeedback('\${event.id}', '忽略')">标记忽略</button>
+                    <button class="event-action-btn" onclick="showEventDetails('\${event.id}')">查看详情</button>
+                </div>
+                \${event.feedback ? \`<div class="event-feedback">反馈: \${event.feedback}</div>\` : ''}
+            \`;
+            
+            return eventDiv;
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': '待处理',
+                'sent': '已发送',
+                'failed': '失败',
+                'acknowledged': '已确认'
+            };
+            return statusMap[status] || status;
+        }
+
+        // 添加事件到列表
+        function addEventToList(event) {
+            const eventsList = document.getElementById('events-list');
+            const eventElement = createEventElement(event);
+            
+            // 插入到列表开头
+            if (eventsList.firstChild) {
+                eventsList.insertBefore(eventElement, eventsList.firstChild);
+            } else {
+                eventsList.appendChild(eventElement);
+            }
+        }
+
+        // 更新列表中的事件
+        function updateEventInList(event) {
+            const eventElement = document.getElementById('event-' + event.id);
+            if (eventElement) {
+                const newElement = createEventElement(event);
+                eventElement.parentNode.replaceChild(newElement, eventElement);
+            }
+        }
+
+        // 更新事件统计
+        async function updateEventStats() {
+            try {
+                const result = await window.electronAPI.getEventStats();
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('total-events').textContent = stats.total;
+                    document.getElementById('today-events').textContent = stats.byDate.today;
+                    document.getElementById('error-events').textContent = stats.byLevel.error || 0;
+                    document.getElementById('pending-events').textContent = stats.byStatus.pending || 0;
+                }
+            } catch (error) {
+                console.error('更新事件统计失败:', error);
+            }
+        }
+
+        // 更新事件类型过滤器
+        async function updateEventTypeFilters() {
+            try {
+                const result = await window.electronAPI.getEventFilters();
+                if (result.success) {
+                    const typeFilter = document.getElementById('type-filter');
+                    const currentValue = typeFilter.value;
+                    
+                    // 清空现有选项（保留"所有类型"）
+                    typeFilter.innerHTML = '<option value="all">所有类型</option>';
+                    
+                    // 添加事件类型选项
+                    result.data.types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        typeFilter.appendChild(option);
+                    });
+                    
+                    // 恢复之前的选择
+                    typeFilter.value = currentValue;
+                }
+            } catch (error) {
+                console.error('更新事件类型过滤器失败:', error);
+            }
+        }
+
+        // 过滤事件
+        function filterEvents() {
+            loadEvents();
+        }
+
+        // 标记事件反馈
+        async function markEventFeedback(eventId, feedback) {
+            try {
+                const result = await window.electronAPI.markEventFeedback(eventId, feedback);
+                if (result.success) {
+                    addLog(\`事件反馈已标记: \${feedback}\`, 'success');
+                } else {
+                    addLog('标记事件反馈失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                addLog('标记事件反馈失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示事件详情
+        function showEventDetails(eventId) {
+            // TODO: 实现事件详情弹窗
+            addLog('事件详情功能开发中...', 'info');
+        }
+
+        // 清理旧事件
+        async function clearOldEvents() {
+            if (confirm('确定要清理30天前的旧事件吗？')) {
+                try {
+                    const result = await window.electronAPI.clearOldEvents(30);
+                    if (result.success) {
+                        addLog(\`已清理 \${result.data.removedCount} 条旧事件\`, 'success');
+                        loadEvents();
+                        updateEventStats();
+                    } else {
+                        addLog('清理旧事件失败: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    addLog('清理旧事件失败: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // 导出事件
+        async function exportEvents() {
+            try {
+                const result = await window.electronAPI.exportEvents('json');
+                if (result.success) {
+                    // 创建下载链接
+                    const blob = new Blob([result.data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = \`events_\${new Date().toISOString().split('T')[0]}.json\`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    addLog('事件数据已导出', 'success');
+                } else {
+                    addLog('导出事件失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                addLog('导出事件失败: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
 </html>`;
