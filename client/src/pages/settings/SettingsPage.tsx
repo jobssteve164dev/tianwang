@@ -20,6 +20,7 @@ import { notificationApi } from '../../services/api';
 import AIModelConfig from '../../components/settings/AIModelConfig';
 import AIUsageStats from '../../components/settings/AIUsageStats';
 import ThreatIntelligenceConfig from '../../components/settings/ThreatIntelligenceConfig';
+import LocalAIModelManagement from '../../components/settings/LocalAIModelManagement';
 
 const { Title, Paragraph } = Typography;
 
@@ -385,6 +386,15 @@ const SettingsPage: React.FC = () => {
             onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
           />
         </Card>
+      )
+    },
+    {
+      key: 'local-ai-models',
+      label: '本地AI模型管理',
+      children: (
+        <LocalAIModelManagement 
+          onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
+        />
       )
     }
   ];
