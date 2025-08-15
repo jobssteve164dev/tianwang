@@ -80,7 +80,7 @@ class AgentController {
         });
       }
 
-      let agent = await models.Agent.findOne({ where: { agentId } });
+      let agent = await models.Agent?.findOne({ where: { agentId } });
             
       if (agent) {
         console.log('代理已存在，更新信息:', { agentId, hostname });
@@ -255,7 +255,7 @@ class AgentController {
 
       // 查找代理
       console.log('查找代理:', { agentId, hostname });
-      const agent = await models.Agent.findOne({ where: { agentId, hostname } });
+      const agent = await models.Agent?.findOne({ where: { agentId, hostname } });
             
       if (!agent) {
         console.warn('代理不存在:', { agentId, hostname });
@@ -489,7 +489,7 @@ class AgentController {
       }
 
       // 验证代理存在
-      const agent = await models.Agent.findOne({ where: { agentId } });
+      const agent = await models.Agent?.findOne({ where: { agentId } });
       if (!agent) {
         return res.status(404).json({
           success: false,
@@ -739,7 +739,7 @@ class AgentController {
         filter.organizationId = req.user.organizationId;
       }
 
-      const agents = await Agent.findAll({
+      const agents = await models.Agent?.findAll({
         where: filter,
         order: [['lastSeen', 'DESC']],
         limit: limit * 1,
@@ -747,7 +747,7 @@ class AgentController {
         attributes: { exclude: ['systemInfo'] } // 排除敏感系统信息
       });
 
-      const total = await Agent.count({ where: filter });
+      const total = await models.Agent?.count({ where: filter });
 
       res.json({
         success: true,
@@ -974,7 +974,7 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOne({ where: { agentId } });
+      const agent = await models.Agent?.findOne({ where: { agentId } });
       if (!agent) {
         return res.status(404).json({
           success: false,
@@ -1010,7 +1010,7 @@ class AgentController {
         });
       }
 
-      const agent = await Agent.findOne({ where: { agentId } });
+      const agent = await models.Agent?.findOne({ where: { agentId } });
       if (agent) {
         agent.status = status;
         agent.lastSeen = new Date();
@@ -1047,7 +1047,7 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOne({ where: { agentId } });
+      const agent = await models.Agent?.findOne({ where: { agentId } });
       if (agent) {
         await agent.destroy();
       }
@@ -1080,7 +1080,7 @@ class AgentController {
     try {
       const { agentId } = req.params;
             
-      const agent = await Agent.findOne({ where: { agentId } });
+      const agent = await models.Agent?.findOne({ where: { agentId } });
       if (agent) {
         agent.lastSeen = new Date();
         agent.status = 'online';

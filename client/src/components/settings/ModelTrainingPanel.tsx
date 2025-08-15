@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Row,
@@ -11,20 +11,16 @@ import {
   Alert,
   Space,
   Typography,
-  Divider,
   List,
   Tag,
   Modal,
-  message,
   App,
-  Spin,
 } from 'antd';
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   StopOutlined,
   UploadOutlined,
-  FileTextOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
@@ -35,7 +31,7 @@ import {
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 interface ModelTrainingPanelProps {
@@ -56,7 +52,6 @@ interface TrainingTask {
 }
 
 const ModelTrainingPanel: React.FC<ModelTrainingPanelProps> = ({
-  modelStatus,
   onTrainingComplete
 }) => {
   const { message: messageApi } = App.useApp();
@@ -64,7 +59,7 @@ const ModelTrainingPanel: React.FC<ModelTrainingPanelProps> = ({
   const [trainingTasks, setTrainingTasks] = useState<TrainingTask[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [trainingData, setTrainingData] = useState<any[]>([]);
-  const [isTraining, setIsTraining] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
 

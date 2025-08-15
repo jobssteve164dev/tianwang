@@ -362,7 +362,7 @@ class DeviceFingerprintService {
             interfaces: this.normalizeNetworkInterfaces(deviceInfo.networkInterfaces),
             macAddresses: this.normalizeMacAddresses(deviceInfo.macAddresses)
           },
-          system: {
+          systemInfo: {
             uuid: deviceInfo.systemUuid,
             bios: this.normalizeBiosInfo(deviceInfo.biosInfo)
           }

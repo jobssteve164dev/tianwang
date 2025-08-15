@@ -16,14 +16,12 @@ import {
 import {
   LineChartOutlined,
   ReloadOutlined,
-  TrendingUpOutlined,
-  ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 interface ModelPerformanceMonitorProps {

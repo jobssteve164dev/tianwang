@@ -3,24 +3,13 @@ import {
   Card,
   Row,
   Col,
-  Table,
   Button,
-  Upload,
-  Modal,
   Space,
-  Typography,
-  Tag,
   Alert,
-  message,
   App,
   Statistic,
-  Select,
-  Form,
 } from 'antd';
 import {
-  UploadOutlined,
-  EyeOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   FileTextOutlined,
   DatabaseOutlined,
@@ -29,8 +18,7 @@ import {
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+
 
 interface TrainingDataManagerProps {
   onDataChange: () => void;
@@ -46,20 +34,12 @@ interface TrainingData {
   metadata: any;
 }
 
-const TrainingDataManager: React.FC<TrainingDataManagerProps> = ({
-  onDataChange
-}) => {
+const TrainingDataManager: React.FC<TrainingDataManagerProps> = () => {
   const { message: messageApi } = App.useApp();
-  const [form] = Form.useForm();
   const [dataList, setDataList] = useState<TrainingData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadForm, setUploadForm] = useState({
-    model_name: '',
-    data_type: '',
-    data: [] as any[]
-  });
+
+
 
   // 加载数据列表
   const loadDataList = async () => {
@@ -83,13 +63,7 @@ const TrainingDataManager: React.FC<TrainingDataManagerProps> = ({
     loadDataList();
   }, []);
 
-  // 模型配置
-  const modelConfigs = {
-    anomaly_detection: '异常检测模型',
-    malware_detection: '恶意软件检测模型',
-    network_intrusion: '网络入侵检测模型',
-    user_behavior: '用户行为分析模型'
-  };
+
 
   return (
     <div className="training-data-manager">
@@ -140,7 +114,7 @@ const TrainingDataManager: React.FC<TrainingDataManagerProps> = ({
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => setShowUploadModal(true)}
+            onClick={() => messageApi.info('上传功能开发中')}
           >
             上传数据
           </Button>
@@ -176,7 +150,7 @@ const TrainingDataManager: React.FC<TrainingDataManagerProps> = ({
             暂无训练数据
           </div>
           <div style={{ fontSize: '12px', color: '#ccc', marginTop: 4 }}>
-            点击"上传数据"按钮开始添加训练数据
+            点击&quot;上传数据&quot;按钮开始添加训练数据
           </div>
         </div>
       </Card>

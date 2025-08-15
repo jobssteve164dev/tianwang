@@ -9,27 +9,20 @@ import {
   Upload,
   Input,
   Space,
-  Typography,
   Alert,
-  message,
   App,
-  Spin,
-  Empty,
-  Tag,
 } from 'antd';
 import {
   ExperimentOutlined,
   UploadOutlined,
   PlayCircleOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   BugOutlined,
   SafetyOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 
-const { Title, Text, Paragraph } = Typography;
+
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -37,9 +30,7 @@ interface ModelTestingToolProps {
   modelStatus: any;
 }
 
-const ModelTestingTool: React.FC<ModelTestingToolProps> = ({
-  modelStatus
-}) => {
+const ModelTestingTool: React.FC<ModelTestingToolProps> = () => {
   const { message: messageApi } = App.useApp();
   const [form] = Form.useForm();
   const [selectedModel, setSelectedModel] = useState<string>('');

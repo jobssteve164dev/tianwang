@@ -101,7 +101,7 @@ const register = async (req, res) => {
     const { username, email, password, full_name } = req.body;
     
     // 检查用户是否已存在
-    const existingUser = await User.findOne({
+    const existingUser = await models.User?.findOne({
       where: {
         $or: [{ username }, { email }]
       }
@@ -115,7 +115,7 @@ const register = async (req, res) => {
     }
     
     // 创建用户
-    const user = await User.create({
+    const user = await models.User?.create({
       username,
       email,
       password_hash: password, // 将在模型的beforeCreate钩子中加密
@@ -162,7 +162,7 @@ const logout = async (req, res) => {
  */
 const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findByPk(req.userId, {
+    const user = await models.User?.findByPk(req.userId, {
       include: ['organization']
     });
     

@@ -492,12 +492,12 @@ class AIModelController {
       // 构建本地模型状态响应
       const localModels = {
         anomaly_detection: {
-          model_name: "异常检测模型",
+          model_name: '异常检测模型',
           status: data.models_loaded?.includes('anomaly_detection') ? 'trained' : 'untrained',
           last_trained: null,
           accuracy: data.metrics?.model_accuracy?.anomaly_detection || 0,
           training_samples: 0,
-          version: "1.0.0",
+          version: '1.0.0',
           performance_metrics: {
             precision: 0.89,
             recall: 0.94,
@@ -506,12 +506,12 @@ class AIModelController {
           }
         },
         malware_detection: {
-          model_name: "恶意软件检测模型",
+          model_name: '恶意软件检测模型',
           status: data.models_loaded?.includes('malware_detection') ? 'trained' : 'untrained',
           last_trained: null,
           accuracy: data.metrics?.model_accuracy?.malware_detection || 0,
           training_samples: 0,
-          version: "1.0.0",
+          version: '1.0.0',
           performance_metrics: {
             precision: 0.87,
             recall: 0.92,
@@ -520,12 +520,12 @@ class AIModelController {
           }
         },
         network_intrusion: {
-          model_name: "网络入侵检测模型",
+          model_name: '网络入侵检测模型',
           status: data.models_loaded?.includes('network_intrusion') ? 'trained' : 'untrained',
           last_trained: null,
           accuracy: data.metrics?.model_accuracy?.network_intrusion || 0,
           training_samples: 0,
-          version: "1.0.0",
+          version: '1.0.0',
           performance_metrics: {
             precision: 0.85,
             recall: 0.90,
@@ -534,12 +534,12 @@ class AIModelController {
           }
         },
         user_behavior: {
-          model_name: "用户行为分析模型",
+          model_name: '用户行为分析模型',
           status: data.models_loaded?.includes('user_behavior') ? 'trained' : 'untrained',
           last_trained: null,
           accuracy: data.metrics?.model_accuracy?.user_behavior || 0,
           training_samples: 0,
-          version: "1.0.0",
+          version: '1.0.0',
           performance_metrics: {
             precision: 0.83,
             recall: 0.88,
@@ -595,7 +595,7 @@ class AIModelController {
         last_trained: null,
         accuracy: data.metrics?.model_accuracy?.[model_name] || 0,
         training_samples: 0,
-        version: "1.0.0",
+        version: '1.0.0',
         performance_metrics: {
           precision: 0.85,
           recall: 0.90,
@@ -715,20 +715,20 @@ class AIModelController {
       
       let endpoint = '';
       switch (model_name) {
-        case 'anomaly_detection':
-          endpoint = '/api/detect/anomaly';
-          break;
-        case 'malware_detection':
-          endpoint = '/api/detect/malware';
-          break;
-        case 'network_intrusion':
-          endpoint = '/api/detect/network';
-          break;
-        case 'user_behavior':
-          endpoint = '/api/detect/behavior';
-          break;
-        default:
-          throw new Error(`不支持的模型类型: ${model_name}`);
+      case 'anomaly_detection':
+        endpoint = '/api/detect/anomaly';
+        break;
+      case 'malware_detection':
+        endpoint = '/api/detect/malware';
+        break;
+      case 'network_intrusion':
+        endpoint = '/api/detect/network';
+        break;
+      case 'user_behavior':
+        endpoint = '/api/detect/behavior';
+        break;
+      default:
+        throw new Error(`不支持的模型类型: ${model_name}`);
       }
       
       const response = await fetch(`${aiEngineUrl}${endpoint}`, {
@@ -1010,7 +1010,7 @@ class AIModelController {
       // 构建性能指标响应
       const performanceMetrics = {
         anomaly_detection: {
-          model_name: "异常检测模型",
+          model_name: '异常检测模型',
           accuracy: data.metrics?.model_accuracy?.anomaly_detection || 0.92,
           precision: 0.89,
           recall: 0.94,
@@ -1021,7 +1021,7 @@ class AIModelController {
           last_updated: new Date().toISOString()
         },
         malware_detection: {
-          model_name: "恶意软件检测模型",
+          model_name: '恶意软件检测模型',
           accuracy: data.metrics?.model_accuracy?.malware_detection || 0.88,
           precision: 0.87,
           recall: 0.92,
@@ -1032,7 +1032,7 @@ class AIModelController {
           last_updated: new Date().toISOString()
         },
         network_intrusion: {
-          model_name: "网络入侵检测模型",
+          model_name: '网络入侵检测模型',
           accuracy: data.metrics?.model_accuracy?.network_intrusion || 0.85,
           precision: 0.85,
           recall: 0.90,
@@ -1043,7 +1043,7 @@ class AIModelController {
           last_updated: new Date().toISOString()
         },
         user_behavior: {
-          model_name: "用户行为分析模型",
+          model_name: '用户行为分析模型',
           accuracy: data.metrics?.model_accuracy?.user_behavior || 0.83,
           precision: 0.83,
           recall: 0.88,
@@ -1124,11 +1124,11 @@ class AIModelController {
       const historyData = model_name 
         ? { [model_name]: generateHistoryData(model_name, parseInt(days)) }
         : {
-            anomaly_detection: generateHistoryData('anomaly_detection', parseInt(days)),
-            malware_detection: generateHistoryData('malware_detection', parseInt(days)),
-            network_intrusion: generateHistoryData('network_intrusion', parseInt(days)),
-            user_behavior: generateHistoryData('user_behavior', parseInt(days))
-          };
+          anomaly_detection: generateHistoryData('anomaly_detection', parseInt(days)),
+          malware_detection: generateHistoryData('malware_detection', parseInt(days)),
+          network_intrusion: generateHistoryData('network_intrusion', parseInt(days)),
+          user_behavior: generateHistoryData('user_behavior', parseInt(days))
+        };
 
       res.json({
         success: true,
