@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const Alert = require('../models/Alert');
 
 /**
  * 获取告警列表
@@ -15,120 +16,95 @@ router.get('/', async (req, res) => {
   try {
     const { 
       page = 1, 
-      pageSize = 10, 
-      status = 'all',
-      severity = 'all',
+      pageSize = 20, 
+      status,
+      severity,
+      type,
+      search,
       startDate,
-      endDate 
+      endDate,
+      deviceId,
+      agentId
     } = req.query;
 
-    // 模拟告警数据
-    const mockAlerts = [
-      {
-        id: 'alert-001',
-        title: '检测到恶意软件活动',
-        description: '在设备 192.168.1.100 上检测到可疑的恶意软件活动',
-        severity: 'high',
-        status: 'active',
-        category: 'malware',
-        source: '192.168.1.100',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        lastUpdated: new Date().toISOString(),
-        assignedTo: 'security-team',
-        tags: ['malware', 'endpoint']
-      },
-      {
-        id: 'alert-002',
-        title: '网络入侵尝试',
-        description: '检测到来自外部IP的暴力破解尝试',
-        severity: 'critical',
-        status: 'active',
-        category: 'intrusion',
-        source: '203.45.67.89',
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        lastUpdated: new Date().toISOString(),
-        assignedTo: 'network-team',
-        tags: ['intrusion', 'brute-force']
-      },
-      {
-        id: 'alert-003',
-        title: '异常登录活动',
-        description: '检测到用户账户的异常登录模式',
-        severity: 'medium',
-        status: 'resolved',
-        category: 'authentication',
-        source: 'user:john.doe',
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        lastUpdated: new Date(Date.now() - 3600000).toISOString(),
-        assignedTo: 'security-team',
-        tags: ['authentication', 'user-behavior']
-      },
-      {
-        id: 'alert-004',
-        title: 'DDoS攻击检测',
-        description: '检测到针对Web服务器的DDoS攻击',
-        severity: 'critical',
-        status: 'active',
-        category: 'ddos',
-        source: 'multiple-ips',
-        timestamp: new Date(Date.now() - 1800000).toISOString(),
-        lastUpdated: new Date().toISOString(),
-        assignedTo: 'network-team',
-        tags: ['ddos', 'web-server']
-      },
-      {
-        id: 'alert-005',
-        title: '数据泄露风险',
-        description: '检测到敏感数据的异常访问模式',
-        severity: 'high',
-        status: 'investigating',
-        category: 'data-leak',
-        source: 'internal-user',
-        timestamp: new Date(Date.now() - 5400000).toISOString(),
-        lastUpdated: new Date().toISOString(),
-        assignedTo: 'data-protection-team',
-        tags: ['data-leak', 'sensitive-data']
-      }
-    ];
-
-    // 过滤告警
-    let filteredAlerts = mockAlerts;
-
-    // 按状态过滤
-    if (status !== 'all') {
-      filteredAlerts = filteredAlerts.filter(alert => alert.status === status);
+    // 构建查询条件
+    const query = {};
+    
+    if (status && status !== 'all') {
+      query.status = status;
     }
-
-    // 按严重程度过滤
-    if (severity !== 'all') {
-      filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity);
+    
+    if (severity && severity !== 'all') {
+      query.severity = severity;
     }
-
-    // 按日期范围过滤
+    
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+    
+    if (deviceId) {
+      query.deviceId = deviceId;
+    }
+    
+    if (agentId) {
+      query.agentId = agentId;
+    }
+    
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { source: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      filteredAlerts = filteredAlerts.filter(alert => {
-        const alertDate = new Date(alert.timestamp);
-        return alertDate >= start && alertDate <= end;
-      });
+      query.timestamp = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
     }
 
-    // 分页
-    const total = filteredAlerts.length;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + parseInt(pageSize);
-    const paginatedAlerts = filteredAlerts.slice(startIndex, endIndex);
+    // 执行查询
+    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const limit = parseInt(pageSize);
+    
+    const [alerts, total] = await Promise.all([
+      Alert.find(query)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Alert.countDocuments(query)
+    ]);
 
     res.json({
       success: true,
       data: {
-        alerts: paginatedAlerts,
+        alerts: alerts.map(alert => ({
+          id: alert._id,
+          title: alert.title,
+          description: alert.description,
+          type: alert.type,
+          severity: alert.severity,
+          status: alert.status,
+          source: alert.source,
+          sourceIP: alert.sourceIP,
+          targetIP: alert.targetIP,
+          deviceId: alert.deviceId,
+          agentId: alert.agentId,
+          timestamp: alert.timestamp,
+          lastUpdated: alert.lastUpdated,
+          assignedTo: alert.assignedTo,
+          tags: alert.tags,
+          threatDetails: alert.threatDetails,
+          autoResponse: alert.autoResponse
+        })),
         pagination: {
           page: parseInt(page),
           pageSize: parseInt(pageSize),
           total,
-          totalPages: Math.ceil(total / pageSize)
+          totalPages: Math.ceil(total / parseInt(pageSize))
         }
       }
     });
@@ -149,55 +125,36 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 模拟告警详情
-    const alertDetail = {
-      id,
-      title: '检测到恶意软件活动',
-      description: '在设备 192.168.1.100 上检测到可疑的恶意软件活动',
-      severity: 'high',
-      status: 'active',
-      category: 'malware',
-      source: '192.168.1.100',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      lastUpdated: new Date().toISOString(),
-      assignedTo: 'security-team',
-      tags: ['malware', 'endpoint'],
-      details: {
-        affectedFiles: ['/tmp/suspicious.exe', '/var/log/malware.log'],
-        networkConnections: ['192.168.1.100:443', '10.0.0.1:80'],
-        processInfo: {
-          pid: 12345,
-          command: './suspicious.exe',
-          user: 'unknown'
-        },
-        indicators: [
-          'Suspicious file creation',
-          'Unusual network activity',
-          'Registry modifications'
-        ]
-      },
-      timeline: [
-        {
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          event: 'Alert triggered',
-          description: 'Malware detection rule matched'
-        },
-        {
-          timestamp: new Date(Date.now() - 3500000).toISOString(),
-          event: 'Investigation started',
-          description: 'Security team assigned to investigate'
-        },
-        {
-          timestamp: new Date(Date.now() - 3000000).toISOString(),
-          event: 'Containment initiated',
-          description: 'Affected device isolated from network'
-        }
-      ]
-    };
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert not found'
+      });
+    }
 
     res.json({
       success: true,
-      data: alertDetail
+      data: {
+        id: alert._id,
+        title: alert.title,
+        description: alert.description,
+        type: alert.type,
+        severity: alert.severity,
+        status: alert.status,
+        source: alert.source,
+        sourceIP: alert.sourceIP,
+        targetIP: alert.targetIP,
+        deviceId: alert.deviceId,
+        agentId: alert.agentId,
+        timestamp: alert.timestamp,
+        lastUpdated: alert.lastUpdated,
+        assignedTo: alert.assignedTo,
+        tags: alert.tags,
+        threatDetails: alert.threatDetails,
+        evidence: alert.evidence,
+        autoResponse: alert.autoResponse
+      }
     });
   } catch (error) {
     logger.error('Error fetching alert detail:', error);
@@ -217,18 +174,31 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { status, assignedTo, notes } = req.body;
 
-    // 模拟更新告警
-    const updatedAlert = {
-      id,
-      status: status || 'active',
-      assignedTo: assignedTo || 'security-team',
-      notes: notes || '',
-      lastUpdated: new Date().toISOString()
-    };
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert not found'
+      });
+    }
+
+    // 更新告警
+    if (status) alert.status = status;
+    if (assignedTo) alert.assignedTo = assignedTo;
+    if (notes) alert.notes = notes;
+    alert.lastUpdated = new Date();
+
+    await alert.save();
 
     res.json({
       success: true,
-      data: updatedAlert,
+      data: {
+        id: alert._id,
+        status: alert.status,
+        assignedTo: alert.assignedTo,
+        notes: alert.notes,
+        lastUpdated: alert.lastUpdated
+      },
       message: 'Alert updated successfully'
     });
   } catch (error) {
@@ -241,37 +211,241 @@ router.put('/:id', async (req, res) => {
 });
 
 /**
+ * 更新告警状态
+ * PATCH /api/alerts/:id/status
+ */
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert not found'
+      });
+    }
+
+    alert.status = status;
+    alert.lastUpdated = new Date();
+
+    await alert.save();
+
+    res.json({
+      success: true,
+      data: {
+        id: alert._id,
+        status: alert.status,
+        lastUpdated: alert.lastUpdated
+      },
+      message: 'Alert status updated successfully'
+    });
+  } catch (error) {
+    logger.error('Error updating alert status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update alert status'
+    });
+  }
+});
+
+/**
+ * 确认告警
+ * POST /api/alerts/:id/acknowledge
+ */
+router.post('/:id/acknowledge', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId = 'system' } = req.body;
+
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert not found'
+      });
+    }
+
+    await alert.acknowledge(userId);
+
+    res.json({
+      success: true,
+      data: {
+        id: alert._id,
+        status: alert.status,
+        assignedTo: alert.assignedTo,
+        lastUpdated: alert.lastUpdated
+      },
+      message: 'Alert acknowledged successfully'
+    });
+  } catch (error) {
+    logger.error('Error acknowledging alert:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to acknowledge alert'
+    });
+  }
+});
+
+/**
+ * 解决告警
+ * POST /api/alerts/:id/resolve
+ */
+router.post('/:id/resolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId = 'system', notes } = req.body;
+
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert not found'
+      });
+    }
+
+    await alert.resolve(userId, notes);
+
+    res.json({
+      success: true,
+      data: {
+        id: alert._id,
+        status: alert.status,
+        assignedTo: alert.assignedTo,
+        notes: alert.notes,
+        resolvedAt: alert.resolvedAt,
+        lastUpdated: alert.lastUpdated
+      },
+      message: 'Alert resolved successfully'
+    });
+  } catch (error) {
+    logger.error('Error resolving alert:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to resolve alert'
+    });
+  }
+});
+
+/**
+ * 接收代理端威胁告警
+ * POST /api/alerts/threat
+ */
+router.post('/threat', async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      type,
+      severity,
+      source,
+      sourceIP,
+      sourcePort,
+      targetIP,
+      targetPort,
+      deviceId,
+      agentId,
+      threatDetails,
+      evidence
+    } = req.body;
+
+    // 验证必需字段
+    if (!title || !description || !type || !severity || !source || !deviceId || !agentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+
+    // 创建新的告警
+    const alert = new Alert({
+      title,
+      description,
+      type,
+      severity,
+      source,
+      sourceIP,
+      sourcePort,
+      targetIP,
+      targetPort,
+      deviceId,
+      agentId,
+      threatDetails,
+      evidence,
+      tags: [type, severity, 'agent-detected']
+    });
+
+    await alert.save();
+
+    logger.info(`New threat alert created: ${alert._id} - ${title} from ${deviceId}`);
+
+    // 通过WebSocket广播新告警
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('new-alert', {
+        id: alert._id,
+        title: alert.title,
+        severity: alert.severity,
+        deviceId: alert.deviceId,
+        timestamp: alert.timestamp
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: alert._id,
+        message: 'Alert created successfully'
+      }
+    });
+  } catch (error) {
+    logger.error('Error creating threat alert:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create alert'
+    });
+  }
+});
+
+/**
  * 获取告警统计信息
  * GET /api/alerts/stats/overview
  */
 router.get('/stats/overview', async (req, res) => {
   try {
-    const alertStats = {
-      total: 234,
-      active: 45,
-      resolved: 156,
-      investigating: 33,
-      bySeverity: {
-        critical: 12,
-        high: 45,
-        medium: 89,
-        low: 88
-      },
-      byCategory: {
-        malware: 67,
-        intrusion: 45,
-        authentication: 34,
-        ddos: 23,
-        dataLeak: 15,
-        other: 50
-      },
-      averageResolutionTime: 4.5, // hours
-      lastUpdated: new Date().toISOString()
+    const stats = await Alert.getAlertStats();
+    const alertStats = stats[0] || {
+      total: 0,
+      active: 0,
+      resolved: 0,
+      acknowledged: 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0
     };
+
+    // 计算平均解决时间
+    const resolvedAlerts = await Alert.find({ status: 'resolved' });
+    let averageResolutionTime = 0;
+    
+    if (resolvedAlerts.length > 0) {
+      const totalTime = resolvedAlerts.reduce((sum, alert) => {
+        if (alert.resolvedAt && alert.timestamp) {
+          return sum + (alert.resolvedAt.getTime() - alert.timestamp.getTime());
+        }
+        return sum;
+      }, 0);
+      averageResolutionTime = totalTime / resolvedAlerts.length / (1000 * 60 * 60); // 转换为小时
+    }
 
     res.json({
       success: true,
-      data: alertStats
+      data: {
+        ...alertStats,
+        averageResolutionTime: Math.round(averageResolutionTime * 100) / 100,
+        lastUpdated: new Date().toISOString()
+      }
     });
   } catch (error) {
     logger.error('Error fetching alert stats:', error);

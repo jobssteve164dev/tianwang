@@ -856,6 +856,65 @@ class AgentService extends EventEmitter {
         return this.sendMessage(message);
     }
 
+    // 发送威胁告警到服务器
+    async sendThreatAlert(threat) {
+        try {
+            logger.info('发送威胁告警到服务器:', threat);
+
+            const alertData = {
+                title: threat.description || `检测到${threat.type}威胁`,
+                description: threat.description,
+                type: threat.type,
+                severity: threat.severity,
+                source: threat.source || 'unknown',
+                sourceIP: threat.sourceIP,
+                sourcePort: threat.sourcePort,
+                targetIP: threat.targetIP,
+                targetPort: threat.targetPort,
+                deviceId: os.hostname(),
+                agentId: this.agentId,
+                threatDetails: {
+                    processName: threat.processName,
+                    processId: threat.pid,
+                    command: threat.command,
+                    user: threat.user,
+                    cpu: threat.cpu,
+                    memory: threat.memory,
+                    connections: threat.connections,
+                    temperature: threat.temperature
+                },
+                evidence: {
+                    logs: threat.logs || [],
+                    networkTraffic: threat.networkTraffic,
+                    systemMetrics: threat.systemMetrics,
+                    processList: threat.processList
+                }
+            };
+
+            // 通过HTTP API发送告警
+            const response = await axios.post(`${this.config.apiUrl}/alerts/threat`, alertData, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'TianWang-Agent/1.0'
+                },
+                timeout: 10000
+            });
+
+            if (response.data.success) {
+                logger.info('威胁告警已发送到服务器:', response.data.data.id);
+                this.emit('threat-alert-sent', { threat, alertId: response.data.data.id });
+                return true;
+            } else {
+                logger.error('服务器返回错误:', response.data.error);
+                return false;
+            }
+        } catch (error) {
+            logger.error('发送威胁告警失败:', error.message);
+            this.emit('threat-alert-failed', { threat, error: error.message });
+            return false;
+        }
+    }
+
     // 发送心跳
     sendHeartbeat() {
         return this.sendMessage({

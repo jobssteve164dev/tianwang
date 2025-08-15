@@ -29,6 +29,16 @@ class FirewallService extends EventEmitter {
         logger.info('初始化防火墙服务...', { platform: this.platform });
 
         try {
+            // 检查平台特定权限
+            if (this.platform === 'darwin') {
+                const hasPermissions = await this.checkMacOSPermissions();
+                if (!hasPermissions) {
+                    logger.warn('macOS权限不足，防火墙功能将受限');
+                    this.isEnabled = false;
+                    return false;
+                }
+            }
+            
             // 检查防火墙状态
             await this.checkFirewallStatus();
             
@@ -50,6 +60,30 @@ class FirewallService extends EventEmitter {
         }
     }
 
+    // 检查macOS权限
+    async checkMacOSPermissions() {
+        try {
+            // 检查是否有执行sudo命令的权限
+            const result = await this.executeCommand('sudo -n true', 5000);
+            if (!result.success) {
+                logger.warn('无法执行sudo命令，需要管理员权限');
+                return false;
+            }
+            
+            // 检查pfctl是否可用
+            const pfctlResult = await this.executeCommand('which pfctl', 5000);
+            if (!pfctlResult.success) {
+                logger.warn('pfctl命令不可用');
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            logger.error('权限检查失败:', error);
+            return false;
+        }
+    }
+
     // 检查防火墙状态
     async checkFirewallStatus() {
         let command;
@@ -62,7 +96,8 @@ class FirewallService extends EventEmitter {
                 command = 'ufw status || iptables -L -n | head -5';
                 break;
             case 'darwin':
-                command = 'pfctl -s info';
+                // macOS需要特殊处理权限问题
+                command = 'sudo pfctl -s info';
                 break;
             default:
                 throw new Error(`不支持的平台: ${this.platform}`);
@@ -72,6 +107,12 @@ class FirewallService extends EventEmitter {
             exec(command, (error, stdout, stderr) => {
                 if (error) {
                     logger.warn('防火墙状态检查失败:', error.message);
+                    // 对于macOS，记录权限问题
+                    if (this.platform === 'darwin') {
+                        logger.warn('macOS防火墙需要管理员权限，请确保应用已获得必要权限');
+                        logger.warn('建议: 1. 在系统偏好设置中授予应用完全磁盘访问权限');
+                        logger.warn('建议: 2. 在安全性与隐私中允许应用控制其他应用');
+                    }
                     // 不抛出错误，允许服务继续运行
                     resolve(false);
                 } else {

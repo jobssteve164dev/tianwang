@@ -350,34 +350,28 @@ async function initializeServices() {
             // 继续初始化其他服务，不中断整个流程
         }
 
-        // 初始化系统监控
-        systemMonitor = new SystemMonitor();
-        systemMonitor.on('data', (data) => {
-            if (agentService) {
-                agentService.sendData('system', data);
-            }
-            if (mainWindow) {
-                mainWindow.webContents.send('system-data', data);
-            }
-        });
-
-        // 初始化网络监控
-        networkMonitor = new NetworkMonitor();
-        networkMonitor.on('data', (data) => {
-            if (agentService) {
-                agentService.sendData('network', data);
-            }
-            if (mainWindow) {
-                mainWindow.webContents.send('network-data', data);
-            }
-        });
-
-        // 初始化安全服务
+        // 初始化安全服务（必须在监控服务之前初始化）
         securityService = new SecurityService();
+        await securityService.initialize();
         securityService.on('threat', (threat) => {
             logger.warn('检测到安全威胁:', threat);
             if (mainWindow) {
                 mainWindow.webContents.send('security-threat', threat);
+            }
+            
+            // 发送威胁告警到服务器
+            if (agentService) {
+                agentService.sendThreatAlert(threat)
+                    .then(success => {
+                        if (success) {
+                            logger.info('威胁告警已发送到服务器');
+                        } else {
+                            logger.warn('威胁告警发送失败');
+                        }
+                    })
+                    .catch(error => {
+                        logger.error('发送威胁告警时出错:', error);
+                    });
             }
             
             // 自动阻止威胁IP（如果启用了防火墙服务）
@@ -398,6 +392,40 @@ async function initializeServices() {
                     body: `检测到威胁: ${threat.type}`,
                     icon: path.join(__dirname, '../assets/warning-icon.png')
                 }).show();
+            }
+        });
+
+        // 初始化系统监控
+        systemMonitor = new SystemMonitor();
+        systemMonitor.on('data', (data) => {
+            if (agentService) {
+                agentService.sendData('system', data);
+            }
+            if (mainWindow) {
+                mainWindow.webContents.send('system-data', data);
+            }
+            // 传递给安全服务进行威胁分析
+            if (securityService) {
+                securityService.analyzeThreat(data).catch(error => {
+                    logger.error('威胁分析失败:', error);
+                });
+            }
+        });
+
+        // 初始化网络监控
+        networkMonitor = new NetworkMonitor();
+        networkMonitor.on('data', (data) => {
+            if (agentService) {
+                agentService.sendData('network', data);
+            }
+            if (mainWindow) {
+                mainWindow.webContents.send('network-data', data);
+            }
+            // 传递给安全服务进行威胁分析
+            if (securityService) {
+                securityService.analyzeThreat(data).catch(error => {
+                    logger.error('威胁分析失败:', error);
+                });
             }
         });
 
