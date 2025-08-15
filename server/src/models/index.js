@@ -15,6 +15,7 @@ const SecurityEvent = require('./SecurityEvent');
 const AlertPolicy = require('./AlertPolicy');
 const SystemConfig = require('./SystemConfig');
 const RegistrationCode = require('./RegistrationCode');
+const Alert = require('./Alert');
 
 // 延迟初始化模型
 let sequelize = null;
@@ -32,6 +33,7 @@ function initializeModels() {
   
   if (!models && sequelize) {
     try {
+      console.log('🔄 开始初始化模型...');
       models = {
         User: User(sequelize),
         Organization: Organization(sequelize),
@@ -43,6 +45,15 @@ function initializeModels() {
         SystemConfig: SystemConfig(sequelize),
         RegistrationCode: RegistrationCode(sequelize)
       };
+      
+      console.log('🔄 初始化Alert模型...');
+      try {
+        models.Alert = Alert(sequelize);
+        console.log('✅ Alert模型初始化成功');
+      } catch (alertError) {
+        console.error('❌ Alert模型初始化失败:', alertError);
+        throw alertError;
+      }
 
       // 设置模型关联关系
       Object.keys(models).forEach(modelName => {
@@ -101,5 +112,9 @@ module.exports = {
   get RegistrationCode() { 
     const result = initializeModels();
     return result.models ? result.models.RegistrationCode : null;
+  },
+  get Alert() { 
+    const result = initializeModels();
+    return result.models ? result.models.Alert : null;
   }
 }; 

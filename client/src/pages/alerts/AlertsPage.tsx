@@ -12,9 +12,9 @@ import {
   Descriptions,
   Badge,
   Tooltip,
-  message,
   Popconfirm,
-  Typography
+  Typography,
+  App
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -35,6 +35,7 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 const AlertsPage: React.FC = () => {
+  const { message } = App.useApp();
   const dispatch = useAppDispatch();
   const { alerts, loading, error, filters, pagination } = useAppSelector((state) => state.alert as any);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);

@@ -6,7 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
-const Alert = require('../models/Alert');
+const models = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * 获取告警列表
@@ -14,6 +15,17 @@ const Alert = require('../models/Alert');
  */
 router.get('/', async (req, res) => {
   try {
+    // 检查Alert模型是否可用
+    const Alert = models.Alert;
+    logger.info(`Alert模型状态: ${Alert ? '已初始化' : '未初始化'}`);
+    if (!Alert) {
+      logger.error('Alert model is null - database may not be initialized');
+      return res.status(500).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
     const { 
       page = 1, 
       pageSize = 20, 
@@ -51,38 +63,40 @@ router.get('/', async (req, res) => {
     }
     
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { source: { $regex: search, $options: 'i' } }
+      query[Op.or] = [
+        { title: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+        { source: { [Op.iLike]: `%${search}%` } }
       ];
     }
     
     if (startDate && endDate) {
       query.timestamp = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        [Op.gte]: new Date(startDate),
+        [Op.lte]: new Date(endDate)
       };
     }
 
     // 执行查询
-    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const limit = parseInt(pageSize);
     
     const [alerts, total] = await Promise.all([
-      Alert.find(query)
-        .sort({ timestamp: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Alert.countDocuments(query)
+      Alert.findAll({
+        where: query,
+        order: [['timestamp', 'DESC']],
+        offset,
+        limit,
+        raw: true
+      }),
+      Alert.count({ where: query })
     ]);
 
     res.json({
       success: true,
       data: {
         alerts: alerts.map(alert => ({
-          id: alert._id,
+          id: alert.id,
           title: alert.title,
           description: alert.description,
           type: alert.type,
@@ -297,7 +311,7 @@ router.post('/:id/resolve', async (req, res) => {
     const { id } = req.params;
     const { userId = 'system', notes } = req.body;
 
-    const alert = await Alert.findById(id);
+    const alert = await Alert.findByPk(id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -310,7 +324,7 @@ router.post('/:id/resolve', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         status: alert.status,
         assignedTo: alert.assignedTo,
         notes: alert.notes,
@@ -334,6 +348,16 @@ router.post('/:id/resolve', async (req, res) => {
  */
 router.post('/threat', async (req, res) => {
   try {
+    // 检查Alert模型是否可用
+    const Alert = models.Alert;
+    if (!Alert) {
+      logger.error('Alert model is null - database may not be initialized');
+      return res.status(500).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
     const {
       title,
       description,
@@ -359,7 +383,7 @@ router.post('/threat', async (req, res) => {
     }
 
     // 创建新的告警
-    const alert = new Alert({
+    const alert = await Alert.create({
       title,
       description,
       type,
@@ -376,14 +400,12 @@ router.post('/threat', async (req, res) => {
       tags: [type, severity, 'agent-detected']
     });
 
-    await alert.save();
-
-    logger.info(`New threat alert created: ${alert._id} - ${title} from ${deviceId}`);
+    logger.info(`New threat alert created: ${alert.id} - ${title} from ${deviceId}`);
 
     // 通过WebSocket广播新告警
     if (req.app.locals.io) {
       req.app.locals.io.emit('new-alert', {
-        id: alert._id,
+        id: alert.id,
         title: alert.title,
         severity: alert.severity,
         deviceId: alert.deviceId,
@@ -394,7 +416,7 @@ router.post('/threat', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         message: 'Alert created successfully'
       }
     });
@@ -402,7 +424,8 @@ router.post('/threat', async (req, res) => {
     logger.error('Error creating threat alert:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create alert'
+      error: 'Failed to create alert',
+      details: error.message
     });
   }
 });

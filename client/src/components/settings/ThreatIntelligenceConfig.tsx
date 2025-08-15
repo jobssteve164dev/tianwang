@@ -11,8 +11,8 @@ import {
   Typography,
   Alert,
   Tag,
-  message,
-  Spin
+  Spin,
+  App
 } from 'antd';
 import {
   SecurityScanOutlined,
@@ -49,6 +49,7 @@ interface ConfigData {
 const ThreatIntelligenceConfig: React.FC<ThreatIntelligenceConfigProps> = ({
   onConfigChange
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
