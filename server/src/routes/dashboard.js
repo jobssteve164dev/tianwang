@@ -6,6 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const models = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * 获取安全指标数据
@@ -13,23 +15,145 @@ const logger = require('../utils/logger');
  */
 router.get('/security-metrics', async (req, res) => {
   try {
-    // 模拟安全指标数据
+    // 检查模型是否可用
+    if (!models.Alert || !models.Agent) {
+      logger.error('Alert或Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 并行查询各种统计数据
+    const [
+      totalThreats,
+      activeAlerts,
+      totalDevices,
+      onlineDevices,
+      recentAlerts,
+      previousAlerts
+    ] = await Promise.all([
+      // 总威胁数（所有告警）
+      models.Alert.count(),
+      
+      // 活跃告警数
+      models.Alert.count({ where: { status: 'active' } }),
+      
+      // 总设备数
+      models.Agent.count(),
+      
+      // 在线设备数
+      models.Agent.count({ where: { status: 'online' } }),
+      
+      // 最近7天的告警数
+      models.Alert.count({
+        where: {
+          timestamp: {
+            [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          }
+        }
+      }),
+      
+      // 之前7天的告警数（用于计算趋势）
+      models.Alert.count({
+        where: {
+          timestamp: {
+            [Op.gte]: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+            [Op.lt]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          }
+        }
+      })
+    ]);
+
+    // 计算威胁趋势百分比
+    const threatTrend = previousAlerts > 0 
+      ? ((recentAlerts - previousAlerts) / previousAlerts * 100).toFixed(1)
+      : recentAlerts > 0 ? 100 : 0;
+
+    // 按类型统计告警
+    const alertTypeStats = await models.Alert.findAll({
+      attributes: [
+        'type',
+        [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
+      ],
+      group: ['type'],
+      raw: true
+    });
+
+    const metrics = {
+      malwareDetections: 0,
+      networkIntrusions: 0,
+      suspiciousActivities: 0,
+      policyViolations: 0
+    };
+
+    alertTypeStats.forEach(stat => {
+      const count = parseInt(stat.count);
+      switch (stat.type) {
+        case 'malware':
+          metrics.malwareDetections = count;
+          break;
+        case 'network-intrusion':
+          metrics.networkIntrusions = count;
+          break;
+        case 'suspicious-activity':
+          metrics.suspiciousActivities = count;
+          break;
+        case 'policy-violation':
+          metrics.policyViolations = count;
+          break;
+      }
+    });
+
+    // 获取最近7天的每日告警趋势
+    const dailyTrends = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      
+      const dailyCount = await models.Alert.count({
+        where: {
+          timestamp: {
+            [Op.gte]: startOfDay,
+            [Op.lt]: endOfDay
+          }
+        }
+      });
+      dailyTrends.push(dailyCount);
+    }
+
+    // 获取最近4周的每周告警趋势
+    const weeklyTrends = [];
+    for (let i = 3; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i * 7);
+      const startOfWeek = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
+      const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const weeklyCount = await models.Alert.count({
+        where: {
+          timestamp: {
+            [Op.gte]: startOfWeek,
+            [Op.lt]: endOfWeek
+          }
+        }
+      });
+      weeklyTrends.push(weeklyCount);
+    }
+
     const securityMetrics = {
-      totalThreats: 156,
-      activeAlerts: 23,
-      connectedDevices: 1247,
-      threatTrend: 12.5,
-      systemHealth: 'healthy',
+      totalThreats,
+      activeAlerts,
+      connectedDevices: onlineDevices,
+      threatTrend: parseFloat(threatTrend),
+      systemHealth: onlineDevices > 0 && (onlineDevices / totalDevices) > 0.8 ? 'healthy' : 'warning',
       lastUpdated: new Date().toISOString(),
-      metrics: {
-        malwareDetections: 45,
-        networkIntrusions: 67,
-        suspiciousActivities: 34,
-        policyViolations: 10
-      },
+      metrics,
       trends: {
-        daily: [12, 15, 8, 20, 18, 14, 16],
-        weekly: [89, 102, 78, 95, 88, 76, 92]
+        daily: dailyTrends,
+        weekly: weeklyTrends
       }
     };
 
@@ -52,12 +176,19 @@ router.get('/security-metrics', async (req, res) => {
  */
 router.get('/threat-trends', async (req, res) => {
   try {
+    // 检查Alert模型是否可用
+    if (!models.Alert) {
+      logger.error('Alert模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
     const { range = '7d' } = req.query;
     
-    // 根据时间范围生成模拟数据
+    // 根据时间范围确定数据点数量
     let dataPoints = 7;
-    let labels = [];
-    
     if (range === '30d') {
       dataPoints = 30;
     } else if (range === '90d') {
@@ -65,34 +196,54 @@ router.get('/threat-trends', async (req, res) => {
     }
 
     // 生成日期标签
+    const labels = [];
     for (let i = dataPoints - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       labels.push(date.toISOString().split('T')[0]);
     }
 
+    // 定义威胁类型和颜色
+    const threatTypes = [
+      { type: 'malware', label: '恶意软件', borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.1)' },
+      { type: 'network-intrusion', label: '网络入侵', borderColor: '#36a2eb', backgroundColor: 'rgba(54, 162, 235, 0.1)' },
+      { type: 'suspicious-activity', label: '可疑活动', borderColor: '#ffcd56', backgroundColor: 'rgba(255, 205, 86, 0.1)' }
+    ];
+
+    // 为每种威胁类型生成时间序列数据
+    const datasets = await Promise.all(threatTypes.map(async (threatType) => {
+      const data = [];
+      
+      for (let i = dataPoints - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+        
+        const count = await models.Alert.count({
+          where: {
+            type: threatType.type,
+            timestamp: {
+              [Op.gte]: startOfDay,
+              [Op.lt]: endOfDay
+            }
+          }
+        });
+        
+        data.push(count);
+      }
+      
+      return {
+        label: threatType.label,
+        data,
+        borderColor: threatType.borderColor,
+        backgroundColor: threatType.backgroundColor
+      };
+    }));
+
     const threatTrends = {
       labels,
-      datasets: [
-        {
-          label: '恶意软件',
-          data: Array.from({ length: dataPoints }, () => Math.floor(Math.random() * 50) + 10),
-          borderColor: '#ff6384',
-          backgroundColor: 'rgba(255, 99, 132, 0.1)'
-        },
-        {
-          label: '网络入侵',
-          data: Array.from({ length: dataPoints }, () => Math.floor(Math.random() * 30) + 5),
-          borderColor: '#36a2eb',
-          backgroundColor: 'rgba(54, 162, 235, 0.1)'
-        },
-        {
-          label: '可疑活动',
-          data: Array.from({ length: dataPoints }, () => Math.floor(Math.random() * 20) + 3),
-          borderColor: '#ffcd56',
-          backgroundColor: 'rgba(255, 205, 86, 0.1)'
-        }
-      ]
+      datasets
     };
 
     res.json({
@@ -114,15 +265,65 @@ router.get('/threat-trends', async (req, res) => {
  */
 router.get('/threat-distribution', async (req, res) => {
   try {
-    const threatDistribution = {
-      categories: [
-        { name: '恶意软件', value: 35, color: '#ff6384' },
-        { name: '网络入侵', value: 28, color: '#36a2eb' },
-        { name: '钓鱼攻击', value: 18, color: '#ffcd56' },
-        { name: 'DDoS攻击', value: 12, color: '#4bc0c0' },
-        { name: '其他', value: 7, color: '#9966ff' }
+    // 检查Alert模型是否可用
+    if (!models.Alert) {
+      logger.error('Alert模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 按类型统计告警数量
+    const alertTypeStats = await models.Alert.findAll({
+      attributes: [
+        'type',
+        [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
       ],
-      total: 156,
+      group: ['type'],
+      raw: true
+    });
+
+    // 定义威胁类型映射和颜色
+    const threatTypeMap = {
+      'malware': { name: '恶意软件', color: '#ff6384' },
+      'network-intrusion': { name: '网络入侵', color: '#36a2eb' },
+      'phishing': { name: '钓鱼攻击', color: '#ffcd56' },
+      'ddos': { name: 'DDoS攻击', color: '#4bc0c0' },
+      'suspicious-activity': { name: '可疑活动', color: '#9966ff' },
+      'policy-violation': { name: '策略违规', color: '#ff9f40' }
+    };
+
+    // 构建分类数据
+    const categories = [];
+    let total = 0;
+
+    alertTypeStats.forEach(stat => {
+      const count = parseInt(stat.count);
+      total += count;
+      
+      const threatType = threatTypeMap[stat.type];
+      if (threatType) {
+        categories.push({
+          name: threatType.name,
+          value: count,
+          color: threatType.color
+        });
+      }
+    });
+
+    // 如果没有数据，返回默认结构
+    if (categories.length === 0) {
+      categories.push({
+        name: '暂无威胁',
+        value: 0,
+        color: '#e0e0e0'
+      });
+    }
+
+    const threatDistribution = {
+      categories,
+      total,
       lastUpdated: new Date().toISOString()
     };
 
@@ -145,18 +346,79 @@ router.get('/threat-distribution', async (req, res) => {
  */
 router.get('/device-stats', async (req, res) => {
   try {
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 并行查询设备统计数据
+    const [
+      totalDevices,
+      onlineDevices,
+      offlineDevices,
+      platformStats
+    ] = await Promise.all([
+      // 总设备数
+      models.Agent.count(),
+      
+      // 在线设备数
+      models.Agent.count({ where: { status: 'online' } }),
+      
+      // 离线设备数
+      models.Agent.count({ where: { status: 'offline' } }),
+      
+      // 按平台统计设备数量
+      models.Agent.findAll({
+        attributes: [
+          'platform',
+          [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
+        ],
+        group: ['platform'],
+        raw: true
+      })
+    ]);
+
+    // 构建设备类型统计
+    const deviceTypes = {
+      servers: 0,
+      workstations: 0,
+      mobileDevices: 0,
+      networkDevices: 0
+    };
+
+    platformStats.forEach(stat => {
+      const count = parseInt(stat.count);
+      switch (stat.platform) {
+        case 'linux':
+          deviceTypes.servers += count;
+          break;
+        case 'windows':
+          deviceTypes.workstations += count;
+          break;
+        case 'macos':
+          deviceTypes.mobileDevices += count;
+          break;
+        case 'openwrt':
+          deviceTypes.networkDevices += count;
+          break;
+      }
+    });
+
+    // 计算保护状态（假设所有在线设备都是受保护的）
+    const protectedDevices = onlineDevices;
+    const unprotectedDevices = totalDevices - protectedDevices;
+
     const deviceStats = {
-      totalDevices: 1247,
-      onlineDevices: 1189,
-      offlineDevices: 58,
-      protectedDevices: 1201,
-      unprotectedDevices: 46,
-      deviceTypes: {
-        servers: 89,
-        workstations: 856,
-        mobileDevices: 234,
-        networkDevices: 68
-      },
+      totalDevices,
+      onlineDevices,
+      offlineDevices,
+      protectedDevices,
+      unprotectedDevices,
+      deviceTypes,
       lastUpdated: new Date().toISOString()
     };
 

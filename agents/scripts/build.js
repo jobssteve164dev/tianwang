@@ -256,6 +256,12 @@ const htmlContent = `<!DOCTYPE html>
             color: #888888;
         }
 
+        .logs-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
         .logs-container {
             flex: 1;
             padding: 16px 20px;
@@ -786,6 +792,7 @@ const htmlContent = `<!DOCTYPE html>
             <div class="tab-container">
                 <button class="tab-button active" onclick="switchTab('dashboard')">监控面板</button>
                 <button class="tab-button" onclick="switchTab('events')">事件列表</button>
+                <button class="tab-button" onclick="switchTab('logs')">系统日志</button>
             </div>
             
             <!-- 监控面板标签页 -->
@@ -836,19 +843,6 @@ const htmlContent = `<!DOCTYPE html>
                 <button class="btn btn-danger" id="stop-btn" onclick="stopMonitoring()" disabled>停止监控</button>
                 <button class="btn" onclick="showSettings()">设置</button>
                 <button class="btn" onclick="runDiagnostics()">诊断</button>
-            </div>
-            
-            <div class="logs-section">
-                <div class="logs-header">
-                    <span class="logs-title">系统日志</span>
-                    <span class="logs-count" id="logs-count">0 条</span>
-                </div>
-                <div class="logs-container" id="logs-container">
-                    <div class="log-entry">
-                        <span class="log-timestamp">[启动]</span>
-                        <span class="log-message log-info">TianWang Agent 已启动</span>
-                    </div>
-                </div>
             </div>
             
             <div class="footer">
@@ -910,6 +904,35 @@ const htmlContent = `<!DOCTYPE html>
                 </div>
             </div>
         </div>
+        
+        <!-- 系统日志标签页 -->
+        <div id="logs-tab" class="tab-content">
+            <div class="logs-section">
+                <div class="logs-header">
+                    <span class="logs-title">系统日志</span>
+                    <div class="logs-controls">
+                        <select class="filter-select" id="log-level-filter" onchange="filterLogs()">
+                            <option value="all">所有级别</option>
+                            <option value="error">错误</option>
+                            <option value="warning">警告</option>
+                            <option value="info">信息</option>
+                            <option value="success">成功</option>
+                        </select>
+                        <input type="text" class="search-input" id="log-search-input" placeholder="搜索日志..." onkeyup="filterLogs()">
+                        <button class="event-action-btn" onclick="clearLogs()">清空日志</button>
+                        <button class="event-action-btn" onclick="exportLogs()">导出日志</button>
+                        <button class="event-action-btn" onclick="refreshLogs()">刷新</button>
+                    </div>
+                    <span class="logs-count" id="logs-count">0 条</span>
+                </div>
+                <div class="logs-container" id="logs-container">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[启动]</span>
+                        <span class="log-message log-info">TianWang Agent 已启动</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -935,6 +958,9 @@ const htmlContent = `<!DOCTYPE html>
                 
                 // 设置事件监听
                 setupEventListeners();
+                
+                // 初始化日志计数
+                updateLogCount();
                 
                 addLog('✅ 系统初始化完成', 'success');
             } catch (error) {
@@ -1460,7 +1486,7 @@ const htmlContent = `<!DOCTYPE html>
             
             // 更新日志计数
             logCount++;
-            document.getElementById('logs-count').textContent = logCount + ' 条';
+            updateLogCount();
             
             // 限制日志数量
             if (logsContainer.children.length > 100) {
@@ -1499,6 +1525,106 @@ const htmlContent = `<!DOCTYPE html>
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initialize);
 
+        // ===== 系统日志相关函数 =====
+
+        // 过滤日志
+        function filterLogs() {
+            const levelFilter = document.getElementById('log-level-filter').value;
+            const searchFilter = document.getElementById('log-search-input').value.toLowerCase();
+            const logEntries = document.querySelectorAll('.log-entry');
+            
+            logEntries.forEach(entry => {
+                const message = entry.querySelector('.log-message').textContent.toLowerCase();
+                const level = getLogLevel(entry);
+                
+                let show = true;
+                
+                // 按级别过滤
+                if (levelFilter !== 'all' && level !== levelFilter) {
+                    show = false;
+                }
+                
+                // 按关键词过滤
+                if (searchFilter && !message.includes(searchFilter)) {
+                    show = false;
+                }
+                
+                entry.style.display = show ? 'flex' : 'none';
+            });
+            
+            updateLogCount();
+        }
+
+        // 获取日志级别
+        function getLogLevel(logEntry) {
+            const messageElement = logEntry.querySelector('.log-message');
+            if (messageElement.classList.contains('log-error')) return 'error';
+            if (messageElement.classList.contains('log-warning')) return 'warning';
+            if (messageElement.classList.contains('log-success')) return 'success';
+            return 'info';
+        }
+
+        // 清空日志
+        function clearLogs() {
+            const logsContainer = document.getElementById('logs-container');
+            logsContainer.innerHTML = '';
+            logCount = 0;
+            document.getElementById('logs-count').textContent = '0 条';
+            addLog('日志已清空', 'info');
+        }
+
+        // 导出日志
+        function exportLogs() {
+            try {
+                const logsContainer = document.getElementById('logs-container');
+                const logEntries = logsContainer.querySelectorAll('.log-entry');
+                let logContent = 'TianWang Agent 系统日志\n';
+                logContent += '导出时间: ' + new Date().toLocaleString('zh-CN') + '\n\n';
+                
+                logEntries.forEach(entry => {
+                    const timestamp = entry.querySelector('.log-timestamp').textContent;
+                    const message = entry.querySelector('.log-message').textContent;
+                    logContent += timestamp + ' ' + message + '\n';
+                });
+                
+                // 创建下载链接
+                const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tianwang-logs-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                addLog('日志已导出', 'success');
+            } catch (error) {
+                addLog('导出日志失败: ' + error.message, 'error');
+            }
+        }
+
+        // 刷新日志
+        function refreshLogs() {
+            // 这里可以添加从后端获取最新日志的逻辑
+            addLog('日志已刷新', 'info');
+        }
+
+        // 更新日志计数
+        function updateLogCount() {
+            const logEntries = document.querySelectorAll('.log-entry');
+            const visibleLogs = Array.from(logEntries).filter(entry => {
+                return entry.style.display !== 'none';
+            }).length;
+            const totalLogs = logEntries.length;
+            
+            if (visibleLogs === totalLogs) {
+                document.getElementById('logs-count').textContent = \`\${totalLogs} 条\`;
+            } else {
+                document.getElementById('logs-count').textContent = \`\${visibleLogs}/\${totalLogs} 条\`;
+            }
+        }
+
         // ===== 事件列表相关函数 =====
 
         // 切换标签页
@@ -1523,6 +1649,11 @@ const htmlContent = `<!DOCTYPE html>
             if (tabName === 'events') {
                 loadEvents();
                 updateEventStats();
+            }
+            
+            // 如果切换到系统日志，刷新日志数据
+            if (tabName === 'logs') {
+                refreshLogs();
             }
         }
 
