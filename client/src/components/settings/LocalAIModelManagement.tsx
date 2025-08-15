@@ -49,11 +49,11 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
       if (response.success) {
         setModelStatus(response.models);
       } else {
-        messageApi.error('加载模型状态失败');
+        messageApi.error(`加载模型状态失败: ${response.message || '未知错误'}`);
       }
     } catch (error) {
       console.error('加载模型状态失败:', error);
-      messageApi.error('加载模型状态失败');
+      messageApi.error(`加载模型状态失败: ${error instanceof Error ? error.message : '网络错误'}`);
     } finally {
       setLoading(false);
     }
@@ -65,9 +65,12 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
       const response = await localAIModelApi.getModelPerformance();
       if (response.success) {
         setPerformanceData(response.performance_metrics);
+      } else {
+        console.warn('加载性能数据失败:', response.message);
       }
     } catch (error) {
       console.error('加载性能数据失败:', error);
+      // 性能数据加载失败不影响主要功能，只记录日志
     }
   };
 
@@ -83,6 +86,14 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
   useEffect(() => {
     loadModelStatus();
     loadPerformanceData();
+    
+    // 设置定时刷新
+    const interval = setInterval(() => {
+      loadModelStatus();
+      loadPerformanceData();
+    }, 30000); // 每30秒刷新一次
+    
+    return () => clearInterval(interval);
   }, []);
 
   // 定义标签页
@@ -197,7 +208,7 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
         </Space>
       </div>
 
-      <Spin spinning={loading}>
+      <Spin spinning={loading} tip="加载中...">
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
@@ -208,6 +219,9 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
             padding: '16px',
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}
+          tabBarStyle={{
+            marginBottom: 16
           }}
         />
       </Spin>
