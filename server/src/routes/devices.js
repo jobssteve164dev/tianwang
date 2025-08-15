@@ -2,63 +2,95 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const models = require('../models');
 
 // GET /api/devices - 获取设备列表
 router.get('/', authenticate, async (req, res) => {
   try {
-    // 模拟设备数据
-    const devices = [
-      {
-        id: '1',
-        name: 'Web服务器-01',
-        hostname: 'web-server-01',
-        ip_address: '192.168.1.100',
-        platform: 'linux',
-        status: 'online',
-        last_seen_at: new Date().toISOString(),
-        agent_version: '1.0.0',
-        capabilities: {
-          log_collection: true,
-          network_monitoring: true,
-          process_monitoring: true
-        }
-      },
-      {
-        id: '2',
-        name: '数据库服务器-01',
-        hostname: 'db-server-01',
-        ip_address: '192.168.1.101',
-        platform: 'linux',
-        status: 'online',
-        last_seen_at: new Date().toISOString(),
-        agent_version: '1.0.0',
-        capabilities: {
-          log_collection: true,
-          network_monitoring: true,
-          process_monitoring: true
-        }
-      },
-      {
-        id: '3',
-        name: '开发工作站-01',
-        hostname: 'dev-workstation-01',
-        ip_address: '192.168.1.102',
-        platform: 'windows',
-        status: 'offline',
-        last_seen_at: new Date(Date.now() - 3600000).toISOString(),
-        agent_version: '1.0.0',
-        capabilities: {
-          log_collection: true,
-          network_monitoring: true,
-          process_monitoring: false
-        }
-      }
-    ];
+    const { page = 1, limit = 20, status, platform, search } = req.query;
+    
+    // 构建查询条件
+    const whereClause = {};
+    
+    // 状态过滤
+    if (status && status !== 'all') {
+      whereClause.status = status;
+    }
+    
+    // 平台过滤
+    if (platform && platform !== 'all') {
+      whereClause.platform = platform;
+    }
+    
+    // 搜索过滤
+    if (search) {
+      whereClause[models.Sequelize.Op.or] = [
+        { name: { [models.Sequelize.Op.iLike]: `%${search}%` } },
+        { hostname: { [models.Sequelize.Op.iLike]: `%${search}%` } },
+        { agentId: { [models.Sequelize.Op.iLike]: `%${search}%` } }
+      ];
+    }
+    
+    // 组织过滤
+    if (req.user?.organizationId) {
+      whereClause.organizationId = req.user.organizationId;
+    }
+
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        message: '数据库服务不可用',
+        error: 'DB_UNAVAILABLE'
+      });
+    }
+
+    // 查询代理数据
+    const agents = await models.Agent.findAll({
+      where: whereClause,
+      order: [['lastSeen', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      attributes: [
+        'id', 'agentId', 'name', 'hostname', 'platform', 'arch', 'version',
+        'status', 'lastSeen', 'registeredAt', 'capabilities', 'systemInfo'
+      ]
+    });
+
+    // 获取总数
+    const total = await models.Agent.count({ where: whereClause });
+
+    // 转换为设备格式
+    const devices = agents.map(agent => ({
+      id: agent.id,
+      name: agent.name || agent.hostname,
+      hostname: agent.hostname,
+      ip_address: agent.systemInfo?.networkInterfaces?.[0]?.ip || 'N/A',
+      mac_address: agent.systemInfo?.networkInterfaces?.[0]?.mac || 'N/A',
+      platform: agent.platform,
+      type: agent.platform, // 兼容前端
+      status: agent.status,
+      last_seen_at: agent.lastSeen,
+      lastSeen: agent.lastSeen, // 兼容前端
+      agent_version: agent.version,
+      version: agent.version, // 兼容前端
+      capabilities: agent.capabilities || {},
+      os: agent.systemInfo?.os || agent.platform,
+      architecture: agent.arch,
+      registered_at: agent.registeredAt
+    }));
 
     res.json({
       success: true,
       data: devices,
-      count: devices.length
+      count: total,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     logger.error('获取设备列表失败:', error);
@@ -70,85 +102,56 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/devices - 添加设备
-router.post('/', authenticate, async (req, res) => {
-  try {
-    const { name, hostname, ip_address, platform, description } = req.body;
-
-    // 验证必需字段
-    if (!name || !hostname || !ip_address || !platform) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必需字段: name, hostname, ip_address, platform'
-      });
-    }
-
-    // 模拟创建设备
-    const newDevice = {
-      id: Date.now().toString(),
-      name,
-      hostname,
-      ip_address,
-      platform,
-      status: 'offline',
-      last_seen_at: null,
-      agent_version: null,
-      capabilities: {
-        log_collection: true,
-        network_monitoring: true,
-        process_monitoring: true
-      },
-      description,
-      created_at: new Date().toISOString()
-    };
-
-    logger.info('设备创建成功:', { deviceId: newDevice.id, name: newDevice.name });
-
-    res.status(201).json({
-      success: true,
-      message: '设备创建成功',
-      data: newDevice
-    });
-  } catch (error) {
-    logger.error('创建设备失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '创建设备失败',
-      error: error.message
-    });
-  }
-});
-
 // GET /api/devices/:id - 获取设备详情
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 模拟设备详情数据
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        message: '数据库服务不可用',
+        error: 'DB_UNAVAILABLE'
+      });
+    }
+
+    const agent = await models.Agent.findByPk(id);
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: '设备不存在'
+      });
+    }
+
+    // 转换为设备详情格式
     const device = {
-      id,
-      name: `设备-${id}`,
-      hostname: `host-${id}`,
-      ip_address: `192.168.1.${100 + parseInt(id)}`,
-      platform: 'linux',
-      status: 'online',
-      last_seen_at: new Date().toISOString(),
-      agent_version: '1.0.0',
-      capabilities: {
-        log_collection: true,
-        network_monitoring: true,
-        process_monitoring: true
-      },
+      id: agent.id,
+      name: agent.name || agent.hostname,
+      hostname: agent.hostname,
+      ip_address: agent.systemInfo?.networkInterfaces?.[0]?.ip || 'N/A',
+      mac_address: agent.systemInfo?.networkInterfaces?.[0]?.mac || 'N/A',
+      platform: agent.platform,
+      type: agent.platform,
+      status: agent.status,
+      last_seen_at: agent.lastSeen,
+      lastSeen: agent.lastSeen,
+      agent_version: agent.version,
+      version: agent.version,
+      capabilities: agent.capabilities || {},
+      os: agent.systemInfo?.os || agent.platform,
+      architecture: agent.arch,
+      registered_at: agent.registeredAt,
       hardware_info: {
-        cpu: 'Intel Xeon E5-2680',
-        memory: '32GB',
-        disk: '1TB SSD'
+        cpu: agent.systemInfo?.cpu || {},
+        memory: agent.systemInfo?.memory || {},
+        disk: agent.systemInfo?.diskInfo || []
       },
       network_info: {
-        interfaces: [
-          { name: 'eth0', ip: '192.168.1.100', mac: '00:11:22:33:44:55' }
-        ]
-      }
+        interfaces: agent.systemInfo?.networkInterfaces || []
+      },
+      system_info: agent.systemInfo || {}
     };
 
     res.json({
@@ -165,18 +168,94 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+// DELETE /api/devices/:id - 删除设备
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        message: '数据库服务不可用',
+        error: 'DB_UNAVAILABLE'
+      });
+    }
+
+    const agent = await models.Agent.findByPk(id);
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: '设备不存在'
+      });
+    }
+
+    // 删除代理
+    await agent.destroy();
+
+    logger.info('设备删除成功:', { agentId: agent.agentId, hostname: agent.hostname });
+
+    res.json({
+      success: true,
+      message: '设备删除成功'
+    });
+  } catch (error) {
+    logger.error('删除设备失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '删除设备失败',
+      error: error.message
+    });
+  }
+});
+
 // PUT /api/devices/:id - 更新设备
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { name, status } = req.body;
 
-    logger.info('设备更新成功:', { deviceId: id, updates: updateData });
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        message: '数据库服务不可用',
+        error: 'DB_UNAVAILABLE'
+      });
+    }
+
+    const agent = await models.Agent.findByPk(id);
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: '设备不存在'
+      });
+    }
+
+    // 更新设备信息
+    if (name) {
+      agent.name = name;
+    }
+    
+    if (status && ['online', 'offline', 'error'].includes(status)) {
+      agent.status = status;
+    }
+
+    await agent.save();
+
+    logger.info('设备更新成功:', { agentId: agent.agentId, hostname: agent.hostname });
 
     res.json({
       success: true,
       message: '设备更新成功',
-      data: { id, ...updateData }
+      data: {
+        id: agent.id,
+        name: agent.name,
+        hostname: agent.hostname,
+        status: agent.status
+      }
     });
   } catch (error) {
     logger.error('更新设备失败:', error);
@@ -188,22 +267,84 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/devices/:id - 删除设备
-router.delete('/:id', authenticate, async (req, res) => {
+// GET /api/devices/stats - 获取设备统计信息
+router.get('/stats/overview', authenticate, async (req, res) => {
   try {
-    const { id } = req.params;
+    // 检查Agent模型是否可用
+    if (!models.Agent) {
+      logger.error('Agent模型不可用');
+      return res.status(503).json({
+        success: false,
+        message: '数据库服务不可用',
+        error: 'DB_UNAVAILABLE'
+      });
+    }
 
-    logger.info('设备删除成功:', { deviceId: id });
+    const whereClause = {};
+    if (req.user?.organizationId) {
+      whereClause.organizationId = req.user.organizationId;
+    }
+
+    // 获取各种状态的设备数量
+    const total = await models.Agent.count({ where: whereClause });
+    const online = await models.Agent.count({ 
+      where: { ...whereClause, status: 'online' } 
+    });
+    const offline = await models.Agent.count({ 
+      where: { ...whereClause, status: 'offline' } 
+    });
+    const error = await models.Agent.count({ 
+      where: { ...whereClause, status: 'error' } 
+    });
+
+    // 按平台统计 - 修复Sequelize引用
+    const { Sequelize } = require('sequelize');
+    const platformStats = await models.Agent.findAll({
+      where: whereClause,
+      attributes: [
+        'platform',
+        [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
+      ],
+      group: ['platform']
+    });
+
+    // 最近注册的设备
+    const recentDevices = await models.Agent.findAll({
+      where: whereClause,
+      order: [['registeredAt', 'DESC']],
+      limit: 5,
+      attributes: ['id', 'name', 'hostname', 'platform', 'status', 'registeredAt']
+    });
 
     res.json({
       success: true,
-      message: '设备删除成功'
+      data: {
+        overview: {
+          total,
+          online,
+          offline,
+          error,
+          onlineRate: total > 0 ? Math.round((online / total) * 100) : 0
+        },
+        platformStats: platformStats.map(stat => ({
+          platform: stat.platform,
+          count: parseInt(stat.dataValues.count)
+        })),
+        recentDevices: recentDevices.map(device => ({
+          id: device.id,
+          name: device.name || device.hostname,
+          hostname: device.hostname,
+          platform: device.platform,
+          status: device.status,
+          registeredAt: device.registeredAt
+        }))
+      }
     });
   } catch (error) {
-    logger.error('删除设备失败:', error);
+    logger.error('获取设备统计失败:', error);
     res.status(500).json({
       success: false,
-      message: '删除设备失败',
+      message: '获取设备统计失败',
       error: error.message
     });
   }

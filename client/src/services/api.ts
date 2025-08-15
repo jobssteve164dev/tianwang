@@ -143,9 +143,12 @@ export const alertAPI = {
 // 设备相关API
 export const deviceAPI = {
   getDevices: async (params: {
+    page?: number;
+    limit?: number;
     type?: string;
     status?: string;
     search?: string;
+    platform?: string;
   } = {}) => {
     const queryString = new URLSearchParams();
     
@@ -164,7 +167,7 @@ export const deviceAPI = {
 
   updateDevice: async (id: string, data: Partial<any>) => {
     return request(`/devices/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },
@@ -173,6 +176,10 @@ export const deviceAPI = {
     return request(`/devices/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  getDeviceStats: async () => {
+    return request('/devices/stats/overview');
   },
 
   controlDevice: async (id: string, action: 'start' | 'stop' | 'restart') => {
