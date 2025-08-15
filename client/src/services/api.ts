@@ -468,6 +468,64 @@ export const aiModelApi = {
     }),
 };
 
+// 本地AI模型管理API
+export const localAIModelApi = {
+  // 获取所有模型状态
+  getModelStatus: () => request('/system/ai-models/status'),
+  
+  // 获取特定模型状态
+  getModelStatusByName: (modelName: string) => request(`/system/ai-models/${modelName}/status`),
+  
+  // 训练模型
+  trainModel: (data: { model_name: string; training_data?: any[] }) => 
+    request('/system/ai-models/train', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  // 获取训练状态
+  getTrainingStatus: (taskId: string) => request(`/system/ai-models/training/${taskId}/status`),
+  
+  // 测试模型
+  testModel: (data: { model_name: string; test_data: any }) => 
+    request('/system/ai-models/test', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  // 训练数据管理
+  uploadTrainingData: (data: { model_name: string; data_type: string; data: any[] }) => 
+    request('/system/ai-models/training-data', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  getTrainingDataList: (params?: { model_name?: string; page?: number; limit?: number }) => {
+    const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return request(`/system/ai-models/training-data${queryString}`);
+  },
+  
+  getTrainingDataDetail: (dataId: string) => request(`/system/ai-models/training-data/${dataId}`),
+  
+  deleteTrainingData: (dataId: string) => 
+    request(`/system/ai-models/training-data/${dataId}`, {
+      method: 'DELETE',
+    }),
+  
+  // 性能监控
+  getModelPerformance: (modelName?: string) => {
+    const queryString = modelName ? `?model_name=${modelName}` : '';
+    return request(`/system/ai-models/performance${queryString}`);
+  },
+  
+  getPerformanceHistory: (params?: { model_name?: string; days?: number }) => {
+    const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return request(`/system/ai-models/performance/history${queryString}`);
+  },
+  
+  getSystemPerformanceOverview: () => request('/system/ai-models/performance/overview'),
+};
+
 // 威胁情报配置管理API
 export const threatIntelligenceApi = {
   getConfig: () => request('/threat-intelligence/config'),
