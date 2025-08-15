@@ -339,8 +339,20 @@ const htmlContent = `<!DOCTYPE html>
             display: flex;
         }
 
+        /* 监控面板标签页样式 - 自然填充空间 */
+        #dashboard-tab {
+            flex: 1;
+            overflow: auto;
+        }
+
         /* 事件列表标签页特殊样式 */
         #events-tab {
+            height: calc(100vh - 200px);
+            overflow: hidden;
+        }
+
+        /* 系统日志标签页特殊样式 */
+        #logs-tab {
             height: calc(100vh - 200px);
             overflow: hidden;
         }
@@ -790,9 +802,9 @@ const htmlContent = `<!DOCTYPE html>
             
             <!-- 标签页导航 -->
             <div class="tab-container">
-                <button class="tab-button active" onclick="switchTab('dashboard')">监控面板</button>
-                <button class="tab-button" onclick="switchTab('events')">事件列表</button>
-                <button class="tab-button" onclick="switchTab('logs')">系统日志</button>
+                <button class="tab-button active" onclick="switchTab('dashboard', this)">监控面板</button>
+                <button class="tab-button" onclick="switchTab('events', this)">事件列表</button>
+                <button class="tab-button" onclick="switchTab('logs', this)">系统日志</button>
             </div>
             
             <!-- 监控面板标签页 -->
@@ -1628,7 +1640,7 @@ const htmlContent = `<!DOCTYPE html>
         // ===== 事件列表相关函数 =====
 
         // 切换标签页
-        function switchTab(tabName) {
+        function switchTab(tabName, buttonElement) {
             // 隐藏所有标签页内容
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -1643,7 +1655,16 @@ const htmlContent = `<!DOCTYPE html>
             document.getElementById(tabName + '-tab').classList.add('active');
             
             // 激活对应的按钮
-            event.target.classList.add('active');
+            if (buttonElement) {
+                buttonElement.classList.add('active');
+            } else {
+                // 如果没有buttonElement参数，通过tabName找到对应的按钮
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    if (btn.textContent.trim() === getTabDisplayName(tabName)) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
             
             // 如果切换到事件列表，加载事件数据
             if (tabName === 'events') {
@@ -1654,6 +1675,16 @@ const htmlContent = `<!DOCTYPE html>
             // 如果切换到系统日志，刷新日志数据
             if (tabName === 'logs') {
                 refreshLogs();
+            }
+        }
+
+        // 获取tab显示名称
+        function getTabDisplayName(tabName) {
+            switch (tabName) {
+                case 'dashboard': return '监控面板';
+                case 'events': return '事件列表';
+                case 'logs': return '系统日志';
+                default: return tabName;
             }
         }
 
