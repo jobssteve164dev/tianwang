@@ -96,20 +96,32 @@ const ModelStatusOverview: React.FC<ModelStatusOverviewProps> = ({
 
   return (
     <div className="model-status-overview">
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <Button 
-            type="primary" 
-            onClick={onRefresh}
-            loading={loading}
-            icon={<ReloadOutlined />}
-          >
-            刷新状态
-          </Button>
-          <Text type="secondary">
-            最后更新: {new Date().toLocaleString()}
-          </Text>
-        </Space>
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        padding: '8px 0'
+      }}>
+        <Text type="secondary" style={{ fontSize: '13px' }}>
+          最后更新: {new Date().toLocaleString()}
+        </Text>
+        <Button 
+          type="text" 
+          size="small"
+          onClick={onRefresh}
+          loading={loading}
+          icon={<ReloadOutlined style={{ fontSize: '14px' }} />}
+          style={{ 
+            color: '#666',
+            padding: '4px 8px',
+            height: 'auto',
+            border: 'none',
+            boxShadow: 'none'
+          }}
+        >
+          <span style={{ fontSize: '13px' }}>刷新</span>
+        </Button>
       </div>
 
       <Row gutter={[16, 16]}>
