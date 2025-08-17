@@ -130,13 +130,13 @@ class WebSocketService {
           logger.debug('连接密钥验证结果:', {
             agentId: decoded.agentId,
             isValid: keyValidation.isValid,
-            error: keyValidation.error
+            error: keyValidation.error || '无错误'
           });
           
           if (!keyValidation.isValid) {
             logger.warn('WebSocket连接密钥验证失败，但允许连接:', { 
               agentId: decoded.agentId,
-              reason: keyValidation.error,
+              reason: keyValidation.error || '未知错误',
               providedSignature: connectionKey.substring(0, 16) + '...',
               expectedKey: decoded.connectionKey.substring(0, 16) + '...'
             });

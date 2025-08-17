@@ -70,6 +70,35 @@ router.get('/security-metrics', async (req, res) => {
       ? ((recentAlerts - previousAlerts) / previousAlerts * 100).toFixed(1)
       : recentAlerts > 0 ? 100 : 0;
 
+    // 定义威胁类型映射（与威胁分布API保持一致）
+    const threatTypeMap = {
+      // 恶意软件相关
+      'malware-activity': { name: '恶意软件', color: '#ff6384', category: 'malware' },
+      
+      // 网络入侵相关
+      'network-intrusion': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'suspicious-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'connection-flood': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'unknown-process-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      
+      // 可疑活动相关
+      'suspicious-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'dangerous-command': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-memory-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-temperature': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      
+      // DDoS攻击
+      'ddos-attack': { name: 'DDoS攻击', color: '#4bc0c0', category: 'ddos' },
+      
+      // 数据泄露
+      'data-leak': { name: '数据泄露', color: '#ff9f40', category: 'data-leak' },
+      
+      // 认证异常
+      'authentication-anomaly': { name: '认证异常', color: '#ffcd56', category: 'authentication-anomaly' }
+    };
+
     // 按类型统计告警
     const alertTypeStats = await models.Alert.findAll({
       attributes: [
@@ -89,19 +118,22 @@ router.get('/security-metrics', async (req, res) => {
 
     alertTypeStats.forEach(stat => {
       const count = parseInt(stat.count);
-      switch (stat.type) {
-        case 'malware':
-          metrics.malwareDetections = count;
-          break;
-        case 'network-intrusion':
-          metrics.networkIntrusions = count;
-          break;
-        case 'suspicious-activity':
-          metrics.suspiciousActivities = count;
-          break;
-        case 'policy-violation':
-          metrics.policyViolations = count;
-          break;
+      const threatType = threatTypeMap[stat.type];
+      if (threatType) {
+        switch (threatType.category) {
+          case 'malware':
+            metrics.malwareDetections += count;
+            break;
+          case 'network-intrusion':
+            metrics.networkIntrusions += count;
+            break;
+          case 'suspicious-activity':
+            metrics.suspiciousActivities += count;
+            break;
+          case 'data-leak':
+            metrics.policyViolations += count;
+            break;
+        }
       }
     });
 
@@ -203,16 +235,50 @@ router.get('/threat-trends', async (req, res) => {
       labels.push(date.toISOString().split('T')[0]);
     }
 
+    // 定义威胁类型映射（与威胁分布API保持一致）
+    const threatTypeMap = {
+      // 恶意软件相关
+      'malware-activity': { name: '恶意软件', color: '#ff6384', category: 'malware' },
+      
+      // 网络入侵相关
+      'network-intrusion': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'suspicious-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'connection-flood': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'unknown-process-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      
+      // 可疑活动相关
+      'suspicious-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'dangerous-command': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-memory-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-temperature': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      
+      // DDoS攻击
+      'ddos-attack': { name: 'DDoS攻击', color: '#4bc0c0', category: 'ddos' },
+      
+      // 数据泄露
+      'data-leak': { name: '数据泄露', color: '#ff9f40', category: 'data-leak' },
+      
+      // 认证异常
+      'authentication-anomaly': { name: '认证异常', color: '#ffcd56', category: 'authentication-anomaly' }
+    };
+
     // 定义威胁类型和颜色
-    const threatTypes = [
-      { type: 'malware', label: '恶意软件', borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.1)' },
-      { type: 'network-intrusion', label: '网络入侵', borderColor: '#36a2eb', backgroundColor: 'rgba(54, 162, 235, 0.1)' },
-      { type: 'suspicious-activity', label: '可疑活动', borderColor: '#ffcd56', backgroundColor: 'rgba(255, 205, 86, 0.1)' }
+    const threatCategories = [
+      { category: 'malware', label: '恶意软件', borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.1)' },
+      { category: 'network-intrusion', label: '网络入侵', borderColor: '#36a2eb', backgroundColor: 'rgba(54, 162, 235, 0.1)' },
+      { category: 'suspicious-activity', label: '可疑活动', borderColor: '#9966ff', backgroundColor: 'rgba(153, 102, 255, 0.1)' }
     ];
 
     // 为每种威胁类型生成时间序列数据
-    const datasets = await Promise.all(threatTypes.map(async (threatType) => {
+    const datasets = await Promise.all(threatCategories.map(async (threatCategory) => {
       const data = [];
+      
+      // 获取该分类下的所有具体类型
+      const specificTypes = Object.keys(threatTypeMap).filter(key => 
+        threatTypeMap[key].category === threatCategory.category
+      );
       
       for (let i = dataPoints - 1; i >= 0; i--) {
         const date = new Date();
@@ -222,7 +288,9 @@ router.get('/threat-trends', async (req, res) => {
         
         const count = await models.Alert.count({
           where: {
-            type: threatType.type,
+            type: {
+              [Op.in]: specificTypes
+            },
             timestamp: {
               [Op.gte]: startOfDay,
               [Op.lt]: endOfDay
@@ -234,10 +302,10 @@ router.get('/threat-trends', async (req, res) => {
       }
       
       return {
-        label: threatType.label,
+        label: threatCategory.label,
         data,
-        borderColor: threatType.borderColor,
-        backgroundColor: threatType.backgroundColor
+        borderColor: threatCategory.borderColor,
+        backgroundColor: threatCategory.backgroundColor
       };
     }));
 
@@ -286,16 +354,35 @@ router.get('/threat-distribution', async (req, res) => {
 
     // 定义威胁类型映射和颜色
     const threatTypeMap = {
-      'malware': { name: '恶意软件', color: '#ff6384' },
-      'network-intrusion': { name: '网络入侵', color: '#36a2eb' },
-      'phishing': { name: '钓鱼攻击', color: '#ffcd56' },
-      'ddos': { name: 'DDoS攻击', color: '#4bc0c0' },
-      'suspicious-activity': { name: '可疑活动', color: '#9966ff' },
-      'policy-violation': { name: '策略违规', color: '#ff9f40' }
+      // 恶意软件相关
+      'malware-activity': { name: '恶意软件', color: '#ff6384', category: 'malware' },
+      
+      // 网络入侵相关
+      'network-intrusion': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'suspicious-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'connection-flood': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      'unknown-process-connection': { name: '网络入侵', color: '#36a2eb', category: 'network-intrusion' },
+      
+      // 可疑活动相关
+      'suspicious-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'dangerous-command': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-process': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-memory-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-cpu-usage': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      'high-temperature': { name: '可疑活动', color: '#9966ff', category: 'suspicious-activity' },
+      
+      // DDoS攻击
+      'ddos-attack': { name: 'DDoS攻击', color: '#4bc0c0', category: 'ddos' },
+      
+      // 数据泄露
+      'data-leak': { name: '数据泄露', color: '#ff9f40', category: 'data-leak' },
+      
+      // 认证异常
+      'authentication-anomaly': { name: '认证异常', color: '#ffcd56', category: 'authentication-anomaly' }
     };
 
     // 构建分类数据
-    const categories = [];
+    const categoryMap = new Map();
     let total = 0;
 
     alertTypeStats.forEach(stat => {
@@ -304,12 +391,23 @@ router.get('/threat-distribution', async (req, res) => {
       
       const threatType = threatTypeMap[stat.type];
       if (threatType) {
-        categories.push({
-          name: threatType.name,
-          value: count,
-          color: threatType.color
-        });
+        const categoryName = threatType.name;
+        if (categoryMap.has(categoryName)) {
+          categoryMap.set(categoryName, categoryMap.get(categoryName) + count);
+        } else {
+          categoryMap.set(categoryName, count);
+        }
       }
+    });
+
+    // 转换为数组格式
+    const categories = Array.from(categoryMap.entries()).map(([name, value]) => {
+      const threatType = Object.values(threatTypeMap).find(t => t.name === name);
+      return {
+        name,
+        value,
+        color: threatType ? threatType.color : '#e0e0e0'
+      };
     });
 
     // 如果没有数据，返回默认结构
@@ -382,29 +480,19 @@ router.get('/device-stats', async (req, res) => {
       })
     ]);
 
-    // 构建设备类型统计
+    // 构建设备类型统计 - 与设备管理页面保持一致
     const deviceTypes = {
-      servers: 0,
-      workstations: 0,
-      mobileDevices: 0,
-      networkDevices: 0
+      windows: 0,
+      linux: 0,
+      macos: 0,
+      openwrt: 0
     };
 
     platformStats.forEach(stat => {
       const count = parseInt(stat.count);
-      switch (stat.platform) {
-        case 'linux':
-          deviceTypes.servers += count;
-          break;
-        case 'windows':
-          deviceTypes.workstations += count;
-          break;
-        case 'macos':
-          deviceTypes.mobileDevices += count;
-          break;
-        case 'openwrt':
-          deviceTypes.networkDevices += count;
-          break;
+      const platform = stat.platform?.toLowerCase();
+      if (deviceTypes.hasOwnProperty(platform)) {
+        deviceTypes[platform] = count;
       }
     });
 

@@ -52,13 +52,13 @@ class AgentController {
         };
 
         const codeValidation = await registrationCodeService.validateRegistrationCode(registrationCode, deviceInfo);
-        console.log('注册码验证结果:', { isValid: codeValidation.isValid, error: codeValidation.error });
+        console.log('注册码验证结果:', { isValid: codeValidation.isValid, error: codeValidation.error || '无错误' });
         
         if (!codeValidation.isValid) {
-          console.warn('注册码验证失败:', codeValidation.error);
+          console.warn('注册码验证失败:', codeValidation.error || '未知错误');
           return res.status(400).json({
             success: false,
-            message: codeValidation.error,
+            message: codeValidation.error || '注册码验证失败',
             code: codeValidation.code
           });
         }
