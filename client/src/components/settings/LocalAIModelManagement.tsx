@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Tabs,
-  Space,
   Spin,
-  Alert,
   Button,
+  Space,
   App,
 } from 'antd';
 import {
@@ -171,27 +170,15 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
 
   return (
     <div className="local-ai-model-management">
-      <div style={{ marginBottom: 16 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }}>
-            <Button 
-              type="primary" 
-              onClick={handleRefresh}
-              loading={loading}
-              icon={<DashboardOutlined />}
-            >
-              刷新状态
-            </Button>
-          </div>
-          
-          <Alert
-            message="功能说明"
-            description="这里可以管理异常检测、恶意软件检测、网络入侵检测和用户行为分析等本地AI模型。支持模型训练、性能监控和测试功能。"
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-        </Space>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button 
+          type="primary" 
+          onClick={handleRefresh}
+          loading={loading}
+          icon={<DashboardOutlined />}
+        >
+          刷新状态
+        </Button>
       </div>
 
       <Spin spinning={loading} tip="加载中...">
@@ -200,15 +187,7 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
           onChange={setActiveTab}
           items={tabItems}
           size="large"
-          style={{ 
-            backgroundColor: '#fff',
-            padding: '16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-          }}
-          tabBarStyle={{
-            marginBottom: 16
-          }}
+          style={{ marginTop: 24 }}
         />
       </Spin>
     </div>
