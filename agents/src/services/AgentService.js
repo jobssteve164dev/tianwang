@@ -6,6 +6,16 @@ const os = require('os');
 const logger = require('../utils/logger');
 const Store = require('electron-store');
 
+// 平台映射工具函数
+function normalizePlatform(platform) {
+    const platformMapping = {
+        'darwin': 'macos',
+        'win32': 'windows',
+        'linux': 'linux'
+    };
+    return platformMapping[platform] || platform;
+}
+
 class AgentService extends EventEmitter {
     constructor() {
         super();
@@ -171,7 +181,7 @@ class AgentService extends EventEmitter {
             const agentInfo = {
                 agentId: this.agentId,
                 hostname: os.hostname(),
-                platform: os.platform(),
+                platform: normalizePlatform(os.platform()),
                 arch: os.arch(),
                 version: process.env.npm_package_version || '1.0.0',
                 capabilities: this.getCapabilities(),
@@ -289,7 +299,7 @@ class AgentService extends EventEmitter {
             // 构建设备指纹数据 - 与服务器端保持一致
             const deviceInfo = {
                 hostname: os.hostname(),
-                platform: os.platform(),
+                platform: normalizePlatform(os.platform()),
                 arch: os.arch(),
                 // 标准化MAC地址 - 与服务器端保持一致
                 macAddresses: network
@@ -393,7 +403,7 @@ class AgentService extends EventEmitter {
             const systemInfo = {
                 // 基础系统信息
                 hostname: os.hostname(),
-                platform: os.platform(),
+                platform: normalizePlatform(os.platform()),
                 arch: os.arch(),
                 
                 // 硬件信息
@@ -448,7 +458,7 @@ class AgentService extends EventEmitter {
                     available: mem.available || 0
                 },
                 os: {
-                    platform: osInfo.platform || '',
+                    platform: normalizePlatform(os.platform()),
                     distro: osInfo.distro || '',
                     release: osInfo.release || '',
                     kernel: osInfo.kernel || '',

@@ -9,10 +9,10 @@ interface DeviceStatsData {
   protectedDevices: number;
   unprotectedDevices: number;
   deviceTypes: {
-    servers: number;
-    workstations: number;
-    mobileDevices: number;
-    networkDevices: number;
+    windows: number;
+    linux: number;
+    macos: number;
+    openwrt: number;
   };
   lastUpdated: string;
 }
@@ -41,12 +41,12 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
       }
 
       // 处理数据
-      const categories = ['服务器', '工作站', '移动设备', '网络设备'];
+      const categories = ['Windows', 'Linux', 'macOS', 'OpenWrt'];
       const onlineData = [
-        data.deviceTypes.servers,
-        data.deviceTypes.workstations,
-        data.deviceTypes.mobileDevices,
-        data.deviceTypes.networkDevices
+        data.deviceTypes.windows,
+        data.deviceTypes.linux,
+        data.deviceTypes.macos,
+        data.deviceTypes.openwrt
       ];
 
       // 配置选项

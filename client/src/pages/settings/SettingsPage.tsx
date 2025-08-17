@@ -20,7 +20,7 @@ import { notificationApi } from '../../services/api';
 import AIModelConfig from '../../components/settings/AIModelConfig';
 import AIUsageStats from '../../components/settings/AIUsageStats';
 import ThreatIntelligenceConfig from '../../components/settings/ThreatIntelligenceConfig';
-import LocalAIModelManagement from '../../components/settings/LocalAIModelManagement';
+
 
 const { Title, Paragraph } = Typography;
 
@@ -348,9 +348,9 @@ const SettingsPage: React.FC = () => {
             </Space>
           }
         >
-          <AIModelConfig 
-            onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
-          />
+        <AIModelConfig 
+          onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
+        />
         </Card>
       )
     },
@@ -382,19 +382,10 @@ const SettingsPage: React.FC = () => {
             </Space>
           }
         >
-          <ThreatIntelligenceConfig 
-            onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
-          />
-        </Card>
-      )
-    },
-    {
-      key: 'local-ai-models',
-      label: '本地AI模型管理',
-      children: (
-        <LocalAIModelManagement 
+        <ThreatIntelligenceConfig 
           onConfigChange={() => setRefreshTrigger(prev => prev + 1)}
         />
+        </Card>
       )
     }
   ];

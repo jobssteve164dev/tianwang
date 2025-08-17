@@ -11,6 +11,7 @@ import {
   KeyOutlined,
   SecurityScanOutlined,
   SettingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { Avatar, Dropdown, Space } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -69,6 +70,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/security-rules',
       name: '安全规则',
       icon: <SecurityScanOutlined />,
+    },
+    {
+      path: '/ai-models',
+      name: '本地AI模型',
+      icon: <RobotOutlined />,
     },
     {
       path: '/settings',

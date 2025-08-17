@@ -530,10 +530,20 @@ async function initializeServices() {
     }
 }
 
+// 平台映射工具函数
+function normalizePlatform(platform) {
+    const platformMapping = {
+        'darwin': 'macos',
+        'win32': 'windows',
+        'linux': 'linux'
+    };
+    return platformMapping[platform] || platform;
+}
+
 // IPC 事件处理
 ipcMain.handle('get-system-info', async () => {
     return {
-        platform: os.platform(),
+        platform: normalizePlatform(os.platform()),
         arch: os.arch(),
         hostname: os.hostname(),
         version: app.getVersion()

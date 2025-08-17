@@ -80,6 +80,39 @@ const AlertsPage: React.FC = () => {
     setDetailModalVisible(true);
   };
 
+  // 告警类型映射
+  const getAlertTypeInfo = (type: string) => {
+    const typeMap: { [key: string]: { name: string; color: string; category: string } } = {
+      // 恶意软件相关
+      'malware-activity': { name: '恶意软件活动', color: '#ff6384', category: '恶意软件' },
+      
+      // 网络入侵相关
+      'network-intrusion': { name: '网络入侵', color: '#36a2eb', category: '网络攻击' },
+      'suspicious-connection': { name: '可疑连接', color: '#36a2eb', category: '网络攻击' },
+      'connection-flood': { name: '连接洪水', color: '#36a2eb', category: '网络攻击' },
+      'unknown-process-connection': { name: '未知进程连接', color: '#36a2eb', category: '网络攻击' },
+      
+      // 可疑活动相关
+      'suspicious-process': { name: '可疑进程', color: '#9966ff', category: '可疑活动' },
+      'dangerous-command': { name: '危险命令', color: '#9966ff', category: '可疑活动' },
+      'high-cpu-process': { name: '高CPU进程', color: '#9966ff', category: '可疑活动' },
+      'high-memory-usage': { name: '高内存使用', color: '#9966ff', category: '可疑活动' },
+      'high-cpu-usage': { name: '高CPU使用', color: '#9966ff', category: '可疑活动' },
+      'high-temperature': { name: '高温告警', color: '#9966ff', category: '可疑活动' },
+      
+      // DDoS攻击
+      'ddos-attack': { name: 'DDoS攻击', color: '#4bc0c0', category: '网络攻击' },
+      
+      // 数据泄露
+      'data-leak': { name: '数据泄露', color: '#ff9f40', category: '数据安全' },
+      
+      // 认证异常
+      'authentication-anomaly': { name: '认证异常', color: '#ffcd56', category: '认证安全' }
+    };
+    
+    return typeMap[type] || { name: type, color: '#d9d9d9', category: '其他' };
+  };
+
   const getSeverityColor = (severity: string) => {
     const colors = {
       low: 'green',
@@ -95,15 +128,34 @@ const AlertsPage: React.FC = () => {
       title: '告警标题',
       dataIndex: 'title',
       key: 'title',
-      width: 250,
+      width: 200,
       render: (text: string, record: Alert) => (
         <div>
           <div style={{ fontWeight: 500, marginBottom: 4 }}>{text}</div>
           <div style={{ fontSize: 12, color: '#666' }}>
-            {record.type} • {record.source}
+            {record.source}
           </div>
         </div>
       ),
+    },
+    {
+      title: '告警类型',
+      dataIndex: 'type',
+      key: 'type',
+      width: 140,
+      render: (type: string) => {
+        const typeInfo = getAlertTypeInfo(type);
+        return (
+          <div>
+            <Tag color={typeInfo.color} className="modern-tag" style={{ marginBottom: 4 }}>
+              {typeInfo.name}
+            </Tag>
+            <div style={{ fontSize: 11, color: '#666' }}>
+              {typeInfo.category}
+            </div>
+          </div>
+        );
+      },
     },
     {
       title: '严重级别',
@@ -266,10 +318,20 @@ const AlertsPage: React.FC = () => {
             onChange={(value) => handleFilterChange('type', value)}
             className="modern-select"
           >
-            <Option value="malware">恶意软件</Option>
-            <Option value="intrusion">网络入侵</Option>
-            <Option value="anomaly">异常行为</Option>
-            <Option value="data_leak">数据泄露</Option>
+            <Option value="malware-activity">恶意软件活动</Option>
+            <Option value="network-intrusion">网络入侵</Option>
+            <Option value="suspicious-connection">可疑连接</Option>
+            <Option value="suspicious-process">可疑进程</Option>
+            <Option value="dangerous-command">危险命令</Option>
+            <Option value="high-cpu-process">高CPU进程</Option>
+            <Option value="high-memory-usage">高内存使用</Option>
+            <Option value="high-cpu-usage">高CPU使用</Option>
+            <Option value="high-temperature">高温告警</Option>
+            <Option value="connection-flood">连接洪水</Option>
+            <Option value="unknown-process-connection">未知进程连接</Option>
+            <Option value="ddos-attack">DDoS攻击</Option>
+            <Option value="data-leak">数据泄露</Option>
+            <Option value="authentication-anomaly">认证异常</Option>
           </Select>
           
           <RangePicker

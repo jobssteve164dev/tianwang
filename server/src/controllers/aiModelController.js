@@ -470,7 +470,7 @@ class AIModelController {
   /**
    * 获取所有本地AI模型状态
    */
-  async getAIModelsStatus(req, res) {
+  async getLocalModelStatus(req, res) {
     try {
       logger.info('🔍 开始获取本地AI模型状态...');
       

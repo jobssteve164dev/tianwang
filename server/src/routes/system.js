@@ -40,15 +40,4 @@ router.get('/ai-models/performance', authenticate, authorize(['admin', 'super_ad
 router.get('/ai-models/performance/history', authenticate, authorize(['admin', 'super_admin']), aiModelController.getPerformanceHistory);
 router.get('/ai-models/performance/overview', authenticate, authorize(['admin', 'super_admin']), aiModelController.getSystemPerformanceOverview);
 
-// ----------------------------------------------------------------
-// WARNING: DEPRECATED ROUTES - These will be removed in a future update.
-// They are temporarily kept for backward compatibility.
-// New features should use the dedicated /api/ai-models endpoint.
-// ----------------------------------------------------------------
-router.get('/ai-models/status', aiModelController.getAIModelsStatus);
-router.get('/ai-models/performance', aiModelController.getModelPerformance);
-router.get('/ai-models/performance/history', aiModelController.getPerformanceHistory);
-router.get('/ai-models/training-data', aiModelController.getTrainingDataList);
-// ----------------------------------------------------------------
-
 module.exports = router; 
