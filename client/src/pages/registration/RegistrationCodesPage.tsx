@@ -74,6 +74,19 @@ const RegistrationCodesPage: React.FC = () => {
     fetchStats();
   }, []);
 
+  // 安全说明：注册码只能由管理端生成，代理端只能验证注册码
+  const securityNotice = (
+    <Card style={{ marginBottom: 16, borderColor: '#1890ff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <ExclamationCircleOutlined style={{ color: '#1890ff', fontSize: 16 }} />
+        <Text strong style={{ color: '#1890ff' }}>安全提示</Text>
+      </div>
+      <Paragraph style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>
+        出于安全考虑，注册码只能由管理端生成，代理端只能验证注册码。这防止了注册码被恶意代理端批量生成和滥用。
+      </Paragraph>
+    </Card>
+  );
+
   const fetchCodes = async () => {
     try {
       setLoading(true);
@@ -230,15 +243,9 @@ const RegistrationCodesPage: React.FC = () => {
       key: 'expiry',
       width: 150,
       render: (expiry: number) => (
-        <div>
-          <Text type={Date.now() > expiry ? 'danger' : 'secondary'}>
-            {dayjs(expiry).format('YYYY-MM-DD HH:mm')}
-          </Text>
-          <br />
-          <Text type="secondary" style={{ fontSize: 10 }}>
-            Raw: {expiry}
-          </Text>
-        </div>
+        <Text type={Date.now() > expiry ? 'danger' : 'secondary'}>
+          {dayjs(expiry).format('YYYY-MM-DD HH:mm')}
+        </Text>
       )
     },
     {
@@ -321,6 +328,9 @@ const RegistrationCodesPage: React.FC = () => {
           生成和管理设备注册码，控制设备接入权限
         </Paragraph>
       </div>
+
+      {/* 安全提示 */}
+      {securityNotice}
 
       {/* 统计卡片 */}
       {stats && (

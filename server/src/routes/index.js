@@ -11,6 +11,7 @@ const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const deviceRoutes = require('./devices');
 const agentRoutes = require('./agents');
+const adminRoutes = require('./admin');
 const securityRoutes = require('./security');
 const systemRoutes = require('./system');
 const dashboardRoutes = require('./dashboard');
@@ -30,6 +31,7 @@ router.get('/', (req, res) => {
       users: '/api/users',
       devices: '/api/devices',
       agents: '/api/agents',
+      admin: '/api/admin',
       security: '/api/security',
       system: '/api/system',
       dashboard: '/api/dashboard',
@@ -48,6 +50,7 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/devices', deviceRoutes);
 router.use('/agents', agentRoutes);
+router.use('/admin', adminRoutes);
 router.use('/security', securityRoutes);
 router.use('/system', systemRoutes);
 router.use('/dashboard', dashboardRoutes);

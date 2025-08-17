@@ -1,38 +1,132 @@
-Uncaught runtime errors:
-×
-ERROR
-Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
-    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
-    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
-    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
-    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
-    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
-    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
-    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
-    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
-    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
-    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)
-ERROR
-Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
-    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
-    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
-    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
-    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
-    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
-    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
-    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
-    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
-    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
-    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)
-ERROR
-Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
-    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
-    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
-    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
-    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
-    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
-    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
-    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
-    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
-    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
-    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)
+ray(0)
+browser-logger.js:112 API Response Data: 
+Array(6)
+0
+: 
+{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
+1
+: 
+{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+2
+: 
+{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+3
+: 
+{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
+4
+: 
+{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+5
+: 
+{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+length
+: 
+6
+[[Prototype]]
+: 
+Array(0)
+browser-logger.js:112 API Response Data: 
+Array(6)
+0
+: 
+{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
+1
+: 
+{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+2
+: 
+{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+3
+: 
+{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
+4
+: 
+{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+5
+: 
+{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+length
+: 
+6
+[[Prototype]]
+: 
+Array(0)
+browser-logger.js:112 API Response Data: 
+Array(6)
+0
+: 
+{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
+1
+: 
+{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+2
+: 
+{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+3
+: 
+{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
+4
+: 
+{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+5
+: 
+{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+length
+: 
+6
+[[Prototype]]
+: 
+Array(0)
+browser-logger.js:112 API Response Data: 
+Array(6)
+0
+: 
+{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
+1
+: 
+{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+2
+: 
+{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+3
+: 
+{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
+4
+: 
+{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+5
+: 
+{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+length
+: 
+6
+[[Prototype]]
+: 
+Array(0)
+browser-logger.js:112 API Response Data: 
+Array(6)
+0
+: 
+{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
+1
+: 
+{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+2
+: 
+{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
+3
+: 
+{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
+4
+: 
+{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+5
+: 
+{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
+length
+: 
+6
+[[Prototype]]
+: 
+Array(0)
+﻿

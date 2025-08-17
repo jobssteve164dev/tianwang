@@ -9,13 +9,6 @@ router.post('/register', agentController.registerAgent);
 // 代理认证 (公开接口，不需要认证)
 router.post('/auth', agentController.authenticateAgent);
 
-// 注册码管理 (需要认证)
-router.post('/registration-codes', authenticate, agentController.generateRegistrationCode);
-router.get('/registration-codes', authenticate, agentController.getRegistrationCodes);
-router.get('/registration-codes/stats', authenticate, agentController.getRegistrationCodeStats);
-router.delete('/registration-codes/:code', authenticate, agentController.disableRegistrationCode);
-router.patch('/registration-codes/:code/extend', authenticate, agentController.extendRegistrationCode);
-
 // 安全状态 (需要认证)
 router.get('/security-status', authenticate, agentController.getSecurityStatus);
 

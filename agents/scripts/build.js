@@ -1187,6 +1187,7 @@ const htmlContent = `<!DOCTYPE html>
                         '<button onclick="validateRegistrationCode()" style="' +
                             'flex: 1;' +
                             'padding: 8px 12px;' +
+                            'margin-right: 8px;' +
                             'border: 1px solid #333333;' +
                             'border-radius: 6px;' +
                             'background: #111111;' +
@@ -1195,17 +1196,7 @@ const htmlContent = `<!DOCTYPE html>
                             'font-size: 12px;' +
                             'font-weight: 500;' +
                         '">验证注册码</button>' +
-                        '<button onclick="generateRegistrationCode()" style="' +
-                            'flex: 1;' +
-                            'padding: 8px 12px;' +
-                            'border: 1px solid #333333;' +
-                            'border-radius: 6px;' +
-                            'background: #111111;' +
-                            'color: white;' +
-                            'cursor: pointer;' +
-                            'font-size: 12px;' +
-                            'font-weight: 500;' +
-                        '">生成注册码</button>' +
+                        '<div style="flex: 1; padding: 8px 12px; border: 1px solid #333333; border-radius: 6px; background: #0a0a0a; color: #666666; font-size: 12px; text-align: center;">注册码由管理端生成</div>' +
                     '</div>' +
                 '</div>' +
                 
@@ -1372,22 +1363,8 @@ const htmlContent = `<!DOCTYPE html>
             }
         }
         
-        // 生成注册码
-        async function generateRegistrationCode() {
-            try {
-                const connectionInfo = await window.electronAPI.getConnectionInfo();
-                const hostname = connectionInfo.hostname || 'unknown';
-                const timestamp = Date.now();
-                const code = 'TW-' + hostname.substring(0, 8).toUpperCase() + '-' + timestamp.toString(36).toUpperCase();
-                
-                document.getElementById('registration-code').value = code;
-                showRegistrationStatus('已生成注册码，请复制并保存', 'info');
-                addLog('已生成注册码: ' + code, 'info');
-            } catch (error) {
-                showRegistrationStatus('生成注册码失败: ' + error.message, 'error');
-                addLog('生成注册码失败: ' + error.message, 'error');
-            }
-        }
+        // 注册码生成功能已移除 - 出于安全考虑，注册码只能由管理端生成
+        // 代理端只能验证注册码，不能生成注册码
         
         // 显示注册状态
         function showRegistrationStatus(message, type) {

@@ -385,9 +385,9 @@ export class WebSocketManager {
 // 导出WebSocket实例
 export const wsManager = new WebSocketManager();
 
-// 注册码管理API
+// 注册码管理API - 仅限管理端访问
 export const registrationCodeApi = {
-  generateRegistrationCode: (data: any) => request('/agents/registration-codes', {
+  generateRegistrationCode: (data: any) => request('/admin/registration-codes', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -400,14 +400,14 @@ export const registrationCodeApi = {
         }
       });
     }
-    return request(`/agents/registration-codes?${queryString.toString()}`);
+    return request(`/admin/registration-codes?${queryString.toString()}`);
   },
-  getRegistrationCodeStats: () => request('/agents/registration-codes/stats'),
-  disableRegistrationCode: (code: string) => request(`/agents/registration-codes/${code}`, {
+  getRegistrationCodeStats: () => request('/admin/registration-codes/stats'),
+  disableRegistrationCode: (code: string) => request(`/admin/registration-codes/${code}`, {
     method: 'DELETE',
   }),
   extendRegistrationCode: (code: string, additionalExpiry: number) => 
-    request(`/agents/registration-codes/${code}/extend`, {
+    request(`/admin/registration-codes/${code}/extend`, {
       method: 'PATCH',
       body: JSON.stringify({ additionalExpiry }),
     }),

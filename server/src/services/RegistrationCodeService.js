@@ -537,8 +537,8 @@ class RegistrationCodeService {
         permissions: code.permissions,
         description: code.description,
         createdBy: code.created_by,
-        createdAt: code.created_at,
-        expiry: code.expiry,
+        createdAt: code.created_at.toISOString(), // 转换为ISO字符串
+        expiry: Number(code.expiry), // 确保为数字类型
         usedCount: code.used_count,
         maxUses: code.max_uses,
         remainingUses: code.getRemainingUses()
