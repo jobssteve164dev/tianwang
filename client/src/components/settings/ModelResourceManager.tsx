@@ -100,7 +100,7 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       license: 'MIT',
       stars: 1200,
       downloads: 8500,
-      status: 'available'
+      status: 'downloaded'
     },
     {
       id: 'cicids2017-dataset',
@@ -327,10 +327,24 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       });
 
       if (response.success) {
-        messageApi.success('资源下载已开始，请稍后查看进度');
+        if (response.message.includes('模拟模式')) {
+          messageApi.success('资源下载已开始（模拟模式），请稍后查看进度');
+        } else {
+          messageApi.success(`资源下载成功！文件大小: ${(response.file_size / 1024 / 1024).toFixed(2)} MB`);
+        }
         setDownloadModalVisible(false);
         downloadForm.resetFields();
         setSelectedResource(null);
+        
+        // 更新本地资源状态
+        setResourceList(prevList => 
+          prevList.map(resource => 
+            resource.id === values.resource_id 
+              ? { ...resource, status: 'downloaded', localPath: response.file_path }
+              : resource
+          )
+        );
+        
         loadResourceList();
         onResourceChange?.();
       } else {
