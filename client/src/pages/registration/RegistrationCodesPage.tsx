@@ -230,9 +230,15 @@ const RegistrationCodesPage: React.FC = () => {
       key: 'expiry',
       width: 150,
       render: (expiry: number) => (
-        <Text type={Date.now() > expiry ? 'danger' : 'secondary'}>
-          {dayjs(expiry).format('YYYY-MM-DD HH:mm')}
-        </Text>
+        <div>
+          <Text type={Date.now() > expiry ? 'danger' : 'secondary'}>
+            {dayjs(expiry).format('YYYY-MM-DD HH:mm')}
+          </Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 10 }}>
+            Raw: {expiry}
+          </Text>
+        </div>
       )
     },
     {
