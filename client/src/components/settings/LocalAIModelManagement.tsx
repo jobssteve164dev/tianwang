@@ -11,6 +11,7 @@ import {
   DatabaseOutlined,
   LineChartOutlined,
   ExperimentOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 import ModelStatusOverview from './ModelStatusOverview';
@@ -18,6 +19,7 @@ import ModelTrainingPanel from './ModelTrainingPanel';
 import TrainingDataManager from './TrainingDataManager';
 import ModelPerformanceMonitor from './ModelPerformanceMonitor';
 import ModelTestingTool from './ModelTestingTool';
+import ModelResourceManager from './ModelResourceManager';
 
 
 
@@ -133,6 +135,20 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
       children: (
         <TrainingDataManager 
           onDataChange={handleRefresh}
+        />
+      )
+    },
+    {
+      key: 'resources',
+      label: (
+        <Space>
+          <CloudDownloadOutlined />
+          开源资源
+        </Space>
+      ),
+      children: (
+        <ModelResourceManager 
+          onResourceChange={handleRefresh}
         />
       )
     },

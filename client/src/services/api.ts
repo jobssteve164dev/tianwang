@@ -536,6 +536,26 @@ export const localAIModelApi = {
   },
   
   getSystemPerformanceOverview: () => request('/system/ai-models/performance/overview'),
+  
+  // 资源管理
+  getResourceList: () => request('/system/ai-models/resources'),
+  
+  downloadResource: (data: { resource_id: string; category: string; model_name?: string }) => 
+    request('/system/ai-models/resources/download', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  loadModel: (data: { model_path: string; model_name: string; category: string }) => 
+    request('/system/ai-models/resources/load', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  deleteResource: (resourceId: string) => 
+    request(`/system/ai-models/resources/${resourceId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // 威胁情报配置管理API

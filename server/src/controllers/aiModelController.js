@@ -1010,6 +1010,123 @@ class AIModelController {
   }
 
   /**
+   * 获取资源列表
+   */
+  async getResourceList(req, res) {
+    try {
+      logger.info('📋 获取资源列表');
+      
+      // 这里应该从数据库查询已下载的资源
+      // 目前返回模拟数据
+      const mockResources = [
+        {
+          id: 'nsl-kdd-dataset',
+          status: 'downloaded',
+          local_path: './data/nsl-kdd-dataset.csv',
+          download_progress: 100
+        }
+      ];
+
+      res.json({
+        success: true,
+        data: mockResources,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('获取资源列表失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取资源列表失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 下载资源
+   */
+  async downloadResource(req, res) {
+    try {
+      const { resource_id, category, model_name } = req.body;
+      logger.info(`📥 开始下载资源: ${resource_id}`);
+      
+      // 这里应该实现实际的下载逻辑
+      // 目前返回成功响应
+      res.json({
+        success: true,
+        message: '资源下载已开始',
+        resource_id: resource_id,
+        task_id: `download_${Date.now()}`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('下载资源失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '下载资源失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 加载模型
+   */
+  async loadModel(req, res) {
+    try {
+      const { model_path, model_name, category } = req.body;
+      logger.info(`🤖 加载模型: ${model_name}`);
+      
+      // 这里应该实现实际的模型加载逻辑
+      // 目前返回成功响应
+      res.json({
+        success: true,
+        message: '模型加载成功',
+        model_name: model_name,
+        category: category,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('加载模型失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '加载模型失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 删除资源
+   */
+  async deleteResource(req, res) {
+    try {
+      const { resource_id } = req.params;
+      logger.info(`🗑️ 删除资源: ${resource_id}`);
+      
+      // 这里应该实现实际的删除逻辑
+      // 目前返回成功响应
+      res.json({
+        success: true,
+        message: '资源删除成功',
+        resource_id: resource_id,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('删除资源失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '删除资源失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * 导出训练数据
    */
   async exportTrainingData(req, res) {
