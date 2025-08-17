@@ -76,7 +76,11 @@ router.get('/', authenticate, async (req, res) => {
       agent_version: agent.version,
       version: agent.version, // 兼容前端
       capabilities: agent.capabilities || {},
-      os: agent.systemInfo?.os || agent.platform,
+      os: agent.systemInfo?.os ? 
+        (typeof agent.systemInfo.os === 'object' ? 
+          `${agent.systemInfo.os.distro || ''} ${agent.systemInfo.os.release || ''}`.trim() || agent.systemInfo.os.platform || agent.platform :
+          agent.systemInfo.os) : 
+        agent.platform,
       architecture: agent.arch,
       registered_at: agent.registeredAt
     }));
@@ -140,7 +144,11 @@ router.get('/:id', authenticate, async (req, res) => {
       agent_version: agent.version,
       version: agent.version,
       capabilities: agent.capabilities || {},
-      os: agent.systemInfo?.os || agent.platform,
+      os: agent.systemInfo?.os ? 
+        (typeof agent.systemInfo.os === 'object' ? 
+          `${agent.systemInfo.os.distro || ''} ${agent.systemInfo.os.release || ''}`.trim() || agent.systemInfo.os.platform || agent.platform :
+          agent.systemInfo.os) : 
+        agent.platform,
       architecture: agent.arch,
       registered_at: agent.registeredAt,
       hardware_info: {
