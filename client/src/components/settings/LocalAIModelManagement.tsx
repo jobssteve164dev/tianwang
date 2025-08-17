@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Tabs,
   Spin,
-  Button,
   Space,
   App,
 } from 'antd';
@@ -170,17 +169,6 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
 
   return (
     <div className="local-ai-model-management">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button 
-          type="primary" 
-          onClick={handleRefresh}
-          loading={loading}
-          icon={<DashboardOutlined />}
-        >
-          刷新状态
-        </Button>
-      </div>
-
       <Spin spinning={loading} tip="加载中...">
         <Tabs
           activeKey={activeTab}
