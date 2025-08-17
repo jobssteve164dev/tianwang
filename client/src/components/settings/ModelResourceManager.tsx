@@ -147,6 +147,62 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       stars: 650,
       downloads: 2100,
       status: 'available'
+    },
+    {
+      id: 'user-behavior-dataset',
+      name: '用户行为分析数据集',
+      type: 'dataset',
+      category: 'user_behavior',
+      description: '包含用户登录模式、操作序列、时间模式等行为数据',
+      source: 'https://github.com/UNB-CIC/CICFlowMeter',
+      size: '125.8 MB',
+      format: 'CSV',
+      license: 'MIT',
+      stars: 850,
+      downloads: 4200,
+      status: 'available'
+    },
+    {
+      id: 'keystroke-dynamics-dataset',
+      name: '击键动力学数据集',
+      type: 'dataset',
+      category: 'user_behavior',
+      description: '基于击键时间间隔的用户身份验证数据集',
+      source: 'https://github.com/keystroke-dynamics/keystroke-dynamics',
+      size: '23.4 MB',
+      format: 'JSON',
+      license: 'MIT',
+      stars: 420,
+      downloads: 1800,
+      status: 'available'
+    },
+    {
+      id: 'user-behavior-model',
+      name: '用户行为分析模型',
+      type: 'model',
+      category: 'user_behavior',
+      description: '基于LSTM的用户行为异常检测模型',
+      source: 'https://github.com/keras-team/keras',
+      size: '12.3 MB',
+      format: 'h5',
+      license: 'MIT',
+      stars: 58000,
+      downloads: 200000,
+      status: 'available'
+    },
+    {
+      id: 'behavioral-biometrics-model',
+      name: '行为生物识别模型',
+      type: 'model',
+      category: 'user_behavior',
+      description: '基于机器学习的用户行为生物识别模型',
+      source: 'https://github.com/scikit-learn/scikit-learn',
+      size: '6.8 MB',
+      format: 'joblib',
+      license: 'BSD-3-Clause',
+      stars: 52000,
+      downloads: 150000,
+      status: 'available'
     }
   ];
 
