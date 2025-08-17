@@ -786,6 +786,7 @@ const htmlContent = `<!DOCTYPE html>
             <div class="tab-container">
                 <button class="tab-button active" onclick="switchTab('dashboard')">监控面板</button>
                 <button class="tab-button" onclick="switchTab('events')">事件列表</button>
+                <button class="tab-button" onclick="switchTab('logs')">系统日志</button>
             </div>
             
             <!-- 监控面板标签页 -->
@@ -907,6 +908,22 @@ const htmlContent = `<!DOCTYPE html>
                 </div>
                 <div class="events-list" id="events-list">
                     <!-- 事件列表将通过JavaScript动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统日志标签页 -->
+        <div id="logs-tab" class="tab-content">
+            <div class="logs-section" style="margin: 20px 30px; height: calc(100% - 40px);">
+                <div class="logs-header">
+                    <span class="logs-title">系统日志</span>
+                    <span class="logs-count" id="logs-count">0 条</span>
+                </div>
+                <div class="logs-container" id="logs-container">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[启动]</span>
+                        <span class="log-message log-info">TianWang Agent 已启动</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1500,6 +1517,12 @@ const htmlContent = `<!DOCTYPE html>
             if (tabName === 'events') {
                 loadEvents();
                 updateEventStats();
+            } else if (tabName === 'logs') {
+                // 确保日志容器滚动到底部
+                const logsContainer = document.getElementById('logs-container');
+                if (logsContainer) {
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
             }
         }
 
