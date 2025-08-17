@@ -29,7 +29,7 @@ const DEMO_USER: User = {
   id: '1',
   username: 'admin',
   email: 'admin@tianwang.com',
-  role: 'admin',
+  role: 'super_admin',
   organizationId: '1',
 };
 

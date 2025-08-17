@@ -838,23 +838,6 @@ const htmlContent = `<!DOCTYPE html>
                 <button class="btn" onclick="showSettings()">设置</button>
                 <button class="btn" onclick="runDiagnostics()">诊断</button>
             </div>
-            
-            <div class="logs-section">
-                <div class="logs-header">
-                    <span class="logs-title">系统日志</span>
-                    <span class="logs-count" id="logs-count">0 条</span>
-                </div>
-                <div class="logs-container" id="logs-container">
-                    <div class="log-entry">
-                        <span class="log-timestamp">[启动]</span>
-                        <span class="log-message log-info">TianWang Agent 已启动</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="footer">
-                <p>TianWang AI Security Monitoring System v1.0.0</p>
-            </div>
         </div>
         
         <!-- 事件列表标签页 -->
@@ -927,9 +910,11 @@ const htmlContent = `<!DOCTYPE html>
                 </div>
             </div>
         </div>
-    </div>
-
-    <script>
+            
+            
+            <div class="footer">
+                <p>TianWang AI Security Monitoring System v1.0.0</p>
+            </div>\n    </div>\n\n    <script>
         // 全局状态
         let isMonitoring = false;
         let systemInfo = null;

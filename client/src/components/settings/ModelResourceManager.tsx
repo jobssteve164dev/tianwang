@@ -406,6 +406,7 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
   const handleToggleModel = async (model: LoadedModel) => {
     try {
       const newStatus = model.status === 'active' ? 'inactive' : 'active';
+      
       const response = await localAIModelApi.toggleModel({
         model_id: model.id,
         status: newStatus

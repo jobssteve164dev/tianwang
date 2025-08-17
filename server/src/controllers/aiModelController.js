@@ -1084,7 +1084,9 @@ class AIModelController {
         'malware-detection-model': {
           url: 'https://raw.githubusercontent.com/ocatak/malware_api_class/master/models/malware_detection.pkl',
           filename: 'malware_detection_model.pkl',
-          type: 'model'
+          type: 'model',
+          name: '恶意软件检测模型',
+          category: 'malware_detection'
         }
       };
 
@@ -1114,19 +1116,26 @@ class AIModelController {
         const fileStream = fs.createWriteStream(filePath);
         response.body.pipe(fileStream);
 
+        const controller = this; // 保存this引用
         return new Promise((resolve, reject) => {
-          fileStream.on('finish', () => {
+          fileStream.on('finish', async () => {
             logger.info(`✅ 资源下载完成: ${resource_id} -> ${filePath}`);
             
+            const fileSize = fs.statSync(filePath).size;
+
             // 更新资源状态到数据库
-            this.updateResourceStatus(resource_id, 'downloaded', filePath);
+            await controller.updateResourceStatus(resource_id, 'downloaded', filePath, fileSize, {
+              ...config,
+              category: category,
+              name: model_name || config.name
+            });
             
             res.json({
               success: true,
               message: '资源下载成功',
               resource_id: resource_id,
               file_path: filePath,
-              file_size: fs.statSync(filePath).size,
+              file_size: fileSize,
               timestamp: new Date().toISOString()
             });
             resolve();
@@ -1134,6 +1143,8 @@ class AIModelController {
 
           fileStream.on('error', (error) => {
             logger.error(`❌ 资源下载失败: ${resource_id}`, error);
+            // 更新数据库状态为error
+            controller.updateResourceStatus(resource_id, 'error', null, null, config);
             reject(error);
           });
         });
@@ -1141,18 +1152,24 @@ class AIModelController {
       } catch (downloadError) {
         logger.error(`❌ 下载资源失败: ${resource_id}`, downloadError);
         
-        // 如果下载失败，返回模拟成功（用于演示）
-        res.json({
-          success: true,
-          message: '资源下载已开始（模拟模式）',
-          resource_id: resource_id,
-          task_id: `download_${Date.now()}`,
-          timestamp: new Date().toISOString()
+        // 更新数据库状态为error
+        this.updateResourceStatus(resource_id, 'error', null, null, config);
+
+        // --- 修改点：暴露真实错误 ---
+        return res.status(500).json({
+          success: false,
+          message: `下载资源时发生内部错误: ${downloadError.message}`,
+          error: {
+            name: downloadError.name,
+            message: downloadError.message,
+            stack: downloadError.stack
+          }
         });
+        // --- 结束修改 ---
       }
 
     } catch (error) {
-      logger.error('下载资源失败:', error);
+      logger.error('处理资源下载请求时出错:', error);
       res.status(500).json({
         success: false,
         message: '下载资源失败',
@@ -1164,13 +1181,35 @@ class AIModelController {
   /**
    * 更新资源状态
    */
-  async updateResourceStatus(resourceId, status, filePath = null) {
+  async updateResourceStatus(resourceId, status, filePath = null, fileSize = null, resourceConfig = {}) {
     try {
-      // 这里应该更新数据库中的资源状态
-      // 目前只是记录日志
       logger.info(`📝 更新资源状态: ${resourceId} -> ${status}${filePath ? ` (${filePath})` : ''}`);
+      
+      const resourceData = {
+        resource_id: resourceId,
+        status: status,
+        name: resourceConfig.name || resourceId,
+        type: resourceConfig.type || 'model',
+        category: resourceConfig.category,
+        local_path: filePath,
+        file_size: fileSize,
+        downloaded_at: status === 'downloaded' ? new Date() : null,
+        metadata: {
+          source_url: resourceConfig.url
+        }
+      };
+
+      // 使用upsert确保记录存在
+      await models.AIResource.upsert(resourceData, {
+        where: { resource_id: resourceId }
+      });
+
     } catch (error) {
-      logger.error('更新资源状态失败:', error);
+      logger.error('更新资源状态到数据库失败:', {
+        message: error.message,
+        stack: error.stack,
+        resourceId: resourceId
+      });
     }
   }
 

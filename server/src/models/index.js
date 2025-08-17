@@ -16,6 +16,7 @@ const AlertPolicy = require('./AlertPolicy');
 const SystemConfig = require('./SystemConfig');
 const RegistrationCode = require('./RegistrationCode');
 const Alert = require('./Alert');
+const AIResource = require('./AIResource');
 
 // 延迟初始化模型
 let sequelize = null;
@@ -43,7 +44,8 @@ function initializeModels() {
         SecurityEvent: SecurityEvent(sequelize),
         AlertPolicy: AlertPolicy(sequelize),
         SystemConfig: SystemConfig(sequelize),
-        RegistrationCode: RegistrationCode(sequelize)
+        RegistrationCode: RegistrationCode(sequelize),
+        AIResource: AIResource(sequelize)
       };
       
       console.log('🔄 初始化Alert模型...');
@@ -116,5 +118,9 @@ module.exports = {
   get Alert() { 
     const result = initializeModels();
     return result.models ? result.models.Alert : null;
+  },
+  get AIResource() { 
+    const result = initializeModels();
+    return result.models ? result.models.AIResource : null;
   }
 }; 

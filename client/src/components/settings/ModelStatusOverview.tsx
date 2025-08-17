@@ -140,7 +140,7 @@ const ModelStatusOverview: React.FC<ModelStatusOverviewProps> = ({
                   height: '100%',
                   borderLeft: `4px solid ${config.color}`
                 }}
-                bodyStyle={{ padding: '16px' }}
+                styles={{ body: { padding: '16px' } }}
               >
                 <div style={{ marginBottom: 12 }}>
                   <Space align="center">

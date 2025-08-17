@@ -1,132 +1,82 @@
-ray(0)
-browser-logger.js:112 API Response Data: 
-Array(6)
-0
-: 
-{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
-1
-: 
-{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-2
-: 
-{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-3
-: 
-{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
-4
-: 
-{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-5
-: 
-{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-length
-: 
-6
-[[Prototype]]
-: 
-Array(0)
-browser-logger.js:112 API Response Data: 
-Array(6)
-0
-: 
-{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
-1
-: 
-{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-2
-: 
-{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-3
-: 
-{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
-4
-: 
-{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-5
-: 
-{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-length
-: 
-6
-[[Prototype]]
-: 
-Array(0)
-browser-logger.js:112 API Response Data: 
-Array(6)
-0
-: 
-{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
-1
-: 
-{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-2
-: 
-{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-3
-: 
-{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
-4
-: 
-{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-5
-: 
-{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-length
-: 
-6
-[[Prototype]]
-: 
-Array(0)
-browser-logger.js:112 API Response Data: 
-Array(6)
-0
-: 
-{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
-1
-: 
-{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-2
-: 
-{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-3
-: 
-{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
-4
-: 
-{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-5
-: 
-{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-length
-: 
-6
-[[Prototype]]
-: 
-Array(0)
-browser-logger.js:112 API Response Data: 
-Array(6)
-0
-: 
-{code: 'TW-A1521C4757CBB4EAA79CE0BB027ECD05', status: 'active', permissions: Array(1), description: '', createdBy: 'admin', …}
-1
-: 
-{code: 'TW-A599AE6B1F194F65B79C936178B77772', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-2
-: 
-{code: 'TW-739884CF59B7ADA964AE7F845C1FF56D', status: 'exhausted', permissions: Array(1), description: '', createdBy: 'admin', …}
-3
-: 
-{code: 'TW-8AD894DA388DD8241E405195A455E834', status: 'expired', permissions: Array(1), description: '', createdBy: 'admin', …}
-4
-: 
-{code: 'TW-650CBC06FE2CB22D87C887ED3F1D7B88', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-5
-: 
-{code: 'TW-E978B457E33D003593A041854BEAADEE', status: 'disabled', permissions: Array(1), description: '', createdBy: 'admin', …}
-length
-: 
-6
-[[Prototype]]
-: 
-Array(0)
-﻿
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+browser-logger.js:128 ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+(anonymous) @ browser-logger.js:128
+warnOnce @ deprecations.ts:9
+logDeprecation @ deprecations.ts:13
+logV6DeprecationWarnings @ deprecations.ts:26
+(anonymous) @ index.tsx:816
+commitHookEffectListMount @ react-dom.development.js:23189
+commitPassiveMountOnFiber @ react-dom.development.js:24965
+commitPassiveMountEffects_complete @ react-dom.development.js:24930
+commitPassiveMountEffects_begin @ react-dom.development.js:24917
+commitPassiveMountEffects @ react-dom.development.js:24905
+flushPassiveEffectsImpl @ react-dom.development.js:27078
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+browser-logger.js:128 ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+(anonymous) @ browser-logger.js:128
+warnOnce @ deprecations.ts:9
+logDeprecation @ deprecations.ts:13
+logV6DeprecationWarnings @ deprecations.ts:37
+(anonymous) @ index.tsx:816
+commitHookEffectListMount @ react-dom.development.js:23189
+commitPassiveMountOnFiber @ react-dom.development.js:24965
+commitPassiveMountEffects_complete @ react-dom.development.js:24930
+commitPassiveMountEffects_begin @ react-dom.development.js:24917
+commitPassiveMountEffects @ react-dom.development.js:24905
+flushPassiveEffectsImpl @ react-dom.development.js:27078
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+browser-logger.js:43 [Browser Logger] 已连接到日志服务器
+browser-logger.js:196  POST http://localhost:3333/api/system/ai-models/resources/download 500 (Internal Server Error)
+(anonymous) @ browser-logger.js:196
+request @ api.ts:25
+downloadResource @ api.ts:555
+handleDownloadSubmit @ ModelResourceManager.tsx:323
+await in handleDownloadSubmit
+handleOk @ Modal.js:89
+(anonymous) @ button.js:188
+callCallback @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+browser-logger.js:136 下载失败: Error: 网络错误
+    at request (api.ts:36:1)
+    at async handleDownloadSubmit (ModelResourceManager.tsx:323:1)
+console.error @ browser-logger.js:136
+handleDownloadSubmit @ ModelResourceManager.tsx:354
+await in handleDownloadSubmit
+handleOk @ Modal.js:89
+(anonymous) @ button.js:188
+callCallback @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430

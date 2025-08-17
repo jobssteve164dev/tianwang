@@ -31,7 +31,7 @@ const authenticate = async (req, res, next) => {
         id: '1',
         username: 'admin',
         email: 'admin@tianwang.com',
-        role: 'admin',
+        role: 'super_admin',
         organization_id: '1',
         status: 'active',
         isLocked: () => false
@@ -200,7 +200,8 @@ const authorize = (roles = []) => {
       return res.status(403).json({
         error: 'Insufficient permissions',
         code: 'INSUFFICIENT_PERMISSIONS',
-        required_roles: roles
+        required_roles: roles,
+        user_role: req.user.role
       });
     }
     
