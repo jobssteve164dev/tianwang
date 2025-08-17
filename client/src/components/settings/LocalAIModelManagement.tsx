@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Tabs,
   Space,
-  Typography,
   Spin,
   Alert,
   Button,
   App,
 } from 'antd';
 import {
-  RobotOutlined,
   DashboardOutlined,
   PlayCircleOutlined,
   DatabaseOutlined,
@@ -23,7 +21,7 @@ import TrainingDataManager from './TrainingDataManager';
 import ModelPerformanceMonitor from './ModelPerformanceMonitor';
 import ModelTestingTool from './ModelTestingTool';
 
-const { Title, Paragraph } = Typography;
+
 
 interface LocalAIModelManagementProps {
   onConfigChange?: () => void;
@@ -175,16 +173,7 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
     <div className="local-ai-model-management">
       <div style={{ marginBottom: 16 }}>
         <Space direction="vertical" style={{ width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <Title level={4} style={{ margin: 0 }}>
-                <RobotOutlined style={{ marginRight: 8 }} />
-                本地AI模型管理
-              </Title>
-              <Paragraph type="secondary" style={{ margin: 0 }}>
-                管理本地AI模型的训练、监控和测试
-              </Paragraph>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }}>
             <Button 
               type="primary" 
               onClick={handleRefresh}
@@ -196,7 +185,7 @@ const LocalAIModelManagement: React.FC<LocalAIModelManagementProps> = ({
           </div>
           
           <Alert
-            message="本地AI模型管理"
+            message="功能说明"
             description="这里可以管理异常检测、恶意软件检测、网络入侵检测和用户行为分析等本地AI模型。支持模型训练、性能监控和测试功能。"
             type="info"
             showIcon
