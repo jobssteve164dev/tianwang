@@ -1,53 +1,38 @@
-Compiled with problems:
+Uncaught runtime errors:
 ×
-ERROR in ./src/components/settings/AIUsageStats.tsx 9:0-112
-Module not found: Error: Can't resolve 'recharts' in '/Volumes/备份/QSYNCS/Qsync/00.AI_PROJECT/tianwang/client/src/components/settings'
-ERROR in ./src/components/settings/AIUsageStats.tsx 26:31-38
-export 'api' (imported as 'api') was not found in '../../services/api' (possible exports: WebSocketManager, aiModelApi, alertAPI, authAPI, dashboardAPI, default, deviceAPI, localAIModelApi, notificationApi, registrationCodeApi, securityRulesApi, systemAPI, threatIntelligenceApi, userAPI, wsManager)
 ERROR
-[eslint] 
-src/components/settings/AIUsageStats.tsx
-  Line 2:49:  'Badge' is defined but never used         no-unused-vars
-  Line 2:61:  'Button' is defined but never used        no-unused-vars
-  Line 2:69:  'Space' is defined but never used         no-unused-vars
-  Line 2:76:  'Tooltip' is defined but never used       no-unused-vars
-  Line 4:10:  'SyncOutlined' is defined but never used  no-unused-vars
-
-Search for the keywords to learn more about each error.
-ERROR in src/components/settings/AIUsageStats.tsx:3:10
-TS2614: Module '"../../services/api"' has no exported member 'api'. Did you mean to use 'import api from "../../services/api"' instead?
-    1 | import React, { useState, useEffect, useMemo } from 'react';
-    2 | import { Card, Row, Col, Statistic, Table, Tag, Badge, App, Button, Space, Tooltip, Spin } from 'antd';
-  > 3 | import { api } from '../../services/api';
-      |          ^^^
-    4 | import { SyncOutlined, CheckCircleOutlined, DisconnectOutlined } from '@ant-design/icons';
-    5 | import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
-    6 | import { Typography } from 'antd';
-ERROR in src/components/settings/AIUsageStats.tsx:5:102
-TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-    3 | import { api } from '../../services/api';
-    4 | import { SyncOutlined, CheckCircleOutlined, DisconnectOutlined } from '@ant-design/icons';
-  > 5 | import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
-      |                                                                                                      ^^^^^^^^^^
-    6 | import { Typography } from 'antd';
-    7 |
-    8 | const AIUsageStats: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger }) => {
-ERROR in src/components/settings/LocalAIModelManagement.tsx:108:11
-TS2322: Type '{ modelStatus: any; onRefresh: () => Promise<void>; loading: boolean; }' is not assignable to type 'IntrinsicAttributes'.
-  Property 'modelStatus' does not exist on type 'IntrinsicAttributes'.
-    106 |       children: (
-    107 |         <ModelStatusOverview 
-  > 108 |           modelStatus={modelStatus}
-        |           ^^^^^^^^^^^
-    109 |           onRefresh={handleRefresh}
-    110 |           loading={loading}
-    111 |         />
-ERROR in src/components/settings/ModelStatusOverview.tsx:13:10
-TS2614: Module '"../../services/api"' has no exported member 'api'. Did you mean to use 'import api from "../../services/api"' instead?
-    11 |   UserOutlined,
-    12 | } from '@ant-design/icons';
-  > 13 | import { api } from '../../services/api';
-       |          ^^^
-    14 |
-    15 | const { Text } = Typography;
-    16 |
+Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
+    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
+    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
+    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
+    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
+    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
+    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
+    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
+    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
+    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
+    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)
+ERROR
+Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
+    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
+    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
+    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
+    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
+    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
+    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
+    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
+    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
+    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
+    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)
+ERROR
+Objects are not valid as a React child (found: object with keys {arch, distro, kernel, release, platform}). If you meant to render a collection of children, use an array instead.
+    at throwOnInvalidObjectType (http://localhost:3333/static/js/bundle.js:246364:13)
+    at reconcileChildFibers (http://localhost:3333/static/js/bundle.js:247140:11)
+    at reconcileChildren (http://localhost:3333/static/js/bundle.js:251556:32)
+    at updateHostComponent (http://localhost:3333/static/js/bundle.js:252207:7)
+    at beginWork (http://localhost:3333/static/js/bundle.js:253659:18)
+    at HTMLUnknownElement.callCallback (http://localhost:3333/static/js/bundle.js:238616:18)
+    at Object.invokeGuardedCallbackDev (http://localhost:3333/static/js/bundle.js:238660:20)
+    at invokeGuardedCallback (http://localhost:3333/static/js/bundle.js:238717:35)
+    at beginWork$1 (http://localhost:3333/static/js/bundle.js:258616:11)
+    at performUnitOfWork (http://localhost:3333/static/js/bundle.js:257864:16)

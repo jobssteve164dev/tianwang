@@ -519,6 +519,11 @@ export const localAIModelApi = {
       method: 'DELETE',
     }),
   
+  exportTrainingData: (params?: { model_name?: string; data_type?: string; format?: string }) => {
+    const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return request(`/system/ai-models/training-data/export${queryString}`);
+  },
+  
   // 性能监控
   getModelPerformance: (modelName?: string) => {
     const queryString = modelName ? `?model_name=${modelName}` : '';

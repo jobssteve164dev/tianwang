@@ -34,6 +34,7 @@ router.post('/ai-models/training-data', authenticate, authorize(['super_admin'])
 router.get('/ai-models/training-data', authenticate, authorize(['admin', 'super_admin']), aiModelController.getTrainingDataList);
 router.get('/ai-models/training-data/:data_id', authenticate, authorize(['admin', 'super_admin']), aiModelController.getTrainingDataDetail);
 router.delete('/ai-models/training-data/:data_id', authenticate, authorize(['super_admin']), aiModelController.deleteTrainingData);
+router.get('/ai-models/training-data/export', authenticate, authorize(['admin', 'super_admin']), aiModelController.exportTrainingData);
 
 // 性能监控路由
 router.get('/ai-models/performance', authenticate, authorize(['admin', 'super_admin']), aiModelController.getModelPerformance);

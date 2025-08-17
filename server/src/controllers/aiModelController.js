@@ -1009,6 +1009,84 @@ class AIModelController {
     }
   }
 
+  /**
+   * 导出训练数据
+   */
+  async exportTrainingData(req, res) {
+    try {
+      const { model_name, data_type, format = 'json' } = req.query;
+      logger.info(`📤 导出训练数据: ${model_name || 'all'}, 类型: ${data_type || 'all'}, 格式: ${format}`);
+      
+      // 这里应该从数据库查询训练数据
+      // 目前返回模拟数据
+      const mockData = [
+        {
+          id: 'data_1234567890_abc123',
+          model_name: 'anomaly_detection',
+          data_type: 'anomaly',
+          sample_count: 1000,
+          upload_time: new Date(Date.now() - 86400000).toISOString(),
+          status: 'uploaded',
+          metadata: {
+            format: 'json',
+            version: '1.0.0'
+          }
+        },
+        {
+          id: 'data_1234567891_def456',
+          model_name: 'malware_detection',
+          data_type: 'malware',
+          sample_count: 500,
+          upload_time: new Date(Date.now() - 172800000).toISOString(),
+          status: 'uploaded',
+          metadata: {
+            format: 'json',
+            version: '1.0.0'
+          }
+        }
+      ];
+
+      // 根据条件过滤数据
+      let filteredData = mockData;
+      if (model_name) {
+        filteredData = filteredData.filter(item => item.model_name === model_name);
+      }
+      if (data_type) {
+        filteredData = filteredData.filter(item => item.data_type === data_type);
+      }
+
+      // 构建导出数据
+      const exportData = {
+        export_info: {
+          export_time: new Date().toISOString(),
+          total_count: filteredData.length,
+          model_name: model_name || 'all',
+          data_type: data_type || 'all',
+          format: format
+        },
+        data: filteredData
+      };
+
+      // 设置响应头
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="training_data_export_${new Date().toISOString().split('T')[0]}.json"`);
+
+      res.json({
+        success: true,
+        data: exportData,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('导出训练数据失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '导出训练数据失败',
+        error: error.message
+      });
+    }
+  }
+
   // ==================== 性能监控API ====================
 
   /**
