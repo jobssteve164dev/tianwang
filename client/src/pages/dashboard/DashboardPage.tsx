@@ -8,17 +8,38 @@ import {
   DashboardOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchSecurityMetrics, fetchThreatTrends, fetchThreatDistribution, fetchDeviceStats } from '../../store/slices/dashboardSlice';
+import { 
+  fetchSecurityMetrics, 
+  fetchThreatTrends, 
+  fetchThreatDistribution, 
+  fetchDeviceStats,
+  fetchThreatIPs,
+  fetchNetworkAttacks,
+  fetchSuspiciousActivities
+} from '../../store/slices/dashboardSlice';
 import DeviceStatsChart from '../../components/charts/DeviceStatsChart';
 import ThreatDistributionChart from '../../components/charts/ThreatDistributionChart';
 import ThreatTrendChart from '../../components/charts/ThreatTrendChart';
+import ThreatIPChart from '../../components/charts/ThreatIPChart';
+import NetworkAttackChart from '../../components/charts/NetworkAttackChart';
+import SuspiciousActivityChart from '../../components/charts/SuspiciousActivityChart';
 import { useResponsive } from '../../utils/responsive';
 
 const { Title, Paragraph } = Typography;
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { metrics, threatTrends, threatDistribution, deviceStats, loading, error } = useAppSelector((state) => state.dashboard);
+  const { 
+    metrics, 
+    threatTrends, 
+    threatDistribution, 
+    deviceStats, 
+    threatIPs, 
+    networkAttacks, 
+    suspiciousActivities, 
+    loading, 
+    error 
+  } = useAppSelector((state) => state.dashboard);
   const { isMobile, isTablet, isDesktop } = useResponsive();
 
   useEffect(() => {
@@ -27,14 +48,25 @@ const DashboardPage: React.FC = () => {
     dispatch(fetchThreatTrends('7d') as any);
     dispatch(fetchThreatDistribution() as any);
     dispatch(fetchDeviceStats() as any);
+    dispatch(fetchThreatIPs() as any);
+    dispatch(fetchNetworkAttacks() as any);
+    dispatch(fetchSuspiciousActivities() as any);
   }, [dispatch]);
 
   // 根据屏幕尺寸调整图表高度 - 优化以确保不超出一个屏幕高度
   const getChartHeight = () => {
-    if (isMobile) return 200; // 移动端使用较小高度
-    if (isTablet) return 250; // 平板使用中等高度
-    if (isDesktop) return 300; // 桌面使用适中高度
-    return 350; // 大屏幕使用较大但合理的高度
+    if (isMobile) return 180; // 移动端使用较小高度
+    if (isTablet) return 200; // 平板使用中等高度
+    if (isDesktop) return 220; // 桌面使用适中高度
+    return 240; // 大屏幕使用较大但合理的高度
+  };
+
+  // 获取小图表高度 - 用于饼图和较小的图表
+  const getSmallChartHeight = () => {
+    if (isMobile) return 160;
+    if (isTablet) return 180;
+    if (isDesktop) return 200;
+    return 220;
   };
 
   if (loading) {
@@ -64,13 +96,13 @@ const DashboardPage: React.FC = () => {
           <DashboardOutlined style={{ marginRight: 8 }} />
           安全态势概览
         </Title>
-        <Paragraph type="secondary">
+        <Paragraph type="secondary" style={{ marginBottom: 8 }}>
           实时监控系统安全状态，查看威胁趋势和设备统计信息
         </Paragraph>
       </div>
 
       {/* 核心指标卡片 - 使用Ant Design的Row/Col系统 */}
-      <Row gutter={[20, 20]} style={{ marginBottom: isMobile ? 16 : 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: isMobile ? 12 : 16 }}>
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <div className="stat-card">
             <Statistic
@@ -135,12 +167,13 @@ const DashboardPage: React.FC = () => {
       </Row>
 
       {/* 图表区域 - 响应式布局 */}
-      <Row gutter={[20, 20]}>
+      <Row gutter={[16, 16]}>
+        {/* 第一行：主要趋势图表 */}
         <Col xs={24} lg={12}>
           <Card 
             title="威胁趋势分析" 
             className="modern-card"
-            style={{ height: getChartHeight() + 80 }}
+            style={{ height: getChartHeight() + 60 }}
           >
             <ThreatTrendChart data={threatTrends} height={getChartHeight()} />
           </Card>
@@ -150,19 +183,51 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="威胁类型分布" 
             className="modern-card"
-            style={{ height: getChartHeight() + 80 }}
+            style={{ height: getChartHeight() + 60 }}
           >
             <ThreatDistributionChart data={threatDistribution} height={getChartHeight()} />
           </Card>
         </Col>
         
+        {/* 第二行：三个小图表 */}
+        <Col xs={24} md={8}>
+          <Card 
+            title="威胁IP统计" 
+            className="modern-card"
+            style={{ height: getSmallChartHeight() + 60 }}
+          >
+            <ThreatIPChart data={threatIPs} height={getSmallChartHeight()} />
+          </Card>
+        </Col>
+        
+        <Col xs={24} md={8}>
+          <Card 
+            title="网络攻击统计" 
+            className="modern-card"
+            style={{ height: getSmallChartHeight() + 60 }}
+          >
+            <NetworkAttackChart data={networkAttacks} height={getSmallChartHeight()} />
+          </Card>
+        </Col>
+        
+        <Col xs={24} md={8}>
+          <Card 
+            title="可疑活动统计" 
+            className="modern-card"
+            style={{ height: getSmallChartHeight() + 60 }}
+          >
+            <SuspiciousActivityChart data={suspiciousActivities} height={getSmallChartHeight()} />
+          </Card>
+        </Col>
+        
+        {/* 第三行：设备类型分布 */}
         <Col xs={24}>
           <Card 
-            title="设备状态统计" 
+            title="设备类型分布" 
             className="modern-card"
-            style={{ height: getChartHeight() + 80 }}
+            style={{ height: getSmallChartHeight() + 60 }}
           >
-            <DeviceStatsChart data={deviceStats} height={getChartHeight()} />
+            <DeviceStatsChart data={deviceStats} height={getSmallChartHeight()} />
           </Card>
         </Col>
       </Row>

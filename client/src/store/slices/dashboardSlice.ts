@@ -14,6 +14,9 @@ export interface DashboardState {
   threatTrends: any | null;
   threatDistribution: any | null;
   deviceStats: any | null;
+  threatIPs: any | null;
+  networkAttacks: any | null;
+  suspiciousActivities: any | null;
   loading: boolean;
   error: string | null;
   lastUpdated: string | null;
@@ -24,6 +27,9 @@ const initialState: DashboardState = {
   threatTrends: null,
   threatDistribution: null,
   deviceStats: null,
+  threatIPs: null,
+  networkAttacks: null,
+  suspiciousActivities: null,
   loading: false,
   error: null,
   lastUpdated: null,
@@ -129,6 +135,81 @@ export const fetchDeviceStats = createAsyncThunk(
   }
 );
 
+// 获取威胁IP统计
+export const fetchThreatIPs = createAsyncThunk(
+  'dashboard/fetchThreatIPs',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/threat-ips', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取威胁IP统计失败');
+    }
+  }
+);
+
+// 获取网络攻击统计
+export const fetchNetworkAttacks = createAsyncThunk(
+  'dashboard/fetchNetworkAttacks',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/network-attacks', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取网络攻击统计失败');
+    }
+  }
+);
+
+// 获取可疑活动统计
+export const fetchSuspiciousActivities = createAsyncThunk(
+  'dashboard/fetchSuspiciousActivities',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard/suspicious-activities', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: '网络错误' }));
+        throw new Error(error.message || `HTTP Error: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      return rejectWithValue(error.message || '获取可疑活动统计失败');
+    }
+  }
+);
+
 const dashboardSlice = createSlice({
   name: 'dashboard',
   initialState,
@@ -206,6 +287,54 @@ const dashboardSlice = createSlice({
         }
       })
       .addCase(fetchDeviceStats.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取威胁IP统计
+      .addCase(fetchThreatIPs.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchThreatIPs.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload.success && action.payload.data) {
+          state.threatIPs = action.payload.data;
+        } else {
+          state.threatIPs = action.payload;
+        }
+      })
+      .addCase(fetchThreatIPs.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取网络攻击统计
+      .addCase(fetchNetworkAttacks.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchNetworkAttacks.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload.success && action.payload.data) {
+          state.networkAttacks = action.payload.data;
+        } else {
+          state.networkAttacks = action.payload;
+        }
+      })
+      .addCase(fetchNetworkAttacks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // 获取可疑活动统计
+      .addCase(fetchSuspiciousActivities.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchSuspiciousActivities.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload.success && action.payload.data) {
+          state.suspiciousActivities = action.payload.data;
+        } else {
+          state.suspiciousActivities = action.payload;
+        }
+      })
+      .addCase(fetchSuspiciousActivities.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

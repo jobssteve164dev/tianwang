@@ -556,6 +556,207 @@ router.get('/performance-metrics', async (req, res) => {
 });
 
 /**
+ * 获取威胁IP统计
+ * GET /api/dashboard/threat-ips
+ */
+router.get('/threat-ips', async (req, res) => {
+  try {
+    // 检查Alert模型是否可用
+    if (!models.Alert) {
+      logger.error('Alert模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 统计威胁IP
+    const threatIPStats = await models.Alert.findAll({
+      attributes: [
+        'sourceIP',
+        'severity',
+        [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count'],
+        [models.sequelize.fn('MAX', models.sequelize.col('timestamp')), 'lastSeen']
+      ],
+      where: {
+        sourceIP: {
+          [Op.not]: null,
+          [Op.ne]: ''
+        }
+      },
+      group: ['sourceIP', 'severity'],
+      order: [[models.sequelize.fn('COUNT', models.sequelize.col('id')), 'DESC']],
+      limit: 20,
+      raw: true
+    });
+
+    // 处理数据
+    const threatIPs = threatIPStats.map(stat => ({
+      ip: stat.sourceIP,
+      count: parseInt(stat.count),
+      severity: stat.severity,
+      lastSeen: stat.lastSeen
+    }));
+
+    const totalThreatIPs = threatIPs.reduce((sum, item) => sum + item.count, 0);
+
+    res.json({
+      success: true,
+      data: {
+        threatIPs,
+        totalThreatIPs,
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching threat IP stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch threat IP stats'
+    });
+  }
+});
+
+/**
+ * 获取网络攻击统计
+ * GET /api/dashboard/network-attacks
+ */
+router.get('/network-attacks', async (req, res) => {
+  try {
+    // 检查Alert模型是否可用
+    if (!models.Alert) {
+      logger.error('Alert模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 定义网络攻击类型
+    const networkAttackTypes = [
+      'network-intrusion',
+      'suspicious-connection',
+      'connection-flood',
+      'unknown-process-connection',
+      'ddos-attack'
+    ];
+
+    // 统计网络攻击类型
+    const attackTypeStats = await models.Alert.findAll({
+      attributes: [
+        'type',
+        'severity',
+        [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count'],
+        [models.sequelize.fn('MAX', models.sequelize.col('timestamp')), 'lastOccurrence']
+      ],
+      where: {
+        type: {
+          [Op.in]: networkAttackTypes
+        }
+      },
+      group: ['type', 'severity'],
+      order: [[models.sequelize.fn('COUNT', models.sequelize.col('id')), 'DESC']],
+      raw: true
+    });
+
+    // 处理数据
+    const attackTypes = attackTypeStats.map(stat => ({
+      type: stat.type,
+      count: parseInt(stat.count),
+      severity: stat.severity,
+      lastOccurrence: stat.lastOccurrence
+    }));
+
+    const totalAttacks = attackTypes.reduce((sum, item) => sum + item.count, 0);
+
+    res.json({
+      success: true,
+      data: {
+        attackTypes,
+        totalAttacks,
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching network attack stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch network attack stats'
+    });
+  }
+});
+
+/**
+ * 获取可疑活动统计
+ * GET /api/dashboard/suspicious-activities
+ */
+router.get('/suspicious-activities', async (req, res) => {
+  try {
+    // 检查Alert模型是否可用
+    if (!models.Alert) {
+      logger.error('Alert模型不可用');
+      return res.status(503).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+
+    // 定义可疑活动类型
+    const suspiciousActivityTypes = [
+      'suspicious-process',
+      'dangerous-command',
+      'high-cpu-process',
+      'high-memory-usage',
+      'high-cpu-usage',
+      'high-temperature'
+    ];
+
+    // 统计可疑活动类型
+    const activityTypeStats = await models.Alert.findAll({
+      attributes: [
+        'type',
+        'severity',
+        [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count'],
+        [models.sequelize.fn('MAX', models.sequelize.col('timestamp')), 'lastOccurrence']
+      ],
+      where: {
+        type: {
+          [Op.in]: suspiciousActivityTypes
+        }
+      },
+      group: ['type', 'severity'],
+      order: [[models.sequelize.fn('COUNT', models.sequelize.col('id')), 'DESC']],
+      raw: true
+    });
+
+    // 处理数据
+    const activityTypes = activityTypeStats.map(stat => ({
+      type: stat.type,
+      count: parseInt(stat.count),
+      severity: stat.severity,
+      lastOccurrence: stat.lastOccurrence
+    }));
+
+    const totalActivities = activityTypes.reduce((sum, item) => sum + item.count, 0);
+
+    res.json({
+      success: true,
+      data: {
+        activityTypes,
+        totalActivities,
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching suspicious activity stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch suspicious activity stats'
+    });
+  }
+});
+
+/**
  * 获取实时告警统计
  * GET /api/dashboard/alert-stats
  */

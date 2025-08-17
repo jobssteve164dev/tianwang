@@ -2,33 +2,29 @@ import React, { useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import { Spin } from 'antd';
 
-interface DeviceStatsData {
-  totalDevices: number;
-  onlineDevices: number;
-  offlineDevices: number;
-  protectedDevices: number;
-  unprotectedDevices: number;
-  deviceTypes: {
-    windows: number;
-    linux: number;
-    macos: number;
-    openwrt: number;
-  };
+interface ThreatIPData {
+  threatIPs: Array<{
+    ip: string;
+    count: number;
+    severity: string;
+    lastSeen: string;
+  }>;
+  totalThreatIPs: number;
   lastUpdated: string;
 }
 
-interface DeviceStatsChartProps {
-  data: DeviceStatsData | null;
+interface ThreatIPChartProps {
+  data: ThreatIPData | null;
   loading?: boolean;
   height?: number;
   title?: string;
 }
 
-const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({ 
+const ThreatIPChart: React.FC<ThreatIPChartProps> = ({ 
   data, 
   loading = false, 
   height = 200,
-  title = '设备状态统计'
+  title = '威胁IP统计'
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -40,16 +36,26 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         chartInstance.current = echarts.init(chartRef.current);
       }
 
-      // 处理数据
-      const categories = ['Windows', 'Linux', 'macOS', 'OpenWrt'];
-      const onlineData = [
-        data.deviceTypes.windows,
-        data.deviceTypes.linux,
-        data.deviceTypes.macos,
-        data.deviceTypes.openwrt
-      ];
+      // 处理数据 - 取前10个威胁IP
+      const threatIPs = data.threatIPs.slice(0, 10);
+      const chartData = threatIPs.map(item => ({
+        name: item.ip,
+        value: item.count,
+        severity: item.severity
+      }));
 
-      // 配置选项 - 改为饼图
+      // 根据严重程度设置颜色
+      const getColor = (severity: string) => {
+        switch (severity) {
+          case 'critical': return '#ff4d4f';
+          case 'high': return '#ff7a45';
+          case 'medium': return '#faad14';
+          case 'low': return '#52c41a';
+          default: return '#1890ff';
+        }
+      };
+
+      // 配置选项
       const option: echarts.EChartsOption = {
         title: {
           text: title,
@@ -63,7 +69,8 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         tooltip: {
           trigger: 'item',
           formatter: (params: any) => {
-            return `${params.name}<br/>设备数量: ${params.value}<br/>占比: ${params.percent}%`;
+            const data = params.data;
+            return `${data.name}<br/>威胁次数: ${data.value}<br/>严重程度: ${data.severity}<br/>占比: ${params.percent}%`;
           }
         },
         legend: {
@@ -80,7 +87,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         },
         series: [
           {
-            name: '设备类型',
+            name: '威胁IP',
             type: 'pie',
             radius: ['35%', '65%'],
             center: ['35%', '50%'],
@@ -104,11 +111,10 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
             labelLine: {
               show: false
             },
-            data: categories.map((category, index) => ({
-              name: category,
-              value: onlineData[index],
+            data: chartData.map(item => ({
+              ...item,
               itemStyle: {
-                color: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'][index % 4]
+                color: getColor(item.severity)
               }
             }))
           }
@@ -156,7 +162,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
     );
   }
 
-  if (!data) {
+  if (!data || !data.threatIPs || data.threatIPs.length === 0) {
     return (
       <div style={{ 
         height, 
@@ -166,7 +172,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         color: '#999',
         fontSize: 14
       }}>
-        暂无数据
+        暂无威胁IP数据
       </div>
     );
   }
@@ -174,4 +180,4 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
   return <div ref={chartRef} style={{ width: '100%', height }} />;
 };
 
-export default DeviceStatsChart; 
+export default ThreatIPChart;

@@ -82,6 +82,18 @@ export const dashboardAPI = {
   getDeviceStats: async () => {
     return request('/dashboard/device-stats');
   },
+
+  getThreatIPs: async () => {
+    return request('/dashboard/threat-ips');
+  },
+
+  getNetworkAttacks: async () => {
+    return request('/dashboard/network-attacks');
+  },
+
+  getSuspiciousActivities: async () => {
+    return request('/dashboard/suspicious-activities');
+  },
 };
 
 // 告警相关API
