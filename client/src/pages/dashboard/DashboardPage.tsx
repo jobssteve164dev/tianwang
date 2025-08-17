@@ -53,20 +53,12 @@ const DashboardPage: React.FC = () => {
     dispatch(fetchSuspiciousActivities() as any);
   }, [dispatch]);
 
-  // 根据屏幕尺寸调整图表高度 - 优化以确保不超出一个屏幕高度
+  // 根据屏幕尺寸调整图表高度 - 2x2布局优化，确保单屏显示
   const getChartHeight = () => {
-    if (isMobile) return 180; // 移动端使用较小高度
-    if (isTablet) return 200; // 平板使用中等高度
-    if (isDesktop) return 220; // 桌面使用适中高度
-    return 240; // 大屏幕使用较大但合理的高度
-  };
-
-  // 获取小图表高度 - 用于饼图和较小的图表
-  const getSmallChartHeight = () => {
-    if (isMobile) return 160;
-    if (isTablet) return 180;
-    if (isDesktop) return 200;
-    return 220;
+    if (isMobile) return 160; // 移动端使用较小高度
+    if (isTablet) return 180; // 平板使用中等高度
+    if (isDesktop) return 200; // 桌面使用适中高度
+    return 220; // 大屏幕使用较大但合理的高度
   };
 
   if (loading) {
@@ -96,22 +88,22 @@ const DashboardPage: React.FC = () => {
           <DashboardOutlined style={{ marginRight: 8 }} />
           安全态势概览
         </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+        <Paragraph type="secondary" style={{ marginBottom: 4 }}>
           实时监控系统安全状态，查看威胁趋势和设备统计信息
         </Paragraph>
       </div>
 
       {/* 核心指标卡片 - 使用Ant Design的Row/Col系统 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: isMobile ? 12 : 16 }}>
+      <Row gutter={[16, 16]} style={{ marginTop: isMobile ? 16 : 20, marginBottom: isMobile ? 16 : 20 }}>
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
-          <div className="stat-card">
+          <div className="stat-card" style={{ padding: '16px' }}>
             <Statistic
               title="总威胁数"
               value={metrics?.totalThreats || 0}
               prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}
               valueStyle={{ 
                 color: '#52c41a', 
-                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
+                fontSize: isMobile ? 20 : isDesktop ? 24 : 22, 
                 fontWeight: 600 
               }}
             />
@@ -119,14 +111,14 @@ const DashboardPage: React.FC = () => {
         </Col>
         
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
-          <div className="stat-card">
+          <div className="stat-card" style={{ padding: '16px' }}>
             <Statistic
               title="活跃告警"
               value={metrics?.activeAlerts || 0}
               prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}
               valueStyle={{ 
                 color: '#ff4d4f', 
-                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
+                fontSize: isMobile ? 20 : isDesktop ? 24 : 22, 
                 fontWeight: 600 
               }}
             />
@@ -134,14 +126,14 @@ const DashboardPage: React.FC = () => {
         </Col>
         
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
-          <div className="stat-card">
+          <div className="stat-card" style={{ padding: '16px' }}>
             <Statistic
               title="在线设备"
               value={metrics?.connectedDevices || 0}
               prefix={<DesktopOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ 
                 color: '#1890ff', 
-                fontSize: isMobile ? 24 : isDesktop ? 32 : 28, 
+                fontSize: isMobile ? 20 : isDesktop ? 24 : 22, 
                 fontWeight: 600 
               }}
             />
@@ -149,7 +141,7 @@ const DashboardPage: React.FC = () => {
         </Col>
         
         <Col xs={24} sm={12} md={12} lg={6} xl={6}>
-          <div className="stat-card">
+          <div className="stat-card" style={{ padding: '16px' }}>
             <Statistic
               title="威胁趋势"
               value={metrics?.threatTrend || 0}
@@ -158,7 +150,7 @@ const DashboardPage: React.FC = () => {
               prefix={<RiseOutlined style={{ color: '#faad14' }} />}
               valueStyle={{ 
                 color: '#faad14', 
-                fontSize: isMobile ? 24 : 28, 
+                fontSize: isMobile ? 20 : 22, 
                 fontWeight: 600 
               }}
             />
@@ -166,14 +158,14 @@ const DashboardPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* 图表区域 - 响应式布局 */}
-      <Row gutter={[16, 16]}>
-        {/* 第一行：主要趋势图表 */}
+      {/* 图表区域 - 2x2网格布局 */}
+      <Row gutter={[16, 12]}>
+        {/* 第一行 */}
         <Col xs={24} lg={12}>
           <Card 
             title="威胁趋势分析" 
             className="modern-card"
-            style={{ height: getChartHeight() + 60 }}
+            style={{ height: getChartHeight() + 80 }}
           >
             <ThreatTrendChart data={threatTrends} height={getChartHeight()} />
           </Card>
@@ -183,52 +175,54 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="威胁类型分布" 
             className="modern-card"
-            style={{ height: getChartHeight() + 60 }}
+            style={{ height: getChartHeight() + 80 }}
           >
             <ThreatDistributionChart data={threatDistribution} height={getChartHeight()} />
           </Card>
         </Col>
         
-        {/* 第二行：三个小图表 */}
-        <Col xs={24} md={8}>
-          <Card 
-            title="威胁IP统计" 
-            className="modern-card"
-            style={{ height: getSmallChartHeight() + 60 }}
-          >
-            <ThreatIPChart data={threatIPs} height={getSmallChartHeight()} />
-          </Card>
+        {/* 第二行 */}
+        <Col xs={24} lg={12}>
+                      <Card 
+              title="威胁IP统计" 
+              className="modern-card"
+              style={{ height: getChartHeight() + 50 }}
+            >
+              <ThreatIPChart data={threatIPs} height={getChartHeight()} />
+            </Card>
         </Col>
         
-        <Col xs={24} md={8}>
-          <Card 
-            title="网络攻击统计" 
-            className="modern-card"
-            style={{ height: getSmallChartHeight() + 60 }}
-          >
-            <NetworkAttackChart data={networkAttacks} height={getSmallChartHeight()} />
-          </Card>
+        <Col xs={24} lg={12}>
+                      <Card 
+              title="网络攻击统计" 
+              className="modern-card"
+              style={{ height: getChartHeight() + 50 }}
+            >
+              <NetworkAttackChart data={networkAttacks} height={getChartHeight()} />
+            </Card>
+        </Col>
+      </Row>
+      
+      {/* 额外图表行 */}
+      <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
+        <Col xs={24} lg={12}>
+                      <Card 
+              title="可疑活动统计" 
+              className="modern-card"
+              style={{ height: getChartHeight() + 50 }}
+            >
+              <SuspiciousActivityChart data={suspiciousActivities} height={getChartHeight()} />
+            </Card>
         </Col>
         
-        <Col xs={24} md={8}>
-          <Card 
-            title="可疑活动统计" 
-            className="modern-card"
-            style={{ height: getSmallChartHeight() + 60 }}
-          >
-            <SuspiciousActivityChart data={suspiciousActivities} height={getSmallChartHeight()} />
-          </Card>
-        </Col>
-        
-        {/* 第三行：设备类型分布 */}
-        <Col xs={24}>
-          <Card 
-            title="设备类型分布" 
-            className="modern-card"
-            style={{ height: getSmallChartHeight() + 60 }}
-          >
-            <DeviceStatsChart data={deviceStats} height={getSmallChartHeight()} />
-          </Card>
+        <Col xs={24} lg={12}>
+                      <Card 
+              title="设备类型分布" 
+              className="modern-card"
+              style={{ height: getChartHeight() + 50 }}
+            >
+              <DeviceStatsChart data={deviceStats} height={getChartHeight()} />
+            </Card>
         </Col>
       </Row>
     </div>

@@ -76,24 +76,24 @@ const SuspiciousActivityChart: React.FC<SuspiciousActivityChartProps> = ({
         legend: {
           type: 'scroll',
           orient: 'vertical',
-          right: 5,
-          top: 15,
-          bottom: 15,
-          itemWidth: 10,
-          itemHeight: 10,
+          right: 10,
+          top: 20,
+          bottom: 20,
+          itemWidth: 12,
+          itemHeight: 12,
           textStyle: {
-            fontSize: 10
+            fontSize: 11
           }
         },
         series: [
           {
             name: '可疑活动',
             type: 'pie',
-            radius: ['35%', '65%'],
+            radius: ['30%', '60%'],
             center: ['35%', '50%'],
             avoidLabelOverlap: false,
             itemStyle: {
-              borderRadius: 3,
+              borderRadius: 2,
               borderColor: '#fff',
               borderWidth: 1
             },
@@ -104,7 +104,7 @@ const SuspiciousActivityChart: React.FC<SuspiciousActivityChartProps> = ({
             emphasis: {
               label: {
                 show: true,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 'bold'
               }
             },

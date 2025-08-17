@@ -16,6 +16,11 @@ import {
   Progress,
   Statistic,
   Typography,
+  Tabs,
+  List,
+  Avatar,
+  Switch,
+  Tooltip,
 } from 'antd';
 import {
   CloudDownloadOutlined,
@@ -26,6 +31,9 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   LinkOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { localAIModelApi } from '../../services/api';
 
@@ -53,6 +61,19 @@ interface ResourceItem {
   localPath?: string;
 }
 
+interface LoadedModel {
+  id: string;
+  name: string;
+  category: string;
+  version: string;
+  status: 'active' | 'inactive' | 'loading' | 'error';
+  accuracy?: number;
+  last_updated: string;
+  file_path: string;
+  model_type: string;
+  description: string;
+}
+
 const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceChange }) => {
   const { message: messageApi } = App.useApp();
   const [resourceList, setResourceList] = useState<ResourceItem[]>([]);
@@ -61,6 +82,9 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
   const [selectedResource, setSelectedResource] = useState<ResourceItem | null>(null);
   const [downloadForm] = Form.useForm();
   const [downloading, setDownloading] = useState(false);
+  const [loadedModels, setLoadedModels] = useState<LoadedModel[]>([]);
+  const [modelManagementLoading, setModelManagementLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('resources');
 
   // 开源资源列表
   const openSourceResources: ResourceItem[] = [
@@ -234,6 +258,51 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
     }
   };
 
+  // 加载已加载的模型列表
+  const loadLoadedModels = async () => {
+    try {
+      setModelManagementLoading(true);
+      const response = await localAIModelApi.getLoadedModels();
+      if (response.success) {
+        setLoadedModels(response.data);
+      } else {
+        // 使用模拟数据
+        setLoadedModels([
+          {
+            id: 'anomaly_detection_default',
+            name: '异常检测模型',
+            category: 'anomaly_detection',
+            version: '1.0.0',
+            status: 'active',
+            accuracy: 0.85,
+            last_updated: new Date().toISOString(),
+            file_path: './models/anomaly_detection.joblib',
+            model_type: 'IsolationForest',
+            description: '默认的异常检测模型'
+          },
+          {
+            id: 'malware_detection_default',
+            name: '恶意软件检测模型',
+            category: 'malware_detection',
+            version: '1.0.0',
+            status: 'inactive',
+            accuracy: 0.78,
+            last_updated: new Date(Date.now() - 86400000).toISOString(),
+            file_path: './models/malware_detection.joblib',
+            model_type: 'RandomForest',
+            description: '默认的恶意软件检测模型'
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('加载模型列表失败:', error);
+      // 使用模拟数据
+      setLoadedModels([]);
+    } finally {
+      setModelManagementLoading(false);
+    }
+  };
+
   // 下载资源
   const handleDownloadResource = async (resource: ResourceItem) => {
     setSelectedResource(resource);
@@ -319,8 +388,48 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
     }
   };
 
+  // 激活/停用模型
+  const handleToggleModel = async (model: LoadedModel) => {
+    try {
+      const newStatus = model.status === 'active' ? 'inactive' : 'active';
+      const response = await localAIModelApi.toggleModel({
+        model_id: model.id,
+        status: newStatus
+      });
+
+      if (response.success) {
+        messageApi.success(`模型${newStatus === 'active' ? '激活' : '停用'}成功`);
+        loadLoadedModels();
+        onResourceChange?.();
+      } else {
+        messageApi.error(`操作失败: ${response.message}`);
+      }
+    } catch (error) {
+      console.error('模型状态切换失败:', error);
+      messageApi.error('操作失败，请重试');
+    }
+  };
+
+  // 重新加载模型
+  const handleReloadModel = async (model: LoadedModel) => {
+    try {
+      const response = await localAIModelApi.reloadModel(model.id);
+      if (response.success) {
+        messageApi.success('模型重新加载成功');
+        loadLoadedModels();
+        onResourceChange?.();
+      } else {
+        messageApi.error(`重新加载失败: ${response.message}`);
+      }
+    } catch (error) {
+      console.error('重新加载失败:', error);
+      messageApi.error('重新加载失败，请重试');
+    }
+  };
+
   useEffect(() => {
     loadResourceList();
+    loadLoadedModels();
   }, []);
 
   // 表格列定义
@@ -465,65 +574,219 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
         style={{ marginBottom: 16 }}
       />
 
-      {/* 统计信息 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="总资源数"
-              value={resourceList.length}
-              prefix={<DatabaseOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="模型数量"
-              value={resourceList.filter(r => r.type === 'model').length}
-              prefix={<RobotOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="数据集数量"
-              value={resourceList.filter(r => r.type === 'dataset').length}
-              prefix={<DatabaseOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="已下载"
-              value={resourceList.filter(r => r.status === 'downloaded').length}
-              valueStyle={{ color: '#52c41a' }}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* 标签页 */}
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'resources',
+            label: (
+              <Space>
+                <DatabaseOutlined />
+                开源资源
+              </Space>
+            ),
+            children: (
+              <>
+                {/* 统计信息 */}
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="总资源数"
+                        value={resourceList.length}
+                        prefix={<DatabaseOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="模型数量"
+                        value={resourceList.filter(r => r.type === 'model').length}
+                        prefix={<RobotOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="数据集数量"
+                        value={resourceList.filter(r => r.type === 'dataset').length}
+                        prefix={<DatabaseOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="已下载"
+                        value={resourceList.filter(r => r.status === 'downloaded').length}
+                        valueStyle={{ color: '#52c41a' }}
+                        prefix={<CheckCircleOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
 
-      {/* 资源列表 */}
-      <Card title="开源资源列表" size="small">
-        <Table
-          columns={columns}
-          dataSource={resourceList}
-          rowKey="id"
-          size="small"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
-          }}
-          scroll={{ x: 1200 }}
-          loading={loading}
-        />
-      </Card>
+                {/* 资源列表 */}
+                <Card title="开源资源列表" size="small">
+                  <Table
+                    columns={columns}
+                    dataSource={resourceList}
+                    rowKey="id"
+                    size="small"
+                    pagination={{
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showQuickJumper: true,
+                      showTotal: (total, range) => 
+                        `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+                    }}
+                    scroll={{ x: 1200 }}
+                    loading={loading}
+                  />
+                </Card>
+              </>
+            )
+          },
+          {
+            key: 'models',
+            label: (
+              <Space>
+                <RobotOutlined />
+                模型管理
+              </Space>
+            ),
+            children: (
+              <>
+                {/* 模型管理统计 */}
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="已加载模型"
+                        value={loadedModels.length}
+                        prefix={<RobotOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="激活模型"
+                        value={loadedModels.filter(m => m.status === 'active').length}
+                        valueStyle={{ color: '#52c41a' }}
+                        prefix={<PlayCircleOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="停用模型"
+                        value={loadedModels.filter(m => m.status === 'inactive').length}
+                        valueStyle={{ color: '#faad14' }}
+                        prefix={<PauseCircleOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small">
+                      <Statistic
+                        title="错误模型"
+                        value={loadedModels.filter(m => m.status === 'error').length}
+                        valueStyle={{ color: '#ff4d4f' }}
+                        prefix={<ExclamationCircleOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+
+                {/* 已加载模型列表 */}
+                <Card 
+                  title="已加载模型列表" 
+                  size="small"
+                  extra={
+                    <Button 
+                      icon={<ReloadOutlined />} 
+                      onClick={loadLoadedModels}
+                      loading={modelManagementLoading}
+                    >
+                      刷新
+                    </Button>
+                  }
+                >
+                  <List
+                    loading={modelManagementLoading}
+                    dataSource={loadedModels}
+                    renderItem={(model) => (
+                      <List.Item
+                        actions={[
+                          <Tooltip key="toggle" title={model.status === 'active' ? '停用模型' : '激活模型'}>
+                            <Switch
+                              checked={model.status === 'active'}
+                              onChange={() => handleToggleModel(model)}
+                              disabled={model.status === 'loading' || model.status === 'error'}
+                            />
+                          </Tooltip>,
+                          <Tooltip key="reload" title="重新加载模型">
+                            <Button
+                              type="text"
+                              icon={<ReloadOutlined />}
+                              onClick={() => handleReloadModel(model)}
+                              disabled={model.status === 'loading'}
+                            />
+                          </Tooltip>
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={
+                            <Avatar 
+                              icon={<RobotOutlined />} 
+                              style={{ 
+                                backgroundColor: model.status === 'active' ? '#52c41a' : 
+                                               model.status === 'error' ? '#ff4d4f' : '#faad14' 
+                              }} 
+                            />
+                          }
+                          title={
+                            <Space>
+                              <Text strong>{model.name}</Text>
+                              <Tag color={
+                                model.status === 'active' ? 'success' :
+                                model.status === 'error' ? 'error' : 'default'
+                              }>
+                                {model.status === 'active' ? '激活' : 
+                                 model.status === 'error' ? '错误' : '停用'}
+                              </Tag>
+                              <Tag color="blue">v{model.version}</Tag>
+                            </Space>
+                          }
+                          description={
+                            <div>
+                              <div>{model.description}</div>
+                              <div style={{ marginTop: 4 }}>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                  类型: {model.model_type} | 
+                                  分类: {model.category} | 
+                                  准确率: {model.accuracy ? `${(model.accuracy * 100).toFixed(1)}%` : 'N/A'} | 
+                                  更新: {new Date(model.last_updated).toLocaleString()}
+                                </Text>
+                              </div>
+                            </div>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              </>
+            )
+          }
+        ]}
+      />
 
       {/* 下载对话框 */}
       <Modal

@@ -63,8 +63,9 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
         title: {
           text: title,
           left: 'center',
+          top: 10,
           textStyle: {
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: 'normal',
             color: '#333'
           }
@@ -80,13 +81,18 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
         },
         legend: {
           data: data.datasets.map(dataset => dataset.label),
-          top: 30
+          top: 30,
+          itemWidth: 12,
+          itemHeight: 12,
+          textStyle: {
+            fontSize: 11
+          }
         },
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '3%',
-          top: '15%',
+          bottom: '12%',
+          top: '25%',
           containLabel: true
         },
         xAxis: {
@@ -94,6 +100,7 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
           boundaryGap: false,
           data: times,
           axisLabel: {
+            fontSize: 11,
             formatter: (value: string) => {
               // 格式化日期显示
               const date = new Date(value);
@@ -105,7 +112,11 @@ const ThreatTrendChart: React.FC<ThreatTrendChartProps> = ({
           type: 'value',
           name: '威胁数量',
           nameTextStyle: {
-            color: '#666'
+            color: '#666',
+            fontSize: 11
+          },
+          axisLabel: {
+            fontSize: 11
           },
           splitLine: {
             lineStyle: {

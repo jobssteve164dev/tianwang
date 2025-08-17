@@ -76,7 +76,7 @@ const ThreatIPChart: React.FC<ThreatIPChartProps> = ({
         legend: {
           type: 'scroll',
           orient: 'vertical',
-          right: 5,
+          right: 8,
           top: 15,
           bottom: 15,
           itemWidth: 10,
@@ -89,11 +89,11 @@ const ThreatIPChart: React.FC<ThreatIPChartProps> = ({
           {
             name: '威胁IP',
             type: 'pie',
-            radius: ['35%', '65%'],
+            radius: ['30%', '60%'],
             center: ['35%', '50%'],
             avoidLabelOverlap: false,
             itemStyle: {
-              borderRadius: 3,
+              borderRadius: 2,
               borderColor: '#fff',
               borderWidth: 1
             },
@@ -104,7 +104,7 @@ const ThreatIPChart: React.FC<ThreatIPChartProps> = ({
             emphasis: {
               label: {
                 show: true,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 'bold'
               }
             },

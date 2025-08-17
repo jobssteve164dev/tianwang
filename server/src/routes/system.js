@@ -42,6 +42,11 @@ router.post('/ai-models/resources/download', authenticate, authorize(['super_adm
 router.post('/ai-models/resources/load', authenticate, authorize(['super_admin']), aiModelController.loadModel);
 router.delete('/ai-models/resources/:resource_id', authenticate, authorize(['super_admin']), aiModelController.deleteResource);
 
+// 模型管理路由
+router.get('/ai-models/loaded-models', authenticate, authorize(['admin', 'super_admin']), aiModelController.getLoadedModels);
+router.post('/ai-models/toggle-model', authenticate, authorize(['super_admin']), aiModelController.toggleModel);
+router.post('/ai-models/reload-model/:model_id', authenticate, authorize(['super_admin']), aiModelController.reloadModel);
+
 // 性能监控路由
 router.get('/ai-models/performance', authenticate, authorize(['admin', 'super_admin']), aiModelController.getModelPerformance);
 router.get('/ai-models/performance/history', authenticate, authorize(['admin', 'super_admin']), aiModelController.getPerformanceHistory);

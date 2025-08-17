@@ -1127,6 +1127,125 @@ class AIModelController {
   }
 
   /**
+   * 获取已加载的模型列表
+   */
+  async getLoadedModels(req, res) {
+    try {
+      logger.info('📋 获取已加载模型列表');
+      
+      // 这里应该从AI引擎获取实际加载的模型
+      // 目前返回模拟数据
+      const mockLoadedModels = [
+        {
+          id: 'anomaly_detection_default',
+          name: '异常检测模型',
+          category: 'anomaly_detection',
+          version: '1.0.0',
+          status: 'active',
+          accuracy: 0.85,
+          last_updated: new Date().toISOString(),
+          file_path: './models/anomaly_detection.joblib',
+          model_type: 'IsolationForest',
+          description: '默认的异常检测模型'
+        },
+        {
+          id: 'malware_detection_default',
+          name: '恶意软件检测模型',
+          category: 'malware_detection',
+          version: '1.0.0',
+          status: 'inactive',
+          accuracy: 0.78,
+          last_updated: new Date(Date.now() - 86400000).toISOString(),
+          file_path: './models/malware_detection.joblib',
+          model_type: 'RandomForest',
+          description: '默认的恶意软件检测模型'
+        },
+        {
+          id: 'network_intrusion_default',
+          name: '网络入侵检测模型',
+          category: 'network_intrusion',
+          version: '1.0.0',
+          status: 'active',
+          accuracy: 0.92,
+          last_updated: new Date(Date.now() - 172800000).toISOString(),
+          file_path: './models/network_intrusion.h5',
+          model_type: 'GradientBoosting',
+          description: '默认的网络入侵检测模型'
+        }
+      ];
+
+      res.json({
+        success: true,
+        data: mockLoadedModels,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('获取已加载模型列表失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取已加载模型列表失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 切换模型状态（激活/停用）
+   */
+  async toggleModel(req, res) {
+    try {
+      const { model_id, status } = req.body;
+      logger.info(`🔄 切换模型状态: ${model_id} -> ${status}`);
+      
+      // 这里应该实现实际的模型状态切换逻辑
+      // 目前返回成功响应
+      res.json({
+        success: true,
+        message: `模型${status === 'active' ? '激活' : '停用'}成功`,
+        model_id: model_id,
+        status: status,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('切换模型状态失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '切换模型状态失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 重新加载模型
+   */
+  async reloadModel(req, res) {
+    try {
+      const { model_id } = req.params;
+      logger.info(`🔄 重新加载模型: ${model_id}`);
+      
+      // 这里应该实现实际的模型重新加载逻辑
+      // 目前返回成功响应
+      res.json({
+        success: true,
+        message: '模型重新加载成功',
+        model_id: model_id,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('重新加载模型失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '重新加载模型失败',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * 导出训练数据
    */
   async exportTrainingData(req, res) {

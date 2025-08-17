@@ -69,7 +69,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
         legend: {
           type: 'scroll',
           orient: 'vertical',
-          right: 5,
+          right: 8,
           top: 15,
           bottom: 15,
           itemWidth: 10,
@@ -82,11 +82,11 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
           {
             name: '设备类型',
             type: 'pie',
-            radius: ['35%', '65%'],
+            radius: ['30%', '60%'],
             center: ['35%', '50%'],
             avoidLabelOverlap: false,
             itemStyle: {
-              borderRadius: 3,
+              borderRadius: 2,
               borderColor: '#fff',
               borderWidth: 1
             },
@@ -97,7 +97,7 @@ const DeviceStatsChart: React.FC<DeviceStatsChartProps> = ({
             emphasis: {
               label: {
                 show: true,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 'bold'
               }
             },

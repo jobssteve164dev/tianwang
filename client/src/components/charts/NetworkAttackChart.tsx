@@ -79,15 +79,15 @@ const NetworkAttackChart: React.FC<NetworkAttackChartProps> = ({
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '20%',
-          top: 50,
+          bottom: '25%',
+          top: 45,
           containLabel: true
         },
         xAxis: {
           type: 'category',
           data: categories,
           axisLabel: {
-            fontSize: 10,
+            fontSize: 9,
             rotate: 45
           },
           axisTick: {
@@ -99,10 +99,10 @@ const NetworkAttackChart: React.FC<NetworkAttackChartProps> = ({
           name: '攻击次数',
           nameTextStyle: {
             color: '#666',
-            fontSize: 12
+            fontSize: 10
           },
           axisLabel: {
-            fontSize: 12
+            fontSize: 10
           },
           splitLine: {
             lineStyle: {

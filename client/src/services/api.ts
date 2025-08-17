@@ -568,6 +568,20 @@ export const localAIModelApi = {
     request(`/system/ai-models/resources/${resourceId}`, {
       method: 'DELETE',
     }),
+  
+  // 模型管理
+  getLoadedModels: () => request('/system/ai-models/loaded-models'),
+  
+  toggleModel: (data: { model_id: string; status: 'active' | 'inactive' }) => 
+    request('/system/ai-models/toggle-model', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  reloadModel: (modelId: string) => 
+    request(`/system/ai-models/reload-model/${modelId}`, {
+      method: 'POST',
+    }),
 };
 
 // 威胁情报配置管理API

@@ -44,9 +44,9 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
         title: {
           text: title,
           left: 'center',
-          top: 20,
+          top: 10,
           textStyle: {
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: 'normal',
             color: '#333'
           }
@@ -62,7 +62,7 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
           itemWidth: 12,
           itemHeight: 12,
           textStyle: {
-            fontSize: 12
+            fontSize: 11
           },
           formatter: (name: string) => {
             const item = data.categories.find(d => d.name === name);
@@ -73,7 +73,7 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
           {
             name: '威胁类型',
             type: 'pie' as const,
-            radius: ['40%', '70%'],
+            radius: ['35%', '65%'],
             center: ['60%', '50%'],
             avoidLabelOverlap: false,
             data: data.categories.map(category => ({
@@ -84,21 +84,21 @@ const ThreatDistributionChart: React.FC<ThreatDistributionChartProps> = ({
               }
             })),
             itemStyle: {
-              borderRadius: 4,
+              borderRadius: 3,
               borderColor: '#fff',
-              borderWidth: 2
+              borderWidth: 1
             },
             label: {
               show: false,
               position: 'center'
             },
-            emphasis: {
-              label: {
-                show: true,
-                fontSize: 16,
-                fontWeight: 'bold',
-                formatter: '{b}\n{d}%'
-              },
+                          emphasis: {
+                label: {
+                  show: true,
+                  fontSize: 12,
+                  fontWeight: 'bold',
+                  formatter: '{b}\n{d}%'
+                },
               itemStyle: {
                 shadowBlur: 10,
                 shadowOffsetX: 0,
