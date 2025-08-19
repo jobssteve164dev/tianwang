@@ -569,7 +569,8 @@ class AgentController {
   async processSystemData(data) {
     try {
       // 存储系统性能数据到时序数据库
-      // TODO: 实现InfluxDB存储逻辑
+      const dataStorageService = require('../services/DataStorageService');
+      await dataStorageService.storeSystemData(data.agentId, data.data);
             
       // 检查系统异常
       if (data.data.system) {
@@ -610,7 +611,8 @@ class AgentController {
   async processNetworkData(data) {
     try {
       // 存储网络流量数据
-      // TODO: 实现InfluxDB存储逻辑
+      const dataStorageService = require('../services/DataStorageService');
+      await dataStorageService.storeNetworkData(data.agentId, data.data);
             
       // 检查网络异常
       if (data.data.suspicious && data.data.suspicious.length > 0) {
@@ -636,7 +638,8 @@ class AgentController {
   async processLogData(data) {
     try {
       // 存储日志数据
-      // TODO: 实现日志存储和分析逻辑
+      const dataStorageService = require('../services/DataStorageService');
+      await dataStorageService.storeLogData(data.agentId, data.data);
             
       logger.debug('日志数据处理完成:', { agentId: data.agentId });
     } catch (error) {
@@ -698,6 +701,14 @@ class AgentController {
           ...eventData.metadata
         },
         device_id: eventData.deviceId,
+        status: 'open'
+      });
+
+      // 同时存储到InfluxDB
+      const dataStorageService = require('../services/DataStorageService');
+      await dataStorageService.storeSecurityEvent(eventData.agentId, {
+        ...eventData,
+        timestamp: new Date(),
         status: 'open'
       });
 

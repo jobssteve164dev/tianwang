@@ -41,6 +41,7 @@ const ReportService = require('./services/ReportService');
 const keyManagementService = require('./services/KeyManagementService');
 const deviceFingerprintService = require('./services/DeviceFingerprintService');
 const registrationCodeService = require('./services/RegistrationCodeService');
+const dataStorageService = require('./services/DataStorageService');
 
 // 创建Express应用
 const app = express();
@@ -183,6 +184,19 @@ async function initialize() {
     logger.info('📨 Skipping Kafka initialization for now...');
     console.log('✅ Kafka initialization skipped');
     logger.info('✅ Kafka initialization skipped');
+
+    // 初始化数据存储服务
+    console.log('💾 Initializing data storage service...');
+    logger.info('💾 Initializing data storage service...');
+    try {
+      await dataStorageService.initialize();
+      console.log('✅ Data storage service initialized successfully');
+      logger.info('✅ Data storage service initialized successfully');
+    } catch (dsError) {
+      console.error('❌ Data storage service initialization failed:', dsError.message);
+      logger.error('❌ Data storage service initialization failed:', dsError);
+      // 继续执行，不阻塞启动
+    }
 
     // 初始化WebSocket服务
     console.log('🔗 Initializing WebSocket service...');
