@@ -133,9 +133,15 @@ async function connectDatabases() {
       logger.warn('⚠️ InfluxDB initialization failed, continuing without InfluxDB:', error.message);
     }
 
-    // 初始化Redis（暂时跳过）
-    logger.info('🔄 Skipping Redis initialization for now...');
-    logger.info('✅ Redis initialization skipped');
+    // 初始化Redis
+    logger.info('🔄 Initializing Redis...');
+    try {
+      initializeRedis();
+      await redisClient.connect();
+      logger.info('✅ Redis connected successfully');
+    } catch (error) {
+      logger.warn('⚠️ Redis initialization failed, continuing without Redis:', error.message);
+    }
 
     // 同步数据库模型（仅在开发环境）
     if (config.app.env === 'development') {

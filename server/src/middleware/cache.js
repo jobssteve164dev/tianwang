@@ -1,6 +1,6 @@
 /**
  * 缓存中间件
- * Cache Middleware - API响应缓存
+ * Cache Middleware - 自动缓存API响应
  */
 
 const cacheService = require('../services/CacheService');
@@ -8,37 +8,41 @@ const logger = require('../utils/logger');
 
 /**
  * 缓存中间件工厂函数
- * @param {number} ttl 缓存时间（秒）
- * @param {Function} keyGenerator 缓存键生成函数
- * @returns {Function} 中间件函数
+ * @param {Object} options 缓存选项
+ * @param {number} options.ttl 缓存时间（秒）
+ * @param {string} options.prefix 缓存键前缀
+ * @param {Function} options.keyGenerator 缓存键生成函数
+ * @param {Function} options.shouldCache 是否应该缓存的判断函数
+ * @returns {Function} Express中间件
  */
-function cacheMiddleware(ttl = 300, keyGenerator = null) {
+function cacheMiddleware(options = {}) {
+  const {
+    ttl = 3600,
+    prefix = 'api',
+    keyGenerator = null,
+    shouldCache = null
+  } = options;
+
   return async (req, res, next) => {
     // 跳过非GET请求
     if (req.method !== 'GET') {
       return next();
     }
 
-    // 跳过需要实时数据的请求
-    if (req.query.nocache === 'true' || req.headers['cache-control'] === 'no-cache') {
+    // 检查是否应该缓存
+    if (shouldCache && !shouldCache(req)) {
       return next();
     }
 
+    // 生成缓存键
+    const cacheKey = keyGenerator ? keyGenerator(req) : generateDefaultKey(req, prefix);
+
     try {
-      // 生成缓存键
-      const cacheKey = keyGenerator ? keyGenerator(req) : generateDefaultKey(req);
-      
-      // 尝试从缓存获取数据
-      const cachedData = await cacheService.get(cacheKey);
-      
-      if (cachedData) {
+      // 尝试从缓存获取
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
         logger.debug(`缓存命中: ${cacheKey}`);
-        return res.json({
-          success: true,
-          data: cachedData,
-          cached: true,
-          timestamp: new Date().toISOString()
-        });
+        return res.json(cached);
       }
 
       // 缓存未命中，继续处理请求
@@ -47,10 +51,12 @@ function cacheMiddleware(ttl = 300, keyGenerator = null) {
       // 重写res.json方法以缓存响应
       const originalJson = res.json;
       res.json = function(data) {
-        // 只缓存成功的响应
-        if (data && data.success !== false) {
-          cacheService.set(cacheKey, data.data || data, ttl);
-        }
+        // 缓存响应数据
+        cacheService.set(cacheKey, data, ttl).catch(err => {
+          logger.error('缓存响应失败:', err);
+        });
+        
+        // 调用原始方法
         return originalJson.call(this, data);
       };
 
@@ -64,98 +70,154 @@ function cacheMiddleware(ttl = 300, keyGenerator = null) {
 
 /**
  * 生成默认缓存键
- * @param {Object} req 请求对象
+ * @param {Object} req Express请求对象
+ * @param {string} prefix 前缀
  * @returns {string} 缓存键
  */
-function generateDefaultKey(req) {
-  const { url, query, user } = req;
-  const userId = user ? user.id : 'anonymous';
-  const queryString = Object.keys(query).length > 0 ? JSON.stringify(query) : '';
+function generateDefaultKey(req, prefix) {
+  const url = req.originalUrl || req.url;
+  const query = JSON.stringify(req.query);
+  const user = req.user ? req.user.id : 'anonymous';
   
-  return `api:${userId}:${url}:${queryString}`;
+  return `${prefix}:${user}:${url}:${query}`;
 }
 
 /**
- * 清除缓存中间件
- * @param {Function} patternGenerator 缓存模式生成函数
- * @returns {Function} 中间件函数
+ * 用户会话缓存中间件
  */
-function clearCacheMiddleware(patternGenerator = null) {
+function sessionCacheMiddleware() {
   return async (req, res, next) => {
-    try {
-      const pattern = patternGenerator ? patternGenerator(req) : generateDefaultPattern(req);
-      
-      if (pattern) {
-        await cacheService.delPattern(pattern);
-        logger.info(`清除缓存模式: ${pattern}`);
-      }
-      
-      next();
-    } catch (error) {
-      logger.error('清除缓存中间件错误:', error);
-      next();
+    const sessionId = req.headers['x-session-id'] || req.cookies?.sessionId;
+    
+    if (!sessionId) {
+      return next();
     }
+
+    try {
+      // 尝试从缓存获取会话
+      const session = await cacheService.getUserSession(sessionId);
+      if (session) {
+        req.cachedSession = session;
+        logger.debug(`会话缓存命中: ${sessionId}`);
+      }
+    } catch (error) {
+      logger.error('会话缓存获取失败:', error);
+    }
+
+    next();
   };
 }
 
 /**
- * 生成默认缓存清除模式
- * @param {Object} req 请求对象
- * @returns {string} 缓存模式
+ * 系统配置缓存中间件
  */
-function generateDefaultPattern(req) {
-  const { user } = req;
-  const userId = user ? user.id : 'anonymous';
-  
-  return `api:${userId}:*`;
+function configCacheMiddleware() {
+  return async (req, res, next) => {
+    const configKey = req.params.configKey || req.query.configKey;
+    
+    if (!configKey) {
+      return next();
+    }
+
+    try {
+      // 尝试从缓存获取配置
+      const config = await cacheService.getSystemConfig(configKey);
+      if (config) {
+        req.cachedConfig = config;
+        logger.debug(`配置缓存命中: ${configKey}`);
+      }
+    } catch (error) {
+      logger.error('配置缓存获取失败:', error);
+    }
+
+    next();
+  };
 }
 
 /**
- * 设备相关缓存键生成器
- * @param {Object} req 请求对象
- * @returns {string} 缓存键
+ * 威胁检测结果缓存中间件
  */
-function deviceCacheKey(req) {
-  const { user, params, query } = req;
-  const userId = user ? user.id : 'anonymous';
-  const deviceId = params.deviceId || query.deviceId;
-  const queryString = Object.keys(query).length > 0 ? JSON.stringify(query) : '';
-  
-  return `device:${userId}:${deviceId || 'all'}:${queryString}`;
+function threatCacheMiddleware() {
+  return async (req, res, next) => {
+    const threatId = req.params.threatId || req.query.threatId;
+    
+    if (!threatId) {
+      return next();
+    }
+
+    try {
+      // 尝试从缓存获取威胁检测结果
+      const threatData = await cacheService.getThreatDetection(threatId);
+      if (threatData) {
+        req.cachedThreatData = threatData;
+        logger.debug(`威胁检测缓存命中: ${threatId}`);
+      }
+    } catch (error) {
+      logger.error('威胁检测缓存获取失败:', error);
+    }
+
+    next();
+  };
 }
 
 /**
- * 安全事件缓存键生成器
- * @param {Object} req 请求对象
- * @returns {string} 缓存键
+ * 缓存清理中间件
  */
-function securityEventCacheKey(req) {
-  const { user, params, query } = req;
-  const userId = user ? user.id : 'anonymous';
-  const eventId = params.eventId || query.eventId;
-  const queryString = Object.keys(query).length > 0 ? JSON.stringify(query) : '';
-  
-  return `security_event:${userId}:${eventId || 'all'}:${queryString}`;
+function cacheClearMiddleware() {
+  return async (req, res, next) => {
+    const originalJson = res.json;
+    
+    res.json = function(data) {
+      // 如果是POST/PUT/DELETE请求，清理相关缓存
+      if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+        const pattern = `${req.baseUrl || ''}${req.path}`;
+        cacheService.delPattern(pattern).catch(err => {
+          logger.error('缓存清理失败:', err);
+        });
+      }
+      
+      return originalJson.call(this, data);
+    };
+
+    next();
+  };
 }
 
 /**
- * 仪表盘数据缓存键生成器
- * @param {Object} req 请求对象
- * @returns {string} 缓存键
+ * 缓存统计中间件
  */
-function dashboardCacheKey(req) {
-  const { user, query } = req;
-  const userId = user ? user.id : 'anonymous';
-  const timeRange = query.timeRange || '24h';
-  const queryString = Object.keys(query).length > 0 ? JSON.stringify(query) : '';
-  
-  return `dashboard:${userId}:${timeRange}:${queryString}`;
+function cacheStatsMiddleware() {
+  return async (req, res, next) => {
+    if (req.path === '/api/cache/stats') {
+      try {
+        const stats = cacheService.getStats();
+        const health = await cacheService.healthCheck();
+        
+        return res.json({
+          success: true,
+          data: {
+            ...stats,
+            health: health ? 'healthy' : 'unhealthy'
+          }
+        });
+      } catch (error) {
+        logger.error('获取缓存统计失败:', error);
+        return res.status(500).json({
+          success: false,
+          error: '获取缓存统计失败'
+        });
+      }
+    }
+    
+    next();
+  };
 }
 
 module.exports = {
   cacheMiddleware,
-  clearCacheMiddleware,
-  deviceCacheKey,
-  securityEventCacheKey,
-  dashboardCacheKey
+  sessionCacheMiddleware,
+  configCacheMiddleware,
+  threatCacheMiddleware,
+  cacheClearMiddleware,
+  cacheStatsMiddleware
 };

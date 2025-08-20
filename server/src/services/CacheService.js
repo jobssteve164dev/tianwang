@@ -1,10 +1,10 @@
 /**
  * 缓存服务
  * Cache Service - 多级缓存策略实现
+ * 兼容Redis v4.x
  */
 
 const redis = require('redis');
-const { promisify } = require('util');
 const logger = require('../utils/logger');
 
 class CacheService {
@@ -21,26 +21,20 @@ class CacheService {
 
   async connect() {
     try {
-      this.client = redis.createClient({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
-        password: process.env.REDIS_PASSWORD,
-        retry_strategy: (options) => {
-          if (options.error && options.error.code === 'ECONNREFUSED') {
-            logger.error('Redis连接被拒绝');
-            return new Error('Redis连接失败');
-          }
-          if (options.total_retry_time > 1000 * 60 * 60) {
-            logger.error('Redis重连超时');
-            return new Error('Redis重连超时');
-          }
-          if (options.attempt > 10) {
-            logger.error('Redis重连次数过多');
-            return undefined;
-          }
-          return Math.min(options.attempt * 100, 3000);
-        }
-      });
+      const redisConfig = {
+        socket: {
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT) || 6379
+        },
+        database: parseInt(process.env.REDIS_DB) || 0
+      };
+
+      // 只有在配置了密码时才添加密码
+      if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
+        redisConfig.password = process.env.REDIS_PASSWORD;
+      }
+
+      this.client = redis.createClient(redisConfig);
 
       // 监听连接事件
       this.client.on('connect', () => {
@@ -58,15 +52,13 @@ class CacheService {
         this.isConnected = false;
       });
 
-      // 转换为Promise接口
-      this.get = promisify(this.client.get).bind(this.client);
-      this.set = promisify(this.client.set).bind(this.client);
-      this.del = promisify(this.client.del).bind(this.client);
-      this.exists = promisify(this.client.exists).bind(this.client);
-      this.expire = promisify(this.client.expire).bind(this.client);
-      this.ttl = promisify(this.client.ttl).bind(this.client);
-      this.keys = promisify(this.client.keys).bind(this.client);
-      this.flushdb = promisify(this.client.flushdb).bind(this.client);
+      this.client.on('ready', () => {
+        logger.info('Redis准备就绪');
+        this.isConnected = true;
+      });
+
+      // 连接到Redis
+      await this.client.connect();
 
     } catch (error) {
       logger.error('Redis初始化失败:', error);
@@ -75,7 +67,7 @@ class CacheService {
   }
 
   async disconnect() {
-    if (this.client) {
+    if (this.client && this.isConnected) {
       await this.client.quit();
       this.isConnected = false;
     }
@@ -90,14 +82,14 @@ class CacheService {
    */
   async get(key, fetchFunction = null, ttl = 3600) {
     try {
-      if (!this.isConnected) {
+      if (!this.isConnected || !this.client) {
         if (fetchFunction) {
           return await fetchFunction();
         }
         return null;
       }
 
-      const cached = await this.get(key);
+      const cached = await this.client.get(key);
       
       if (cached) {
         this.cacheStats.hits++;
@@ -132,11 +124,10 @@ class CacheService {
    */
   async set(key, value, ttl = 3600) {
     try {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !this.client) return;
 
       const serialized = JSON.stringify(value);
-      await this.set(key, serialized);
-      await this.expire(key, ttl);
+      await this.client.setEx(key, ttl, serialized);
       
       this.cacheStats.sets++;
     } catch (error) {
@@ -150,9 +141,9 @@ class CacheService {
    */
   async del(key) {
     try {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !this.client) return;
 
-      await this.del(key);
+      await this.client.del(key);
       this.cacheStats.deletes++;
     } catch (error) {
       logger.error('缓存删除失败:', error);
@@ -165,11 +156,11 @@ class CacheService {
    */
   async delPattern(pattern) {
     try {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !this.client) return;
 
-      const keys = await this.keys(pattern);
+      const keys = await this.client.keys(pattern);
       if (keys.length > 0) {
-        await this.del(keys);
+        await this.client.del(keys);
         this.cacheStats.deletes += keys.length;
       }
     } catch (error) {
@@ -184,9 +175,9 @@ class CacheService {
    */
   async exists(key) {
     try {
-      if (!this.isConnected) return false;
+      if (!this.isConnected || !this.client) return false;
 
-      const result = await this.exists(key);
+      const result = await this.client.exists(key);
       return result === 1;
     } catch (error) {
       logger.error('缓存存在检查失败:', error);
@@ -201,9 +192,9 @@ class CacheService {
    */
   async ttl(key) {
     try {
-      if (!this.isConnected) return -2;
+      if (!this.isConnected || !this.client) return -2;
 
-      return await this.ttl(key);
+      return await this.client.ttl(key);
     } catch (error) {
       logger.error('缓存TTL获取失败:', error);
       return -2;
@@ -215,9 +206,9 @@ class CacheService {
    */
   async clear() {
     try {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !this.client) return;
 
-      await this.flushdb();
+      await this.client.flushDb();
       logger.info('缓存已清空');
     } catch (error) {
       logger.error('缓存清空失败:', error);
@@ -249,6 +240,133 @@ class CacheService {
       sets: 0,
       deletes: 0
     };
+  }
+
+  /**
+   * 用户会话缓存相关方法
+   */
+  
+  /**
+   * 设置用户会话
+   * @param {string} sessionId 会话ID
+   * @param {Object} sessionData 会话数据
+   * @param {number} ttl 过期时间（秒）
+   */
+  async setUserSession(sessionId, sessionData, ttl = 3600) {
+    const key = `session:${sessionId}`;
+    await this.set(key, sessionData, ttl);
+  }
+
+  /**
+   * 获取用户会话
+   * @param {string} sessionId 会话ID
+   * @returns {Promise<Object|null>} 会话数据
+   */
+  async getUserSession(sessionId) {
+    const key = `session:${sessionId}`;
+    return await this.get(key);
+  }
+
+  /**
+   * 删除用户会话
+   * @param {string} sessionId 会话ID
+   */
+  async deleteUserSession(sessionId) {
+    const key = `session:${sessionId}`;
+    await this.del(key);
+  }
+
+  /**
+   * 系统配置缓存相关方法
+   */
+
+  /**
+   * 设置系统配置
+   * @param {string} configKey 配置键
+   * @param {any} configValue 配置值
+   * @param {number} ttl 过期时间（秒）
+   */
+  async setSystemConfig(configKey, configValue, ttl = 7200) {
+    const key = `config:${configKey}`;
+    await this.set(key, configValue, ttl);
+  }
+
+  /**
+   * 获取系统配置
+   * @param {string} configKey 配置键
+   * @param {Function} fetchFunction 数据获取函数
+   * @returns {Promise<any>} 配置值
+   */
+  async getSystemConfig(configKey, fetchFunction = null) {
+    const key = `config:${configKey}`;
+    return await this.get(key, fetchFunction, 7200);
+  }
+
+  /**
+   * 删除系统配置
+   * @param {string} configKey 配置键
+   */
+  async deleteSystemConfig(configKey) {
+    const key = `config:${configKey}`;
+    await this.del(key);
+  }
+
+  /**
+   * 威胁检测结果缓存相关方法
+   */
+
+  /**
+   * 设置威胁检测结果
+   * @param {string} threatId 威胁ID
+   * @param {Object} threatData 威胁数据
+   * @param {number} ttl 过期时间（秒）
+   */
+  async setThreatDetection(threatId, threatData, ttl = 1800) {
+    const key = `threat:${threatId}`;
+    await this.set(key, threatData, ttl);
+  }
+
+  /**
+   * 获取威胁检测结果
+   * @param {string} threatId 威胁ID
+   * @returns {Promise<Object|null>} 威胁数据
+   */
+  async getThreatDetection(threatId) {
+    const key = `threat:${threatId}`;
+    return await this.get(key);
+  }
+
+  /**
+   * 删除威胁检测结果
+   * @param {string} threatId 威胁ID
+   */
+  async deleteThreatDetection(threatId) {
+    const key = `threat:${threatId}`;
+    await this.del(key);
+  }
+
+  /**
+   * 批量删除威胁检测结果
+   * @param {string} pattern 匹配模式
+   */
+  async deleteThreatDetectionPattern(pattern) {
+    const keyPattern = `threat:${pattern}`;
+    await this.delPattern(keyPattern);
+  }
+
+  /**
+   * 健康检查
+   * @returns {Promise<boolean>} 是否健康
+   */
+  async healthCheck() {
+    try {
+      if (!this.isConnected || !this.client) return false;
+      await this.client.ping();
+      return true;
+    } catch (error) {
+      logger.error('Redis健康检查失败:', error);
+      return false;
+    }
   }
 }
 
