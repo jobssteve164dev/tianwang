@@ -22,14 +22,20 @@ module.exports = (sequelize) => {
       unique: true
     },
     status: {
-      type: DataTypes.ENUM('active', 'inactive', 'suspended'),
+      type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: 'active'
+      defaultValue: 'active',
+      validate: {
+        isIn: [['active', 'inactive', 'suspended']]
+      }
     },
     plan: {
-      type: DataTypes.ENUM('free', 'basic', 'professional', 'enterprise'),
+      type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: 'free'
+      defaultValue: 'free',
+      validate: {
+        isIn: [['free', 'basic', 'professional', 'enterprise']]
+      }
     },
     settings: {
       type: DataTypes.JSONB,
@@ -49,6 +55,17 @@ module.exports = (sequelize) => {
     Organization.hasMany(models.Device, {
       foreignKey: 'organization_id',
       as: 'devices'
+    });
+    
+    // 新增的关联关系
+    Organization.hasMany(models.SecurityEvent, {
+      foreignKey: 'organization_id',
+      as: 'security_events'
+    });
+    
+    Organization.hasMany(models.AuditLog, {
+      foreignKey: 'organization_id',
+      as: 'audit_logs'
     });
   };
 

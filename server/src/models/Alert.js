@@ -15,18 +15,27 @@ module.exports = (sequelize) => {
       allowNull: false
     },
     type: {
-      type: DataTypes.ENUM('suspicious-process', 'dangerous-command', 'suspicious-connection', 'unknown-process-connection', 'connection-flood', 'high-cpu-process', 'high-memory-usage', 'high-cpu-usage', 'high-temperature', 'network-intrusion', 'malware-activity', 'data-leak', 'ddos-attack', 'authentication-anomaly'),
-      allowNull: false
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      validate: {
+        isIn: [['suspicious-process', 'dangerous-command', 'suspicious-connection', 'unknown-process-connection', 'connection-flood', 'high-cpu-process', 'high-memory-usage', 'high-cpu-usage', 'high-temperature', 'network-intrusion', 'malware-activity', 'data-leak', 'ddos-attack', 'authentication-anomaly']]
+      }
     },
     severity: {
-      type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
+      type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: 'medium'
+      defaultValue: 'medium',
+      validate: {
+        isIn: [['low', 'medium', 'high', 'critical']]
+      }
     },
     status: {
-      type: DataTypes.ENUM('active', 'acknowledged', 'resolved', 'false-positive'),
+      type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: 'active'
+      defaultValue: 'active',
+      validate: {
+        isIn: [['active', 'acknowledged', 'resolved', 'false-positive']]
+      }
     },
     
     // 来源信息
@@ -99,8 +108,11 @@ module.exports = (sequelize) => {
     
     // 自动响应
     autoResponse: {
-      type: DataTypes.ENUM('none', 'blocked-ip', 'terminated-process', 'isolated-device'),
-      defaultValue: 'none'
+      type: DataTypes.STRING(30),
+      defaultValue: 'none',
+      validate: {
+        isIn: [['none', 'blocked-ip', 'terminated-process', 'isolated-device']]
+      }
     },
     
     // 证据数据 (JSON字段)
@@ -113,10 +125,10 @@ module.exports = (sequelize) => {
     timestamps: true,
     indexes: [
       {
-        fields: ['deviceId', 'timestamp']
+        fields: ['device_id', 'timestamp']
       },
       {
-        fields: ['agentId', 'timestamp']
+        fields: ['agent_id', 'timestamp']
       },
       {
         fields: ['status', 'severity']
@@ -125,7 +137,7 @@ module.exports = (sequelize) => {
         fields: ['type', 'timestamp']
       },
       {
-        fields: ['sourceIP', 'timestamp']
+        fields: ['source_ip', 'timestamp']
       }
     ]
   });

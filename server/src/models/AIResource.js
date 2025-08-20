@@ -13,7 +13,6 @@ module.exports = (sequelize) => {
     resource_id: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
       comment: '资源的唯一标识符'
     },
     name: {
@@ -22,8 +21,11 @@ module.exports = (sequelize) => {
       comment: '资源名称'
     },
     type: {
-      type: DataTypes.ENUM('model', 'dataset'),
+      type: DataTypes.STRING(20),
       allowNull: false,
+      validate: {
+        isIn: [['model', 'dataset']]
+      },
       comment: '资源类型'
     },
     category: {
@@ -32,9 +34,12 @@ module.exports = (sequelize) => {
       comment: '资源分类'
     },
     status: {
-      type: DataTypes.ENUM('available', 'downloading', 'downloaded', 'error'),
+      type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'available',
+      validate: {
+        isIn: [['available', 'downloading', 'downloaded', 'error']]
+      },
       comment: '资源状态'
     },
     local_path: {
@@ -63,7 +68,22 @@ module.exports = (sequelize) => {
     tableName: 'ai_resources',
     timestamps: true,
     underscored: true,
-    comment: '用于存储本地AI模型和数据集资源的状态'
+    comment: '用于存储本地AI模型和数据集资源的状态',
+    indexes: [
+      {
+        unique: true,
+        fields: ['resource_id']
+      },
+      {
+        fields: ['type']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['category']
+      }
+    ]
   });
 
   return AIResource;

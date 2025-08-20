@@ -15,7 +15,6 @@ module.exports = (sequelize) => {
     code: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
       comment: '注册码'
     },
     signature: {
@@ -80,6 +79,7 @@ module.exports = (sequelize) => {
     updatedAt: 'updated_at',
     indexes: [
       {
+        unique: true,
         fields: ['code']
       },
       {

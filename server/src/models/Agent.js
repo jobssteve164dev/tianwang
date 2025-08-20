@@ -7,10 +7,9 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4, 
       primaryKey: true 
     },
-    agentId: {
+    agent_id: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: true,
       comment: '代理唯一标识符'
     },
     name: { 
@@ -40,8 +39,12 @@ module.exports = (sequelize) => {
       comment: '代理版本'
     },
     status: { 
-      type: DataTypes.ENUM('online', 'offline', 'error'), 
+      type: DataTypes.STRING(20), 
+      allowNull: false,
       defaultValue: 'offline',
+      validate: {
+        isIn: [['online', 'offline', 'error']]
+      },
       comment: '代理状态'
     },
     capabilities: {
@@ -49,28 +52,28 @@ module.exports = (sequelize) => {
       defaultValue: [],
       comment: '代理能力列表'
     },
-    systemInfo: {
+    system_info: {
       type: DataTypes.JSONB,
       defaultValue: {},
       comment: '系统信息'
     },
-    deviceFingerprint: {
+    device_fingerprint: {
       type: DataTypes.STRING(255),
       allowNull: true,
       comment: '设备指纹'
     },
-    lastSeen: {
+    last_seen: {
       type: DataTypes.DATE,
       allowNull: true,
       comment: '最后在线时间'
     },
-    registeredAt: {
+    registered_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
       comment: '注册时间'
     },
-    organizationId: {
+    organization_id: {
       type: DataTypes.UUID,
       allowNull: true,
       references: { model: 'organizations', key: 'id' },
@@ -96,12 +99,30 @@ module.exports = (sequelize) => {
     tableName: 'agents',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+      {
+        unique: true,
+        fields: ['agent_id']
+      },
+      {
+        fields: ['organization_id']
+      },
+      {
+        fields: ['device_id']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['last_seen']
+      }
+    ]
   });
 
   Agent.associate = (models) => {
     Agent.belongsTo(models.Device, { foreignKey: 'device_id', as: 'device' });
-    Agent.belongsTo(models.Organization, { foreignKey: 'organizationId', as: 'organization' });
+    Agent.belongsTo(models.Organization, { foreignKey: 'organization_id', as: 'organization' });
   };
 
   return Agent;

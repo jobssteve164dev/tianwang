@@ -160,6 +160,27 @@ module.exports = (sequelize) => {
       foreignKey: 'created_by',
       as: 'created_policies'
     });
+    
+    // 新增的关联关系
+    User.hasMany(models.UserPermission, {
+      foreignKey: 'user_id',
+      as: 'permissions'
+    });
+    
+    User.hasMany(models.UserSession, {
+      foreignKey: 'user_id',
+      as: 'sessions'
+    });
+    
+    User.hasMany(models.AuditLog, {
+      foreignKey: 'user_id',
+      as: 'audit_logs'
+    });
+    
+    User.hasMany(models.SecurityEvent, {
+      foreignKey: 'resolved_by',
+      as: 'resolved_events'
+    });
   };
 
   return User;
