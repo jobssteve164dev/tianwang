@@ -49,12 +49,12 @@ router.get('/', authenticate, async (req, res) => {
     // 查询代理数据
     const agents = await models.Agent.findAll({
       where: whereClause,
-      order: [['lastSeen', 'DESC']],
+      order: [['last_seen', 'DESC']],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
       attributes: [
-        'id', 'agentId', 'name', 'hostname', 'platform', 'arch', 'version',
-        'status', 'lastSeen', 'registeredAt', 'capabilities', 'systemInfo'
+        'id', 'agent_id', 'name', 'hostname', 'platform', 'arch', 'version',
+        'status', 'last_seen', 'registered_at', 'capabilities', 'system_info'
       ]
     });
 
@@ -66,23 +66,23 @@ router.get('/', authenticate, async (req, res) => {
       id: agent.id,
       name: agent.name || agent.hostname,
       hostname: agent.hostname,
-      ip_address: agent.systemInfo?.networkInterfaces?.[0]?.ip || 'N/A',
-      mac_address: agent.systemInfo?.networkInterfaces?.[0]?.mac || 'N/A',
+      ip_address: agent.system_info?.networkInterfaces?.[0]?.ip || 'N/A',
+      mac_address: agent.system_info?.networkInterfaces?.[0]?.mac || 'N/A',
       platform: agent.platform,
       type: agent.platform, // 兼容前端
       status: agent.status,
-      last_seen_at: agent.lastSeen,
-      lastSeen: agent.lastSeen, // 兼容前端
+      last_seen_at: agent.last_seen,
+      lastSeen: agent.last_seen, // 兼容前端
       agent_version: agent.version,
       version: agent.version, // 兼容前端
       capabilities: agent.capabilities || {},
-      os: agent.systemInfo?.os ? 
-        (typeof agent.systemInfo.os === 'object' ? 
-          `${agent.systemInfo.os.distro || ''} ${agent.systemInfo.os.release || ''}`.trim() || agent.systemInfo.os.platform || agent.platform :
-          agent.systemInfo.os) : 
+      os: agent.system_info?.os ? 
+        (typeof agent.system_info.os === 'object' ? 
+          `${agent.system_info.os.distro || ''} ${agent.system_info.os.release || ''}`.trim() || agent.system_info.os.platform || agent.platform :
+          agent.system_info.os) : 
         agent.platform,
       architecture: agent.arch,
-      registered_at: agent.registeredAt
+      registered_at: agent.registered_at
     }));
 
     res.json({
@@ -150,7 +150,7 @@ router.get('/:id', authenticate, async (req, res) => {
           agent.systemInfo.os) : 
         agent.platform,
       architecture: agent.arch,
-      registered_at: agent.registeredAt,
+      registered_at: agent.registered_at,
       hardware_info: {
         cpu: agent.systemInfo?.cpu || {},
         memory: agent.systemInfo?.memory || {},
@@ -319,9 +319,9 @@ router.get('/stats/overview', authenticate, async (req, res) => {
     // 最近注册的设备
     const recentDevices = await models.Agent.findAll({
       where: whereClause,
-      order: [['registeredAt', 'DESC']],
+      order: [['registered_at', 'DESC']],
       limit: 5,
-      attributes: ['id', 'name', 'hostname', 'platform', 'status', 'registeredAt']
+      attributes: ['id', 'name', 'hostname', 'platform', 'status', 'registered_at']
     });
 
     res.json({
@@ -344,7 +344,7 @@ router.get('/stats/overview', authenticate, async (req, res) => {
           hostname: device.hostname,
           platform: device.platform,
           status: device.status,
-          registeredAt: device.registeredAt
+          registeredAt: device.registered_at
         }))
       }
     });

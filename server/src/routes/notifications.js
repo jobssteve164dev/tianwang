@@ -85,7 +85,7 @@ function setServices(notification, report) {
  */
 router.post('/send', [
   protect,
-  authorize(['admin', 'security_analyst']),
+  authorize(['admin', 'security_analyst', 'super_admin']),
   body('type').isIn(['email', 'sms', 'webhook', 'all']).withMessage('无效的通知类型'),
   body('template').isIn(['threat_alert', 'system_alert', 'weekly_report']).withMessage('无效的模板类型'),
   body('recipients').isArray({ min: 1 }).withMessage('至少需要一个接收者'),
@@ -171,7 +171,7 @@ router.post('/send', [
  */
 router.get('/status', [
   protect,
-  authorize(['admin', 'security_analyst'])
+  authorize(['admin', 'security_analyst', 'super_admin'])
 ], async (req, res) => {
   try {
     if (!notificationService) {
@@ -368,7 +368,7 @@ router.post('/test', [
  */
 router.get('/config', [
   protect,
-  authorize(['admin', 'security_analyst'])
+  authorize(['admin', 'security_analyst', 'super_admin'])
 ], async (req, res) => {
   try {
     if (!notificationService) {
@@ -519,7 +519,7 @@ router.get('/config', [
  */
 router.put('/config', [
   protect,
-  authorize(['admin']),
+  authorize(['admin', 'security_analyst', 'super_admin']),
   body('email.smtp.host').optional().isString().withMessage('SMTP主机必须是字符串'),
   body('email.smtp.port').optional().isInt({ min: 1, max: 65535 }).withMessage('SMTP端口必须是1-65535之间的整数'),
   body('email.smtp.secure').optional().isBoolean().withMessage('SMTP安全连接必须是布尔值'),

@@ -6,14 +6,14 @@
 const express = require('express');
 const router = express.Router();
 const cacheService = require('../services/CacheService');
-const { auth } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 /**
  * 获取缓存统计信息
  * GET /api/cache/stats
  */
-router.get('/stats', auth, async (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
   try {
     const stats = cacheService.getStats();
     const health = await cacheService.healthCheck();
@@ -39,7 +39,7 @@ router.get('/stats', auth, async (req, res) => {
  * 重置缓存统计
  * POST /api/cache/stats/reset
  */
-router.post('/stats/reset', auth, async (req, res) => {
+router.post('/stats/reset', authenticate, async (req, res) => {
   try {
     cacheService.resetStats();
     
@@ -60,7 +60,7 @@ router.post('/stats/reset', auth, async (req, res) => {
  * 清空所有缓存
  * POST /api/cache/clear
  */
-router.post('/clear', auth, async (req, res) => {
+router.post('/clear', authenticate, async (req, res) => {
   try {
     await cacheService.clear();
     
@@ -81,7 +81,7 @@ router.post('/clear', auth, async (req, res) => {
  * 删除指定模式的缓存
  * DELETE /api/cache/pattern/:pattern
  */
-router.delete('/pattern/:pattern', auth, async (req, res) => {
+router.delete('/pattern/:pattern', authenticate, async (req, res) => {
   try {
     const { pattern } = req.params;
     await cacheService.delPattern(pattern);
@@ -103,7 +103,7 @@ router.delete('/pattern/:pattern', auth, async (req, res) => {
  * 删除指定键的缓存
  * DELETE /api/cache/key/:key
  */
-router.delete('/key/:key', auth, async (req, res) => {
+router.delete('/key/:key', authenticate, async (req, res) => {
   try {
     const { key } = req.params;
     await cacheService.del(key);
@@ -125,7 +125,7 @@ router.delete('/key/:key', auth, async (req, res) => {
  * 获取缓存键的TTL
  * GET /api/cache/ttl/:key
  */
-router.get('/ttl/:key', auth, async (req, res) => {
+router.get('/ttl/:key', authenticate, async (req, res) => {
   try {
     const { key } = req.params;
     const ttl = await cacheService.ttl(key);
@@ -151,7 +151,7 @@ router.get('/ttl/:key', auth, async (req, res) => {
  * 检查缓存键是否存在
  * GET /api/cache/exists/:key
  */
-router.get('/exists/:key', auth, async (req, res) => {
+router.get('/exists/:key', authenticate, async (req, res) => {
   try {
     const { key } = req.params;
     const exists = await cacheService.exists(key);
@@ -180,7 +180,7 @@ router.get('/exists/:key', auth, async (req, res) => {
  * 设置用户会话
  * POST /api/cache/session
  */
-router.post('/session', auth, async (req, res) => {
+router.post('/session', authenticate, async (req, res) => {
   try {
     const { sessionId, sessionData, ttl = 3600 } = req.body;
     
@@ -210,7 +210,7 @@ router.post('/session', auth, async (req, res) => {
  * 获取用户会话
  * GET /api/cache/session/:sessionId
  */
-router.get('/session/:sessionId', auth, async (req, res) => {
+router.get('/session/:sessionId', authenticate, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const session = await cacheService.getUserSession(sessionId);
@@ -232,7 +232,7 @@ router.get('/session/:sessionId', auth, async (req, res) => {
  * 删除用户会话
  * DELETE /api/cache/session/:sessionId
  */
-router.delete('/session/:sessionId', auth, async (req, res) => {
+router.delete('/session/:sessionId', authenticate, async (req, res) => {
   try {
     const { sessionId } = req.params;
     await cacheService.deleteUserSession(sessionId);
@@ -258,7 +258,7 @@ router.delete('/session/:sessionId', auth, async (req, res) => {
  * 设置系统配置
  * POST /api/cache/config
  */
-router.post('/config', auth, async (req, res) => {
+router.post('/config', authenticate, async (req, res) => {
   try {
     const { configKey, configValue, ttl = 7200 } = req.body;
     
@@ -288,7 +288,7 @@ router.post('/config', auth, async (req, res) => {
  * 获取系统配置
  * GET /api/cache/config/:configKey
  */
-router.get('/config/:configKey', auth, async (req, res) => {
+router.get('/config/:configKey', authenticate, async (req, res) => {
   try {
     const { configKey } = req.params;
     const config = await cacheService.getSystemConfig(configKey);
@@ -310,7 +310,7 @@ router.get('/config/:configKey', auth, async (req, res) => {
  * 删除系统配置
  * DELETE /api/cache/config/:configKey
  */
-router.delete('/config/:configKey', auth, async (req, res) => {
+router.delete('/config/:configKey', authenticate, async (req, res) => {
   try {
     const { configKey } = req.params;
     await cacheService.deleteSystemConfig(configKey);
@@ -336,7 +336,7 @@ router.delete('/config/:configKey', auth, async (req, res) => {
  * 设置威胁检测结果
  * POST /api/cache/threat
  */
-router.post('/threat', auth, async (req, res) => {
+router.post('/threat', authenticate, async (req, res) => {
   try {
     const { threatId, threatData, ttl = 1800 } = req.body;
     
@@ -366,7 +366,7 @@ router.post('/threat', auth, async (req, res) => {
  * 获取威胁检测结果
  * GET /api/cache/threat/:threatId
  */
-router.get('/threat/:threatId', auth, async (req, res) => {
+router.get('/threat/:threatId', authenticate, async (req, res) => {
   try {
     const { threatId } = req.params;
     const threatData = await cacheService.getThreatDetection(threatId);
@@ -388,7 +388,7 @@ router.get('/threat/:threatId', auth, async (req, res) => {
  * 删除威胁检测结果
  * DELETE /api/cache/threat/:threatId
  */
-router.delete('/threat/:threatId', auth, async (req, res) => {
+router.delete('/threat/:threatId', authenticate, async (req, res) => {
   try {
     const { threatId } = req.params;
     await cacheService.deleteThreatDetection(threatId);
@@ -410,7 +410,7 @@ router.delete('/threat/:threatId', auth, async (req, res) => {
  * 批量删除威胁检测结果
  * DELETE /api/cache/threat/pattern/:pattern
  */
-router.delete('/threat/pattern/:pattern', auth, async (req, res) => {
+router.delete('/threat/pattern/:pattern', authenticate, async (req, res) => {
   try {
     const { pattern } = req.params;
     await cacheService.deleteThreatDetectionPattern(pattern);

@@ -4,7 +4,6 @@
  * 兼容Redis v4.x
  */
 
-const redis = require('redis');
 const logger = require('../utils/logger');
 
 class CacheService {
@@ -21,6 +20,34 @@ class CacheService {
 
   async connect() {
     try {
+      logger.debug('🔍 CacheService.connect() 开始执行');
+      
+      // 尝试从database.js获取已存在的Redis客户端
+      try {
+        const { getRedisClient } = require('../config/database');
+        this.client = getRedisClient();
+        logger.debug('🔍 CacheService: 使用database.js中的Redis客户端');
+        
+        // 检查Redis客户端是否已连接
+        if (this.client && this.client.isOpen) {
+          this.isConnected = true;
+          logger.info('✅ CacheService: 使用已连接的Redis客户端');
+          return;
+        }
+      } catch (error) {
+        logger.debug('🔍 CacheService: 无法获取database.js中的Redis客户端，将创建新连接');
+      }
+
+      // 如果无法获取已存在的客户端，则创建新的连接
+      logger.debug('🔍 CacheService: 创建新的Redis连接');
+      const redis = require('redis');
+      
+      logger.debug('🔍 环境变量检查:');
+      logger.debug(`   REDIS_HOST: ${process.env.REDIS_HOST || 'localhost'}`);
+      logger.debug(`   REDIS_PORT: ${process.env.REDIS_PORT || 6379}`);
+      logger.debug(`   REDIS_DB: ${process.env.REDIS_DB || 0}`);
+      logger.debug(`   REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? '已设置' : '未设置'}`);
+
       const redisConfig = {
         socket: {
           host: process.env.REDIS_HOST || 'localhost',
@@ -32,36 +59,54 @@ class CacheService {
       // 只有在配置了密码时才添加密码
       if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
         redisConfig.password = process.env.REDIS_PASSWORD;
+        logger.debug('🔍 添加了Redis密码配置');
+      } else {
+        logger.debug('🔍 未添加Redis密码配置');
       }
+
+      logger.debug('🔍 Redis配置对象:', JSON.stringify(redisConfig, null, 2));
+      logger.debug('🔍 创建Redis客户端...');
 
       this.client = redis.createClient(redisConfig);
 
       // 监听连接事件
       this.client.on('connect', () => {
-        logger.info('Redis连接成功');
+        logger.info('✅ CacheService: Redis连接成功');
         this.isConnected = true;
       });
 
       this.client.on('error', (err) => {
-        logger.error('Redis连接错误:', err);
+        logger.error('❌ CacheService: Redis连接错误:', err);
+        logger.error('❌ 错误详情:', {
+          message: err.message,
+          code: err.code,
+          stack: err.stack
+        });
         this.isConnected = false;
       });
 
       this.client.on('end', () => {
-        logger.warn('Redis连接断开');
+        logger.warn('🔌 CacheService: Redis连接断开');
         this.isConnected = false;
       });
 
       this.client.on('ready', () => {
-        logger.info('Redis准备就绪');
+        logger.info('🚀 CacheService: Redis准备就绪');
         this.isConnected = true;
       });
 
+      logger.debug('🔍 开始连接到Redis...');
       // 连接到Redis
       await this.client.connect();
+      logger.debug('🔍 Redis连接完成');
 
     } catch (error) {
-      logger.error('Redis初始化失败:', error);
+      logger.error('❌ CacheService: Redis初始化失败:', error);
+      logger.error('❌ 错误详情:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       throw error;
     }
   }

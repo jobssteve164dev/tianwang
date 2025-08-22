@@ -63,7 +63,14 @@ function initializeInfluxDB() {
  * Redis连接配置
  */
 function initializeRedis() {
+  logger.debug('🔍 database.js: initializeRedis() 开始执行');
   const { redis } = config.database;
+  
+  logger.debug('🔍 database.js: Redis配置检查:');
+  logger.debug(`   host: ${redis.host}`);
+  logger.debug(`   port: ${redis.port}`);
+  logger.debug(`   db: ${redis.db}`);
+  logger.debug(`   password: ${redis.password ? '已设置' : '未设置'}`);
   
   const redisConfig = {
     socket: {
@@ -76,27 +83,39 @@ function initializeRedis() {
   // 只有在配置了密码时才添加密码
   if (redis.password && redis.password.trim() !== '') {
     redisConfig.password = redis.password;
+    logger.debug('🔍 database.js: 添加了Redis密码配置');
+  } else {
+    logger.debug('🔍 database.js: 未添加Redis密码配置');
   }
+  
+  logger.debug('🔍 database.js: Redis配置对象:', JSON.stringify(redisConfig, null, 2));
+  logger.debug('🔍 database.js: 创建Redis客户端...');
   
   redisClient = Redis.createClient(redisConfig);
 
   // Redis事件监听
   redisClient.on('connect', () => {
-    logger.info('✅ Redis connected');
+    logger.info('✅ database.js: Redis connected');
   });
 
   redisClient.on('error', (error) => {
-    logger.error('❌ Redis connection error:', error);
+    logger.error('❌ database.js: Redis connection error:', error);
+    logger.error('❌ database.js: 错误详情:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
   });
 
   redisClient.on('ready', () => {
-    logger.info('🚀 Redis ready');
+    logger.info('🚀 database.js: Redis ready');
   });
 
   redisClient.on('end', () => {
-    logger.info('🔌 Redis connection ended');
+    logger.info('🔌 database.js: Redis connection ended');
   });
 
+  logger.debug('🔍 database.js: Redis客户端创建完成');
   return redisClient;
 }
 
