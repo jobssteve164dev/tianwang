@@ -576,7 +576,7 @@ router.get('/threat-ips', async (req, res) => {
         'sourceIP',
         'severity',
         [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count'],
-        [models.sequelize.fn('MAX', models.sequelize.col('timestamp')), 'lastSeen']
+        [models.sequelize.fn('MAX', models.sequelize.col('timestamp')), 'last_seen']
       ],
       where: {
         sourceIP: {
@@ -595,7 +595,7 @@ router.get('/threat-ips', async (req, res) => {
       ip: stat.sourceIP,
       count: parseInt(stat.count),
       severity: stat.severity,
-      lastSeen: stat.lastSeen
+      lastSeen: stat.last_seen
     }));
 
     const totalThreatIPs = threatIPs.reduce((sum, item) => sum + item.count, 0);

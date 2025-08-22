@@ -12,29 +12,29 @@ class AgentController {
   async registerAgent(req, res) {
     try {
       const {
-        agentId,
+        agentId: agent_id,
         hostname,
         platform,
         arch,
         version,
         capabilities,
-        systemInfo,
+        systemInfo: system_info,
         registrationCode,
-        deviceFingerprint
+        deviceFingerprint: device_fingerprint
       } = req.body;
 
       console.log('代理注册请求:', {
-        agentId,
+        agentId: agent_id,
         hostname,
         platform,
         hasRegistrationCode: !!registrationCode,
-        hasFingerprint: !!deviceFingerprint,
-        fingerprint: deviceFingerprint?.substring(0, 16) + '...'
+        hasFingerprint: !!device_fingerprint,
+        fingerprint: device_fingerprint?.substring(0, 16) + '...'
       });
 
       // 验证必需字段
-      if (!agentId || !hostname || !platform) {
-        console.warn('代理注册缺少必需字段:', { agentId, hostname, platform });
+      if (!agent_id || !hostname || !platform) {
+        console.warn('代理注册缺少必需字段:', { agentId: agent_id, hostname, platform });
         return res.status(400).json({
           success: false,
           message: '缺少必需字段: agentId, hostname, platform'
@@ -45,10 +45,10 @@ class AgentController {
       if (registrationCode) {
         console.log('验证注册码:', registrationCode.substring(0, 8) + '...');
         const deviceInfo = {
-          agentId,
+          agentId: agent_id,
           hostname,
           platform,
-          fingerprint: deviceFingerprint
+          fingerprint: device_fingerprint
         };
 
         const codeValidation = await registrationCodeService.validateRegistrationCode(registrationCode, deviceInfo);
@@ -64,12 +64,12 @@ class AgentController {
         }
 
         // 增加注册码使用次数
-        await registrationCodeService.incrementCodeUsage(registrationCode, agentId, deviceFingerprint);
+        await registrationCodeService.incrementCodeUsage(registrationCode, agent_id, device_fingerprint);
         console.log('注册码使用次数已增加');
       }
 
       // 检查代理是否已存在
-      console.log('检查代理是否已存在:', { agentId });
+      console.log('检查代理是否已存在:', { agentId: agent_id });
       
       // 检查模型是否可用
       if (!models.Agent) {
@@ -80,10 +80,10 @@ class AgentController {
         });
       }
 
-      let agent = await models.Agent?.findOne({ where: { agentId } });
+      let agent = await models.Agent?.findOne({ where: { agent_id } });
             
       if (agent) {
-        console.log('代理已存在，更新信息:', { agentId, hostname });
+        console.log('代理已存在，更新信息:', { agentId: agent_id, hostname });
         
         // 更新现有代理信息
         agent.hostname = hostname;
@@ -91,34 +91,34 @@ class AgentController {
         agent.arch = arch;
         agent.version = version;
         agent.capabilities = capabilities;
-        agent.systemInfo = systemInfo;
-        agent.deviceFingerprint = deviceFingerprint;
-        agent.lastSeen = new Date();
+        agent.system_info = system_info;
+        agent.device_fingerprint = device_fingerprint;
+        agent.last_seen = new Date();
         agent.status = 'online';
                 
         await agent.save();
                 
-        console.log('代理信息已更新:', { agentId, hostname });
-        logger.info('代理信息已更新:', { agentId, hostname });
+        console.log('代理信息已更新:', { agentId: agent_id, hostname });
+        logger.info('代理信息已更新:', { agentId: agent_id, hostname });
                 
         return res.status(409).json({
           success: false,
           message: '代理已存在，请使用认证接口获取token',
-          agentId
+          agentId: agent_id
         });
       }
 
       console.log('代理不存在，创建新代理');
 
       // 生成设备指纹（如果未提供）
-      let fingerprint = deviceFingerprint;
-      if (!fingerprint && systemInfo) {
+      let fingerprint = device_fingerprint;
+      if (!fingerprint && system_info) {
         console.log('生成设备指纹...');
         const fingerprintResult = deviceFingerprintService.generateFingerprint({
           hostname,
           platform,
           arch,
-          ...systemInfo
+          ...system_info
         });
         fingerprint = fingerprintResult.fingerprint;
         console.log('生成的设备指纹:', fingerprint.substring(0, 16) + '...');
@@ -126,29 +126,29 @@ class AgentController {
 
       // 创建新代理
       agent = new models.Agent({
-        agentId,
+        agent_id,
         name: hostname, // 使用hostname作为name
         hostname,
         platform,
         arch,
         version: version || '1.0.0',
         capabilities: capabilities || [],
-        systemInfo: systemInfo || {},
-        deviceFingerprint: fingerprint,
+        system_info: system_info || {},
+        device_fingerprint: fingerprint,
         status: 'online',
-        registeredAt: new Date(),
-        lastSeen: new Date(),
-        organizationId: req.user?.organizationId // 如果用户已认证
+        registered_at: new Date(),
+        last_seen: new Date(),
+        organization_id: req.user?.organizationId // 如果用户已认证
       });
 
       await agent.save();
-      console.log('新代理已保存到数据库:', { agentId, hostname });
+      console.log('新代理已保存到数据库:', { agentId: agent_id, hostname });
 
       // 使用注册码（如果提供）
       if (registrationCode) {
         console.log('使用注册码...');
         const deviceInfo = {
-          agentId,
+          agentId: agent_id,
           hostname,
           platform,
           fingerprint
@@ -164,7 +164,7 @@ class AgentController {
       // 生成JWT token
       const token = jwt.sign(
         { 
-          agentId, 
+          agentId: agent_id, 
           hostname,
           type: 'agent',
           connectionKey: connectionKey.key
@@ -175,18 +175,18 @@ class AgentController {
 
       console.log('JWT token已生成');
 
-      console.log('新代理注册成功:', { agentId, hostname, platform });
-      logger.info('新代理注册成功:', { agentId, hostname, platform });
+      console.log('新代理注册成功:', { agentId: agent_id, hostname, platform });
+      logger.info('新代理注册成功:', { agentId: agent_id, hostname, platform });
 
       res.status(201).json({
         success: true,
         message: '代理注册成功',
         agent: {
-          agentId: agent.agentId,
+          agentId: agent.agent_id,
           hostname: agent.hostname,
           platform: agent.platform,
           status: agent.status,
-          registeredAt: agent.registeredAt,
+          registeredAt: agent.registered_at,
           deviceFingerprint: fingerprint
         },
         token,
@@ -241,12 +241,12 @@ class AgentController {
   // 代理认证
   async authenticateAgent(req, res) {
     try {
-      const { agentId, hostname, deviceFingerprint } = req.body;
+      const { agentId: agent_id, hostname, deviceFingerprint: device_fingerprint } = req.body;
 
-      console.log('代理认证请求:', { agentId, hostname, hasFingerprint: !!deviceFingerprint });
+      console.log('代理认证请求:', { agentId: agent_id, hostname, hasFingerprint: !!device_fingerprint });
 
-      if (!agentId || !hostname) {
-        console.warn('代理认证缺少必需字段:', { agentId, hostname });
+      if (!agent_id || !hostname) {
+        console.warn('代理认证缺少必需字段:', { agentId: agent_id, hostname });
         return res.status(400).json({
           success: false,
           message: '缺少必需字段: agentId, hostname'
@@ -254,11 +254,11 @@ class AgentController {
       }
 
       // 查找代理
-      console.log('查找代理:', { agentId, hostname });
-      const agent = await models.Agent?.findOne({ where: { agentId, hostname } });
+      console.log('查找代理:', { agentId: agent_id, hostname });
+      const agent = await models.Agent?.findOne({ where: { agent_id, hostname } });
             
       if (!agent) {
-        console.warn('代理不存在:', { agentId, hostname });
+        console.warn('代理不存在:', { agentId: agent_id, hostname });
         return res.status(404).json({
           success: false,
           message: '代理不存在，请先注册'
@@ -266,17 +266,17 @@ class AgentController {
       }
 
       console.log('找到代理:', { 
-        agentId: agent.agentId, 
+        agentId: agent.agent_id, 
         hostname: agent.hostname, 
         platform: agent.platform,
-        hasStoredFingerprint: !!agent.deviceFingerprint 
+        hasStoredFingerprint: !!agent.device_fingerprint 
       });
 
       // 验证设备指纹（如果提供）
-      if (deviceFingerprint && agent.deviceFingerprint) {
+      if (device_fingerprint && agent.device_fingerprint) {
         console.log('开始设备指纹验证:', {
-          providedFingerprint: deviceFingerprint.substring(0, 16) + '...',
-          storedFingerprint: agent.deviceFingerprint.substring(0, 16) + '...'
+          providedFingerprint: device_fingerprint.substring(0, 16) + '...',
+          storedFingerprint: agent.device_fingerprint.substring(0, 16) + '...'
         });
 
         // 构建完整的设备信息用于指纹验证
