@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
       startDate,
       endDate,
       deviceId,
-      agentId
+      agent_id
     } = req.query;
 
     // 构建查询条件
@@ -58,8 +58,8 @@ router.get('/', async (req, res) => {
       query.deviceId = deviceId;
     }
     
-    if (agentId) {
-      query.agentId = agentId;
+    if (agent_id) {
+      query.agent_id = agent_id;
     }
     
     if (search) {
@@ -106,7 +106,7 @@ router.get('/', async (req, res) => {
           sourceIP: alert.sourceIP,
           targetIP: alert.targetIP,
           deviceId: alert.deviceId,
-          agentId: alert.agentId,
+          agent_id: alert.agent_id,
           timestamp: alert.timestamp,
           lastUpdated: alert.lastUpdated,
           assignedTo: alert.assignedTo,
@@ -160,7 +160,7 @@ router.get('/:id', async (req, res) => {
         sourceIP: alert.sourceIP,
         targetIP: alert.targetIP,
         deviceId: alert.deviceId,
-        agentId: alert.agentId,
+        agent_id: alert.agent_id,
         timestamp: alert.timestamp,
         lastUpdated: alert.lastUpdated,
         assignedTo: alert.assignedTo,
@@ -369,13 +369,13 @@ router.post('/threat', async (req, res) => {
       targetIP,
       targetPort,
       deviceId,
-      agentId,
+      agent_id,
       threatDetails,
       evidence
     } = req.body;
 
     // 验证必需字段
-    if (!title || !description || !type || !severity || !source || !deviceId || !agentId) {
+    if (!title || !description || !type || !severity || !source || !deviceId || !agent_id) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields'
@@ -394,7 +394,7 @@ router.post('/threat', async (req, res) => {
       targetIP,
       targetPort,
       deviceId,
-      agentId,
+      agent_id,
       threatDetails,
       evidence,
       tags: [type, severity, 'agent-detected']

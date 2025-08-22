@@ -10,24 +10,24 @@ const dataStorageService = require('../services/DataStorageService');
 const logger = require('../utils/logger');
 
 /**
- * GET /api/data/system/:agentId
+ * GET /api/data/system/:agent_id
  * 获取代理的系统性能数据
  */
-router.get('/system/:agentId', authenticate, async (req, res) => {
+router.get('/system/:agent_id', authenticate, async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
 
     // 验证时间范围
     const startTime = start ? new Date(start).toISOString() : '-1h';
     const endTime = end ? new Date(end).toISOString() : 'now()';
 
-    const data = await dataStorageService.querySystemData(agentId, startTime, endTime, parseInt(limit));
+    const data = await dataStorageService.querySystemData(agent_id, startTime, endTime, parseInt(limit));
 
     res.json({
       success: true,
       data: {
-        agentId,
+        agent_id,
         metrics: data,
         count: data.length,
         timeRange: { start: startTime, end: endTime }
@@ -45,24 +45,24 @@ router.get('/system/:agentId', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/data/network/:agentId
+ * GET /api/data/network/:agent_id
  * 获取代理的网络流量数据
  */
-router.get('/network/:agentId', authenticate, async (req, res) => {
+router.get('/network/:agent_id', authenticate, async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
 
     // 验证时间范围
     const startTime = start ? new Date(start).toISOString() : '-1h';
     const endTime = end ? new Date(end).toISOString() : 'now()';
 
-    const data = await dataStorageService.queryNetworkData(agentId, startTime, endTime, parseInt(limit));
+    const data = await dataStorageService.queryNetworkData(agent_id, startTime, endTime, parseInt(limit));
 
     res.json({
       success: true,
       data: {
-        agentId,
+        agent_id,
         metrics: data,
         count: data.length,
         timeRange: { start: startTime, end: endTime }
@@ -80,24 +80,24 @@ router.get('/network/:agentId', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/data/security/:agentId
+ * GET /api/data/security/:agent_id
  * 获取代理的安全事件数据
  */
-router.get('/security/:agentId', authenticate, async (req, res) => {
+router.get('/security/:agent_id', authenticate, async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
 
     // 验证时间范围
     const startTime = start ? new Date(start).toISOString() : '-24h';
     const endTime = end ? new Date(end).toISOString() : 'now()';
 
-    const data = await dataStorageService.querySecurityEvents(agentId, startTime, endTime, parseInt(limit));
+    const data = await dataStorageService.querySecurityEvents(agent_id, startTime, endTime, parseInt(limit));
 
     res.json({
       success: true,
       data: {
-        agentId,
+        agent_id,
         events: data,
         count: data.length,
         timeRange: { start: startTime, end: endTime }
@@ -115,20 +115,20 @@ router.get('/security/:agentId', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/data/stats/:agentId
+ * GET /api/data/stats/:agent_id
  * 获取代理的系统性能统计
  */
-router.get('/stats/:agentId', authenticate, async (req, res) => {
+router.get('/stats/:agent_id', authenticate, async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { agent_id } = req.params;
     const { timeRange = '1h' } = req.query;
 
-    const stats = await dataStorageService.getSystemStats(agentId, timeRange);
+    const stats = await dataStorageService.getSystemStats(agent_id, timeRange);
 
     res.json({
       success: true,
       data: {
-        agentId,
+        agent_id,
         stats,
         timeRange
       }
@@ -145,23 +145,23 @@ router.get('/stats/:agentId', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/data/agents/:agentId/summary
+ * GET /api/data/agents/:agent_id/summary
  * 获取代理的数据摘要
  */
-router.get('/agents/:agentId/summary', authenticate, async (req, res) => {
+router.get('/agents/:agent_id/summary', authenticate, async (req, res) => {
   try {
-    const { agentId } = req.params;
+    const { agent_id } = req.params;
     const { timeRange = '24h' } = req.query;
 
     // 获取系统统计
-    const systemStats = await dataStorageService.getSystemStats(agentId, timeRange);
+    const systemStats = await dataStorageService.getSystemStats(agent_id, timeRange);
     
     // 获取安全事件统计
-    const securityEvents = await dataStorageService.querySecurityEvents(agentId, `-${timeRange}`, 'now()', 100);
+    const securityEvents = await dataStorageService.querySecurityEvents(agent_id, `-${timeRange}`, 'now()', 100);
 
     // 计算摘要数据
     const summary = {
-      agentId,
+      agent_id,
       timeRange,
       system: {
         avgCpuLoad: 0,

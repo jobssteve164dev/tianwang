@@ -65,7 +65,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: false
     },
-    agentId: {
+    agent_id: {
       type: DataTypes.STRING,
       allowNull: false
     },

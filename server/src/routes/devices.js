@@ -27,13 +27,13 @@ router.get('/', authenticate, async (req, res) => {
       whereClause[models.Sequelize.Op.or] = [
         { name: { [models.Sequelize.Op.iLike]: `%${search}%` } },
         { hostname: { [models.Sequelize.Op.iLike]: `%${search}%` } },
-        { agentId: { [models.Sequelize.Op.iLike]: `%${search}%` } }
+        { agent_id: { [models.Sequelize.Op.iLike]: `%${search}%` } }
       ];
     }
     
     // 组织过滤
-    if (req.user?.organizationId) {
-      whereClause.organizationId = req.user.organizationId;
+    if (req.user?.organization_id) {
+      whereClause.organization_id = req.user.organization_id;
     }
 
     // 检查Agent模型是否可用
@@ -72,7 +72,7 @@ router.get('/', authenticate, async (req, res) => {
       type: agent.platform, // 兼容前端
       status: agent.status,
       last_seen_at: agent.last_seen,
-      lastSeen: agent.last_seen, // 兼容前端
+      last_seen: agent.last_seen, // 兼容前端
       agent_version: agent.version,
       version: agent.version, // 兼容前端
       capabilities: agent.capabilities || {},
@@ -134,32 +134,32 @@ router.get('/:id', authenticate, async (req, res) => {
       id: agent.id,
       name: agent.name || agent.hostname,
       hostname: agent.hostname,
-      ip_address: agent.systemInfo?.networkInterfaces?.[0]?.ip || 'N/A',
-      mac_address: agent.systemInfo?.networkInterfaces?.[0]?.mac || 'N/A',
+      ip_address: agent.system_info?.networkInterfaces?.[0]?.ip || 'N/A',
+      mac_address: agent.system_info?.networkInterfaces?.[0]?.mac || 'N/A',
       platform: agent.platform,
       type: agent.platform,
       status: agent.status,
-      last_seen_at: agent.lastSeen,
-      lastSeen: agent.lastSeen,
+      last_seen_at: agent.last_seen,
+      last_seen: agent.last_seen,
       agent_version: agent.version,
       version: agent.version,
       capabilities: agent.capabilities || {},
-      os: agent.systemInfo?.os ? 
-        (typeof agent.systemInfo.os === 'object' ? 
-          `${agent.systemInfo.os.distro || ''} ${agent.systemInfo.os.release || ''}`.trim() || agent.systemInfo.os.platform || agent.platform :
-          agent.systemInfo.os) : 
+      os: agent.system_info?.os ? 
+        (typeof agent.system_info.os === 'object' ? 
+          `${agent.system_info.os.distro || ''} ${agent.system_info.os.release || ''}`.trim() || agent.system_info.os.platform || agent.platform :
+          agent.system_info.os) : 
         agent.platform,
       architecture: agent.arch,
       registered_at: agent.registered_at,
       hardware_info: {
-        cpu: agent.systemInfo?.cpu || {},
-        memory: agent.systemInfo?.memory || {},
-        disk: agent.systemInfo?.diskInfo || []
+        cpu: agent.system_info?.cpu || {},
+        memory: agent.system_info?.memory || {},
+        disk: agent.system_info?.diskInfo || []
       },
       network_info: {
-        interfaces: agent.systemInfo?.networkInterfaces || []
+        interfaces: agent.system_info?.networkInterfaces || []
       },
-      system_info: agent.systemInfo || {}
+      system_info: agent.system_info || {}
     };
 
     res.json({
@@ -202,7 +202,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     // 删除代理
     await agent.destroy();
 
-    logger.info('设备删除成功:', { agentId: agent.agentId, hostname: agent.hostname });
+    logger.info('设备删除成功:', { agent_id: agent.agent_id, hostname: agent.hostname });
 
     res.json({
       success: true,
@@ -253,7 +253,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     await agent.save();
 
-    logger.info('设备更新成功:', { agentId: agent.agentId, hostname: agent.hostname });
+    logger.info('设备更新成功:', { agent_id: agent.agent_id, hostname: agent.hostname });
 
     res.json({
       success: true,
@@ -289,8 +289,8 @@ router.get('/stats/overview', authenticate, async (req, res) => {
     }
 
     const whereClause = {};
-    if (req.user?.organizationId) {
-      whereClause.organizationId = req.user.organizationId;
+    if (req.user?.organization_id) {
+      whereClause.organization_id = req.user.organization_id;
     }
 
     // 获取各种状态的设备数量
@@ -344,7 +344,7 @@ router.get('/stats/overview', authenticate, async (req, res) => {
           hostname: device.hostname,
           platform: device.platform,
           status: device.status,
-          registeredAt: device.registered_at
+          registered_at: device.registered_at
         }))
       }
     });

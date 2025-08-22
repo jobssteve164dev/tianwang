@@ -19,18 +19,18 @@ router.use(authenticate);
 router.get('/', agentController.getAgents);
 
 // 获取代理详情
-router.get('/:agentId', agentController.getAgent);
+router.get('/:agent_id', agentController.getAgent);
 
 // 更新代理状态
-router.patch('/:agentId/status', agentController.updateAgentStatus);
+router.patch('/:agent_id/status', agentController.updateAgentStatus);
 
 // 删除代理
-router.delete('/:agentId', agentController.deleteAgent);
+router.delete('/:agent_id', agentController.deleteAgent);
 
 // 代理心跳
-router.post('/:agentId/heartbeat', agentController.heartbeat);
+router.post('/:agent_id/heartbeat', agentController.heartbeat);
 
 // 接收代理数据
-router.post('/:agentId/data', agentController.receiveData);
+router.post('/:agent_id/data', agentController.receiveData);
 
 module.exports = router; 

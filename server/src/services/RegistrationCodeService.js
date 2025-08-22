@@ -196,7 +196,7 @@ class RegistrationCodeService {
         if (fingerprintValidation.isReuse) {
           logger.info('同一设备重复使用注册码，允许通过:', { 
             code, 
-            deviceFingerprint: deviceInfo.fingerprint.substring(0, 16) + '...' 
+            device_fingerprint: deviceInfo.fingerprint.substring(0, 16) + '...' 
           });
           return {
             isValid: true,
@@ -251,7 +251,7 @@ class RegistrationCodeService {
   }
 
   // 增加注册码使用次数
-  async incrementCodeUsage(code, agentId, deviceFingerprint) {
+  async incrementCodeUsage(code, agent_id, device_fingerprint) {
     try {
       if (!models.RegistrationCode) {
         throw new Error('RegistrationCode model not available');
@@ -266,7 +266,7 @@ class RegistrationCodeService {
         return false;
       }
 
-      await registrationCode.incrementUsage(agentId, deviceFingerprint);
+      await registrationCode.incrementUsage(agent_id, device_fingerprint);
 
       logger.info('注册码使用次数已增加:', { code, usedCount: registrationCode.used_count });
       return true;
@@ -358,11 +358,11 @@ class RegistrationCodeService {
       }
 
       // 更新使用信息
-      await registrationCode.incrementUsage(deviceInfo.agentId, deviceInfo.fingerprint);
+      await registrationCode.incrementUsage(deviceInfo.agent_id, deviceInfo.fingerprint);
 
       logger.info('注册码使用成功:', { 
         code, 
-        agentId: deviceInfo.agentId,
+        agent_id: deviceInfo.agent_id,
         remainingUses: registrationCode.getRemainingUses()
       });
 

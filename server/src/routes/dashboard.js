@@ -595,7 +595,7 @@ router.get('/threat-ips', async (req, res) => {
       ip: stat.sourceIP,
       count: parseInt(stat.count),
       severity: stat.severity,
-      lastSeen: stat.last_seen
+      last_seen: stat.last_seen
     }));
 
     const totalThreatIPs = threatIPs.reduce((sum, item) => sum + item.count, 0);

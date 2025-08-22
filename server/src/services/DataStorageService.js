@@ -126,7 +126,7 @@ class DataStorageService {
   /**
    * 存储系统性能数据
    */
-  async storeSystemData(agentId, data) {
+  async storeSystemData(agent_id, data) {
     try {
       if (!this.isInitialized) {
         logger.warn('DataStorageService not initialized, skipping system data storage');
@@ -134,12 +134,12 @@ class DataStorageService {
       }
 
       if (this.mockMode) {
-        logger.debug('📊 Mock mode: System data would be stored for agent:', agentId);
+        logger.debug('📊 Mock mode: System data would be stored for agent:', agent_id);
         return;
       }
 
       const point = new Point('system_metrics')
-        .tag('agent_id', agentId)
+        .tag('agent_id', agent_id)
         .tag('hostname', data.hostname || 'unknown')
         .tag('platform', data.platform || 'unknown')
         .timestamp(data.timestamp || Date.now());
@@ -183,7 +183,7 @@ class DataStorageService {
   /**
    * 存储网络流量数据
    */
-  async storeNetworkData(agentId, data) {
+  async storeNetworkData(agent_id, data) {
     try {
       if (!this.isInitialized) {
         logger.warn('DataStorageService not initialized, skipping network data storage');
@@ -191,7 +191,7 @@ class DataStorageService {
       }
 
       if (this.mockMode) {
-        logger.debug('🌐 Mock mode: Network data would be stored for agent:', agentId);
+        logger.debug('🌐 Mock mode: Network data would be stored for agent:', agent_id);
         return;
       }
 
@@ -199,7 +199,7 @@ class DataStorageService {
       if (data.interfaces && Array.isArray(data.interfaces)) {
         for (const iface of data.interfaces) {
           const point = new Point('network_interface_metrics')
-            .tag('agent_id', agentId)
+            .tag('agent_id', agent_id)
             .tag('interface', iface.iface || 'unknown')
             .tag('operstate', iface.operstate || 'unknown')
             .timestamp(data.timestamp || Date.now())
@@ -225,7 +225,7 @@ class DataStorageService {
       // 存储网络连接数据
       if (data.connections && data.connections.connections) {
         const connectionsPoint = new Point('network_connections')
-          .tag('agent_id', agentId)
+          .tag('agent_id', agent_id)
           .timestamp(data.timestamp || Date.now())
           .intField('total_connections', data.connections.total || 0)
           .intField('active_connections', data.connections.active || 0);
@@ -241,7 +241,7 @@ class DataStorageService {
   /**
    * 存储日志数据
    */
-  async storeLogData(agentId, data) {
+  async storeLogData(agent_id, data) {
     try {
       if (!this.isInitialized) {
         logger.warn('DataStorageService not initialized, skipping log data storage');
@@ -251,7 +251,7 @@ class DataStorageService {
       if (data.lines && Array.isArray(data.lines)) {
         for (const line of data.lines) {
           const point = new Point('log_entries')
-            .tag('agent_id', agentId)
+            .tag('agent_id', agent_id)
             .tag('source', data.source || 'unknown')
             .tag('log_type', 'system')
             .timestamp(data.timestamp || Date.now())
@@ -270,7 +270,7 @@ class DataStorageService {
   /**
    * 存储安全事件数据
    */
-  async storeSecurityEvent(agentId, eventData) {
+  async storeSecurityEvent(agent_id, eventData) {
     try {
       if (!this.isInitialized) {
         logger.warn('DataStorageService not initialized, skipping security event storage');
@@ -278,7 +278,7 @@ class DataStorageService {
       }
 
       const point = new Point('security_events')
-        .tag('agent_id', agentId)
+        .tag('agent_id', agent_id)
         .tag('event_type', eventData.type || 'unknown')
         .tag('severity', eventData.severity || 'medium')
         .tag('status', eventData.status || 'open')
@@ -312,27 +312,27 @@ class DataStorageService {
   /**
    * 查询系统性能数据
    */
-  async querySystemData(agentId, startTime, endTime, limit = 1000) {
+  async querySystemData(agent_id, startTime, endTime, limit = 1000) {
     try {
       if (!this.isInitialized) {
         throw new Error('DataStorageService not initialized');
       }
 
       if (this.mockMode) {
-        logger.debug('📊 Mock mode: Returning mock system data for agent:', agentId);
+        logger.debug('📊 Mock mode: Returning mock system data for agent:', agent_id);
         // 返回模拟数据
         return [
           {
             _time: new Date().toISOString(),
             _measurement: 'system_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             _field: 'cpu_load',
             _value: 45.2
           },
           {
             _time: new Date().toISOString(),
             _measurement: 'system_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             _field: 'memory_usage_percent',
             _value: 65.8
           }
@@ -343,7 +343,7 @@ class DataStorageService {
         from(bucket: "${config.database.influxdb.bucket}")
           |> range(start: ${startTime}, stop: ${endTime})
           |> filter(fn: (r) => r._measurement == "system_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agentId}")
+          |> filter(fn: (r) => r.agent_id == "${agent_id}")
           |> sort(columns: ["_time"])
           |> limit(n: ${limit})
       `;
@@ -365,20 +365,20 @@ class DataStorageService {
   /**
    * 查询网络流量数据
    */
-  async queryNetworkData(agentId, startTime, endTime, limit = 1000) {
+  async queryNetworkData(agent_id, startTime, endTime, limit = 1000) {
     try {
       if (!this.isInitialized) {
         throw new Error('DataStorageService not initialized');
       }
 
       if (this.mockMode) {
-        logger.debug('🌐 Mock mode: Returning mock network data for agent:', agentId);
+        logger.debug('🌐 Mock mode: Returning mock network data for agent:', agent_id);
         // 返回模拟数据
         return [
           {
             _time: new Date().toISOString(),
             _measurement: 'network_interface_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             interface: 'eth0',
             _field: 'rx_bytes',
             _value: 1024000
@@ -386,7 +386,7 @@ class DataStorageService {
           {
             _time: new Date().toISOString(),
             _measurement: 'network_interface_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             interface: 'eth0',
             _field: 'tx_bytes',
             _value: 512000
@@ -398,7 +398,7 @@ class DataStorageService {
         from(bucket: "${config.database.influxdb.bucket}")
           |> range(start: ${startTime}, stop: ${endTime})
           |> filter(fn: (r) => r._measurement == "network_interface_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agentId}")
+          |> filter(fn: (r) => r.agent_id == "${agent_id}")
           |> sort(columns: ["_time"])
           |> limit(n: ${limit})
       `;
@@ -420,20 +420,20 @@ class DataStorageService {
   /**
    * 查询安全事件数据
    */
-  async querySecurityEvents(agentId, startTime, endTime, limit = 1000) {
+  async querySecurityEvents(agent_id, startTime, endTime, limit = 1000) {
     try {
       if (!this.isInitialized) {
         throw new Error('DataStorageService not initialized');
       }
 
       if (this.mockMode) {
-        logger.debug('🛡️ Mock mode: Returning mock security events for agent:', agentId);
+        logger.debug('🛡️ Mock mode: Returning mock security events for agent:', agent_id);
         // 返回模拟数据
         return [
           {
             _time: new Date().toISOString(),
             _measurement: 'security_events',
-            agent_id: agentId,
+            agent_id: agent_id,
             event_type: 'suspicious_connection',
             severity: 'medium',
             _field: 'title',
@@ -446,7 +446,7 @@ class DataStorageService {
         from(bucket: "${config.database.influxdb.bucket}")
           |> range(start: ${startTime}, stop: ${endTime})
           |> filter(fn: (r) => r._measurement == "security_events")
-          |> filter(fn: (r) => r.agent_id == "${agentId}")
+          |> filter(fn: (r) => r.agent_id == "${agent_id}")
           |> sort(columns: ["_time"])
           |> limit(n: ${limit})
       `;
@@ -468,27 +468,27 @@ class DataStorageService {
   /**
    * 获取系统性能统计
    */
-  async getSystemStats(agentId, timeRange = '1h') {
+  async getSystemStats(agent_id, timeRange = '1h') {
     try {
       if (!this.isInitialized) {
         throw new Error('DataStorageService not initialized');
       }
 
       if (this.mockMode) {
-        logger.debug('📊 Mock mode: Returning mock system stats for agent:', agentId);
+        logger.debug('📊 Mock mode: Returning mock system stats for agent:', agent_id);
         // 返回模拟数据
         return [
           {
             _time: new Date().toISOString(),
             _measurement: 'system_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             _field: 'cpu_load',
             _value: 45.2
           },
           {
             _time: new Date().toISOString(),
             _measurement: 'system_metrics',
-            agent_id: agentId,
+            agent_id: agent_id,
             _field: 'memory_usage_percent',
             _value: 65.8
           }
@@ -499,7 +499,7 @@ class DataStorageService {
         from(bucket: "${config.database.influxdb.bucket}")
           |> range(start: -${timeRange})
           |> filter(fn: (r) => r._measurement == "system_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agentId}")
+          |> filter(fn: (r) => r.agent_id == "${agent_id}")
           |> group()
           |> mean()
       `;

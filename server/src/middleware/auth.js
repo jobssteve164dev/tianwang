@@ -32,12 +32,12 @@ const authenticate = async (req, res, next) => {
         username: 'admin',
         email: 'admin@tianwang.com',
         role: 'super_admin',
-        organization_id: '1',
+        organization_id: 'd8ca4979-0e71-409f-8944-acba9b1a9b5c', // 使用第一个组织的UUID
         status: 'active',
         isLocked: () => false
       };
       req.userId = '1';
-      req.organizationId = '1';
+      req.organizationId = 'd8ca4979-0e71-409f-8944-acba9b1a9b5c';
       return next();
     }
     
@@ -78,14 +78,14 @@ const authenticate = async (req, res, next) => {
           username: 'agent',
           email: 'agent@tianwang.com',
           role: 'admin',
-          organization_id: agent.organization_id || '1',
+          organization_id: agent.organization_id || 'd8ca4979-0e71-409f-8944-acba9b1a9b5c',
           status: 'active',
           isLocked: () => false,
           isAgent: true,
           agentId: decoded.agentId
         };
         req.userId = 'agent-' + decoded.agentId;
-        req.organizationId = agent.organization_id || '1';
+        req.organizationId = agent.organization_id || 'd8ca4979-0e71-409f-8944-acba9b1a9b5c';
         req.agentId = decoded.agentId;
         
         logger.debug('代理认证成功:', { agentId: decoded.agentId, hostname: decoded.hostname });

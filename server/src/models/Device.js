@@ -189,23 +189,23 @@ module.exports = (sequelize) => {
   };
 
   // 静态方法
-  Device.getOnlineDevices = async function(organizationId = null) {
+  Device.getOnlineDevices = async function(organization_id = null) {
     const where = {
       status: 'online'
     };
     
-    if (organizationId) {
-      where.organization_id = organizationId;
+    if (organization_id) {
+      where.organization_id = organization_id;
     }
     
     return await this.findAll({ where });
   };
 
-  Device.getByPlatform = async function(platform, organizationId = null) {
+  Device.getByPlatform = async function(platform, organization_id = null) {
     const where = { platform };
     
-    if (organizationId) {
-      where.organization_id = organizationId;
+    if (organization_id) {
+      where.organization_id = organization_id;
     }
     
     return await this.findAll({ where });
