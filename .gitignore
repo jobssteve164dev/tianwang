@@ -123,4 +123,7 @@ agents/*/build/
 
 # Configuration files with secrets
 config/prod/
-config/*/secrets.* 
+config/*/secrets.*
+
+# SoloMap runtime state
+/.solopreneur/
