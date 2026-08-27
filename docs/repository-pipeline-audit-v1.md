@@ -6,7 +6,7 @@
 
 本轮没有推翻现有架构，而是在原有持续监测、规则检测、AI 分析、告警、仪表盘和节点主动防护路径上，补齐 MCP 外部智能体调查与响应主路径，并修复阻断真实运行的配置、鉴权、数据、构建和部署缺口。
 
-当前仓库统一验证入口 `npm run verify` 已全绿：代码检查和类型检查通过，5 个测试域共 219 项测试通过，服务端、Web 管理端和桌面 Agent 的生产构建通过。根工作区和 Agent 的生产依赖审计均为 0 项漏洞。
+当前仓库统一验证入口 `npm run verify` 已全绿：代码检查和类型检查通过，5 个测试域共 220 项测试通过，服务端、Web 管理端和桌面 Agent 的生产构建通过。根工作区和 Agent 的生产依赖审计均为 0 项漏洞。
 
 本报告中的“已闭环”指代码路径、自动化契约与最终构建物均已连通；不把缺少真实外部基础设施的本机模拟结果冒充实机验收。真实 Linux 抓包与防火墙、PostgreSQL 迁移和容器运行仍按第 5 节的发布门禁执行。
 
@@ -65,12 +65,12 @@
 
 | 验证域 | 结果 |
 | --- | --- |
-| 服务端 Jest | 20 suites，128 tests passed |
+| 服务端 Jest | 21 suites，129 tests passed |
 | Web 管理端 Jest | 2 suites，10 tests passed |
 | 桌面 Agent Jest | 6 suites，31 tests passed |
 | WebSocket 集成 | 1 suite，5 tests passed |
 | AI 引擎 pytest | 45 tests passed |
-| 合计 | 29 suites，219 tests passed |
+| 合计 | 30 suites，220 tests passed |
 | ESLint | 0 errors；历史 warning 仍存在，见第 6 节 |
 | TypeScript | `tsc --noEmit` passed |
 | 生产构建 | server/client/agent passed |
