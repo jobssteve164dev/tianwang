@@ -1,5 +1,5 @@
 # 多阶段构建 - 依赖缓存阶段
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 
 # 设置工作目录
 WORKDIR /app
@@ -17,7 +17,7 @@ RUN npm ci --cache /tmp/npm-cache && \
     npm cache clean --force
 
 # 构建阶段
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -38,7 +38,6 @@ RUN npm ci --cache /tmp/npm-cache && \
 COPY public/ ./public/
 COPY src/ ./src/
 COPY tsconfig.json ./
-COPY .env* ./
 
 # 设置构建环境变量
 ENV CI=true
@@ -59,10 +58,6 @@ COPY --from=builder /app/build /usr/share/nginx/html
 # 复制nginx配置
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# 创建非root用户
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S nginx -u 1001
-
 # 设置权限
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
@@ -72,12 +67,12 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
 # 切换到非root用户
 USER nginx
 
-# 暴露端口
-EXPOSE 80
+# 暴露非特权端口
+EXPOSE 8080
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:80/ || exit 1
+  CMD curl -f http://localhost:8080/health || exit 1
 
 # 启动nginx
 CMD ["nginx", "-g", "daemon off;"]

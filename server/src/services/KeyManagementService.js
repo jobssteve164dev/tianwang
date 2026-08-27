@@ -142,6 +142,14 @@ class KeyManagementService {
     }
   }
 
+  async cleanup() {
+    if (this.rotationTimer) {
+      clearInterval(this.rotationTimer);
+      this.rotationTimer = null;
+    }
+    logger.info('密钥管理服务已清理');
+  }
+
   // 轮换密钥
   async rotateKeys() {
     try {

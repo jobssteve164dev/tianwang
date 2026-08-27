@@ -102,7 +102,7 @@ class SigmaRuleManager:
             logger.error(f"下载 {source_name} Sigma规则失败: {e}")
             return False
     
-    async def load_rules(self) -> int:
+    async def load_rules(self, allow_download: bool = True) -> int:
         """加载所有规则"""
         try:
             self.rules.clear()
@@ -118,7 +118,7 @@ class SigmaRuleManager:
                         logger.info(f"从 {source_name} 加载了 {rules_count} 条Sigma规则")
             
             # 如果本地规则不足，尝试下载外部规则
-            if total_rules < 5:
+            if total_rules < 5 and allow_download:
                 logger.info("本地Sigma规则数量不足，尝试下载外部规则...")
                 download_success = await self.download_rules()
                 if download_success:
@@ -192,6 +192,7 @@ class SigmaRuleManager:
                 "modified": rule_data.get("modified", ""),
                 "logsource": rule_data.get("logsource", {}),
                 "detection": rule_data.get("detection", {}),
+                "enabled": rule_data.get("enabled", True),
                 "falsepositives": rule_data.get("falsepositives", []),
                 "tags": rule_data.get("tags", []),
                 "references": rule_data.get("references", []),
@@ -213,6 +214,8 @@ class SigmaRuleManager:
         
         try:
             for rule in self.rules:
+                if not rule.get("enabled", True):
+                    continue
                 if await self._evaluate_sigma_rule(rule, log_data):
                     match = {
                         "rule_id": rule["id"],
@@ -462,4 +465,4 @@ class SigmaRuleManager:
             
         except Exception as e:
             logger.error(f"创建默认Sigma规则失败: {e}")
-            raise 
+            raise

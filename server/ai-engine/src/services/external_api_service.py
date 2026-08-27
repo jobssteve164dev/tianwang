@@ -72,8 +72,9 @@ class ExternalAPIService:
                 logger.info("Redis缓存连接成功")
             
             # 初始化API状态
-            for api_name in config.external_apis.keys():
-                self.api_status[api_name] = APIStatus.HEALTHY
+            for api_name, api_config in config.external_apis.items():
+                has_key = bool(getattr(config, f"{api_name}_api_key", ""))
+                self.api_status[api_name] = APIStatus.HEALTHY if api_config.get("enabled") and has_key else APIStatus.DISABLED
                 self.failure_counts[api_name] = 0
                 self.request_counts[api_name] = 0
             
@@ -219,15 +220,20 @@ class ExternalAPIService:
             "max_tokens": min(api_config.get("max_tokens", 4096), 4096),
             "temperature": 0.1,  # 安全分析需要较低的随机性
         }
+
+        if api_name == "claude":
+            request_data = {
+                "model": api_config["default_model"],
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": min(api_config.get("max_tokens", 4096), 4096),
+                "temperature": 0.1,
+            }
         
         # API特定的参数调整
-        if api_name == "openrouter":
-            request_data["site_url"] = "https://tianwang-security.com"
-            request_data["app_name"] = "TianWang Security Monitor"
-        
         return request_data
     
-    async def _make_api_request(self, api_name: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _make_api_request(self, api_name: str, request_data: Dict[str, Any], api_key_override: str = "") -> Dict[str, Any]:
         """发送API请求"""
         try:
             api_config = config.external_apis[api_name]
@@ -238,7 +244,7 @@ class ExternalAPIService:
             }
             
             # 设置API密钥
-            api_key = getattr(config, f"{api_name}_api_key", "")
+            api_key = api_key_override or getattr(config, f"{api_name}_api_key", "")
             if not api_key:
                 return {
                     "success": False,
@@ -254,11 +260,13 @@ class ExternalAPIService:
             elif api_name == "openrouter":
                 headers["Authorization"] = f"Bearer {api_key}"
                 headers["HTTP-Referer"] = "https://tianwang-security.com"
+                headers["X-Title"] = "TianWang Security Monitor"
             elif api_name == "deepseek":
                 headers["Authorization"] = f"Bearer {api_key}"
             
             # 发送请求
-            url = f"{api_config['base_url']}/chat/completions"
+            endpoint = "messages" if api_name == "claude" else "chat/completions"
+            url = f"{api_config['base_url']}/{endpoint}"
             
             async with self.session.post(url, json=request_data, headers=headers) as response:
                 if response.status == 200:
@@ -268,7 +276,9 @@ class ExternalAPIService:
                     content = ""
                     tokens_used = 0
                     
-                    if "choices" in result and len(result["choices"]) > 0:
+                    if api_name == "claude" and result.get("content"):
+                        content = "".join(part.get("text", "") for part in result["content"] if part.get("type") == "text")
+                    elif "choices" in result and len(result["choices"]) > 0:
                         content = result["choices"][0]["message"]["content"]
                     
                     if "usage" in result:
@@ -520,7 +530,43 @@ class ExternalAPIService:
             "cost_tracking": self.cost_tracker,
             "request_counts": self.request_counts
         }
+
+    def configure_providers(self, provider_configs: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
+        supported = {provider.value for provider in APIProvider}
+        unknown = set(provider_configs) - supported
+        if unknown:
+            raise ValueError(f"不支持的外部API提供方: {', '.join(sorted(unknown))}")
+
+        for api_name, incoming in provider_configs.items():
+            current = dict(config.external_apis[api_name])
+            enabled = bool(incoming.get("enabled", current.get("enabled", False)))
+            api_key = str(incoming.get("api_key", "") or getattr(config, f"{api_name}_api_key", "")).strip()
+            default_model = incoming.get("default_model") or current.get("default_model")
+            if enabled and not api_key:
+                raise ValueError(f"{api_name} 启用时必须提供API密钥")
+            if not isinstance(default_model, str) or not default_model.strip():
+                raise ValueError(f"{api_name} 默认模型无效")
+
+            current["enabled"] = enabled
+            current["default_model"] = default_model.strip()
+            config.external_apis[api_name] = current
+            setattr(config, f"{api_name}_api_key", api_key)
+            self.api_status[api_name] = APIStatus.HEALTHY if enabled else APIStatus.DISABLED
+            self.failure_counts[api_name] = 0
+
+        return {name: status.value for name, status in self.api_status.items()}
+
+    async def test_provider(self, provider: str, api_key: str, model: Optional[str] = None) -> Dict[str, Any]:
+        if provider not in {item.value for item in APIProvider}:
+            raise ValueError(f"不支持的外部API提供方: {provider}")
+        if not api_key.strip():
+            raise ValueError("API密钥不能为空")
+
+        request_data = self._build_request(provider, "Reply with OK.", "general")
+        if model:
+            request_data["model"] = model
+        return await self._make_api_request(provider, request_data, api_key_override=api_key.strip())
     
     def is_healthy(self) -> bool:
         """检查服务是否健康"""
-        return any(status == APIStatus.HEALTHY for status in self.api_status.values()) 
+        return any(status == APIStatus.HEALTHY for status in self.api_status.values())

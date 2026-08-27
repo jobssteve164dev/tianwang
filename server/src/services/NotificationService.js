@@ -16,6 +16,8 @@ class NotificationService extends EventEmitter {
     this.emailTransporter = null;
     this.notificationQueue = [];
     this.processingQueue = false;
+    this.isDrainingQueue = false;
+    this.queueTimer = null;
         
     // 通知配置
     this.config = {
@@ -75,7 +77,7 @@ class NotificationService extends EventEmitter {
             
       // 初始化邮件传输器
       if (this.config.email.smtp.auth.user && this.config.email.smtp.auth.pass) {
-        this.emailTransporter = nodemailer.createTransporter({
+        this.emailTransporter = nodemailer.createTransport({
           host: this.config.email.smtp.host,
           port: this.config.email.smtp.port,
           secure: this.config.email.smtp.secure,
@@ -137,6 +139,9 @@ class NotificationService extends EventEmitter {
         
     this.notificationQueue.push(notificationItem);
     logger.debug(`通知已加入队列: ${notificationItem.id}`);
+
+    // 立即唤醒队列，避免通知在空队列轮询间隙中滞留。
+    this.processQueue();
         
     return notificationItem.id;
   }
@@ -155,6 +160,9 @@ class NotificationService extends EventEmitter {
      * 处理通知队列
      */
   async processQueue() {
+    if (this.isDrainingQueue) return;
+    this.isDrainingQueue = true;
+
     while (this.processingQueue && this.notificationQueue.length > 0) {
       const notification = this.notificationQueue.shift();
             
@@ -166,9 +174,11 @@ class NotificationService extends EventEmitter {
         // 重试逻辑
         if (notification.attempts < this.config.retryAttempts) {
           notification.attempts++;
-          setTimeout(() => {
+          const retryTimer = setTimeout(() => {
             this.notificationQueue.unshift(notification);
+            this.processQueue();
           }, this.config.retryDelay * notification.attempts);
+          retryTimer.unref?.();
         } else {
           this.stats.failedAttempts++;
           this.emit('notification_failed', notification, error);
@@ -176,10 +186,7 @@ class NotificationService extends EventEmitter {
       }
     }
         
-    // 继续处理队列
-    if (this.processingQueue) {
-      setTimeout(() => this.processQueue(), 100);
-    }
+    this.isDrainingQueue = false;
   }
     
   /**
@@ -380,14 +387,53 @@ class NotificationService extends EventEmitter {
      * 调用阿里云短信API
      */
   async callAliyunSMS(params) {
-    // 这里应该实现阿里云短信API的具体调用
-    // 暂时返回模拟结果
-    logger.debug('调用阿里云短信API:', params);
-        
+    const accessKey = this.config.sms.aliyun.accessKey;
+    const secretKey = this.config.sms.aliyun.secretKey;
+    if (!accessKey || !secretKey || !params.templateCode) {
+      throw new Error('阿里云短信配置不完整');
+    }
+
+    const encode = value => encodeURIComponent(value)
+      .replace(/!/g, '%21')
+      .replace(/'/g, '%27')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+      .replace(/\*/g, '%2A');
+    const requestParams = {
+      AccessKeyId: accessKey,
+      Action: 'SendSms',
+      Format: 'JSON',
+      PhoneNumbers: params.phoneNumbers,
+      RegionId: 'cn-hangzhou',
+      SignName: params.signName,
+      SignatureMethod: 'HMAC-SHA1',
+      SignatureNonce: crypto.randomUUID(),
+      SignatureVersion: '1.0',
+      TemplateCode: params.templateCode,
+      TemplateParam: params.templateParam,
+      Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      Version: '2017-05-25'
+    };
+    const canonical = Object.keys(requestParams)
+      .sort()
+      .map(key => `${encode(key)}=${encode(requestParams[key])}`)
+      .join('&');
+    const signature = crypto
+      .createHmac('sha1', `${secretKey}&`)
+      .update(`POST&%2F&${encode(canonical)}`)
+      .digest('base64');
+
+    const response = await axios.post('https://dysmsapi.aliyuncs.com/', null, {
+      timeout: this.config.webhook.timeout,
+      params: { ...requestParams, Signature: signature }
+    });
+    if (response.data?.Code !== 'OK') {
+      throw new Error(`阿里云短信发送失败: ${response.data?.Message || response.data?.Code || '未知错误'}`);
+    }
     return {
-      requestId: crypto.randomUUID(),
-      code: 'OK',
-      message: '发送成功'
+      requestId: response.data.RequestId,
+      code: response.data.Code,
+      message: response.data.Message || 'OK'
     };
   }
     
@@ -413,6 +459,12 @@ class NotificationService extends EventEmitter {
      */
   async cleanup() {
     this.processingQueue = false;
+    this.isDrainingQueue = false;
+
+    if (this.queueTimer) {
+      clearTimeout(this.queueTimer);
+      this.queueTimer = null;
+    }
         
     if (this.emailTransporter) {
       this.emailTransporter.close();

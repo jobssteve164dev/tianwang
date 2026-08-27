@@ -209,7 +209,9 @@ function validateConfig() {
   const required = [
     'JWT_SECRET',
     'DB_PASSWORD',
-    'REDIS_PASSWORD'
+    'REDIS_PASSWORD',
+    'ENCRYPTION_KEY',
+    'AI_INTERNAL_TOKEN'
   ];
 
   const missing = required.filter(key => !process.env[key]);

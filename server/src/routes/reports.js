@@ -33,7 +33,7 @@ function setServices(report) {
  *           description: 报告数据
  *         format:
  *           type: string
- *           enum: [html, json, csv, xlsx]
+ *           enum: [html, json, csv]
  *           default: html
  *           description: 输出格式
  *         filters:
@@ -87,10 +87,10 @@ function setServices(report) {
  */
 router.post('/generate', [
   protect,
-  authorize(['admin', 'security_analyst']),
+  authorize(['admin', 'analyst', 'super_admin']),
   body('type').isIn(['threat_summary', 'system_health', 'weekly_security', 'monthly_audit', 'incident_report'])
     .withMessage('无效的报告类型'),
-  body('format').optional().isIn(['html', 'json', 'csv', 'xlsx']).withMessage('无效的输出格式')
+  body('format').optional().isIn(['html', 'json', 'csv']).withMessage('无效的输出格式')
 ], async (req, res) => {
   try {
     // 验证请求
@@ -165,7 +165,7 @@ router.post('/generate', [
  *                 description: 数据类型
  *               format:
  *                 type: string
- *                 enum: [json, csv, xlsx]
+ *                 enum: [json, csv]
  *                 default: json
  *                 description: 导出格式
  *               filters:
@@ -186,9 +186,9 @@ router.post('/generate', [
  */
 router.post('/export', [
   protect,
-  authorize(['admin', 'security_analyst']),
+  authorize(['admin', 'analyst', 'super_admin']),
   body('type').isIn(['threats', 'events', 'alerts']).withMessage('无效的数据类型'),
-  body('format').optional().isIn(['json', 'csv', 'xlsx']).withMessage('无效的导出格式')
+  body('format').optional().isIn(['json', 'csv']).withMessage('无效的导出格式')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -265,7 +265,7 @@ router.post('/export', [
  */
 router.get('/download/:fileName', [
   protect,
-  authorize(['admin', 'security_analyst'])
+  authorize(['admin', 'analyst', 'super_admin'])
 ], async (req, res) => {
   try {
     const { fileName } = req.params;
@@ -363,7 +363,7 @@ router.get('/download/:fileName', [
  */
 router.get('/list', [
   protect,
-  authorize(['admin', 'security_analyst']),
+  authorize(['admin', 'analyst', 'super_admin']),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('限制数量必须在1-100之间'),
   query('offset').optional().isInt({ min: 0 }).withMessage('偏移量必须大于等于0')
 ], async (req, res) => {
@@ -427,7 +427,7 @@ router.get('/list', [
  */
 router.get('/status', [
   protect,
-  authorize(['admin', 'security_analyst'])
+  authorize(['admin', 'analyst', 'super_admin'])
 ], async (req, res) => {
   try {
     if (!reportService) {
@@ -477,7 +477,7 @@ router.get('/status', [
  */
 router.get('/types', [
   protect,
-  authorize(['admin', 'security_analyst'])
+  authorize(['admin', 'analyst', 'super_admin'])
 ], async (req, res) => {
   try {
     if (!reportService) {

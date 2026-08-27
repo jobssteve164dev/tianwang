@@ -62,14 +62,14 @@ scrape_configs:
   # 前端应用监控
   - job_name: 'tianwang-client'
     static_configs:
-      - targets: ['client:3000']
+      - targets: ['client:8080']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
   # AI引擎监控
   - job_name: 'tianwang-ai-engine'
     static_configs:
-      - targets: ['ai-engine:8001']
+      - targets: ['ai-engine:8888']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
@@ -341,7 +341,7 @@ const http = require('http');
 const https = require('https');
 
 const services = [
-  { name: 'API Server', url: 'http://localhost:8000/api/health' },
+  { name: 'API Server', url: 'http://localhost:8000/health' },
   { name: 'Frontend', url: 'http://localhost:3000' },
   { name: 'AI Engine', url: 'http://localhost:8888/health' }
 ];

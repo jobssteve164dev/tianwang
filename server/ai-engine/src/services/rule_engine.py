@@ -42,6 +42,29 @@ class RuleEngine:
             "otx_api_key": config.otx_api_key
         }
         self.otx_manager = OtxManager(otx_config)
+
+    def configure_threat_intelligence(self, misp: Dict[str, Any], otx: Dict[str, Any]) -> Dict[str, str]:
+        """原子替换运行中的威胁情报管理器，保证管理端保存后新配置立即用于后续匹配。"""
+        misp_enabled = bool(misp.get("enabled", False))
+        otx_enabled = bool(otx.get("enabled", False))
+        misp_url = str(misp.get("url", "")).rstrip("/") if misp_enabled else ""
+        misp_api_key = str(misp.get("api_key", "")) if misp_enabled else ""
+        otx_api_key = str(otx.get("api_key", "")) if otx_enabled else ""
+
+        if misp_enabled and (not misp_url or not misp_api_key):
+            raise ValueError("MISP启用时必须提供服务器地址和API密钥")
+        if otx_enabled and not otx_api_key:
+            raise ValueError("OTX启用时必须提供API密钥")
+
+        config.misp_url = misp_url
+        config.misp_api_key = misp_api_key
+        config.otx_api_key = otx_api_key
+        self.misp_manager = MispManager({"misp_url": misp_url, "misp_api_key": misp_api_key})
+        self.otx_manager = OtxManager({"otx_api_key": otx_api_key})
+        return {
+            "misp": "configured" if misp_enabled else "disabled",
+            "otx": "configured" if otx_enabled else "disabled"
+        }
     
     async def initialize(self):
         """初始化规则引擎"""
@@ -306,6 +329,19 @@ class RuleEngine:
         except Exception as e:
             logger.error(f"更新规则库失败: {e}")
             return False
+
+    async def reload_custom_rules(self) -> int:
+        """Reload local Sigma rules after a governed custom-rule change."""
+        if not self.is_initialized:
+            raise RuntimeError("规则引擎未初始化")
+
+        sigma_count = await self.sigma_manager.load_rules(allow_download=False)
+        total_rules = sigma_count
+        total_rules += len(self.suricata_manager.rules)
+        total_rules += len(self.yara_manager.rules)
+        self.metrics["rules_loaded"] = total_rules
+        self.metrics["last_update_time"] = datetime.now().isoformat()
+        return sigma_count
     
     async def cleanup(self):
         """清理资源"""
@@ -315,4 +351,4 @@ class RuleEngine:
             logger.info("规则引擎资源清理完成")
         except Exception as e:
             logger.error(f"规则引擎清理失败: {e}")
-            raise 
+            raise

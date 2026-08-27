@@ -9,6 +9,7 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { validateRequest } = require('../middleware/validation');
 const { rateLimitAuth } = require('../middleware/rateLimit');
+const { authenticate } = require('../middleware/auth');
 
 // 登录验证规则
 const loginValidation = [
@@ -140,7 +141,7 @@ router.post('/refresh', authController.refreshToken);
  *       200:
  *         description: Logout successful
  */
-router.post('/logout', authController.logout);
+router.post('/logout', authenticate, authController.logout);
 
 /**
  * @swagger
@@ -156,7 +157,7 @@ router.post('/logout', authController.logout);
  *       401:
  *         description: Unauthorized
  */
-router.get('/me', authController.getCurrentUser);
+router.get('/me', authenticate, authController.getCurrentUser);
 
 /**
  * @swagger
@@ -186,7 +187,7 @@ router.get('/me', authController.getCurrentUser);
  *       400:
  *         description: Invalid current password
  */
-router.post('/change-password', [
+router.post('/change-password', authenticate, [
   body('current_password').notEmpty().withMessage('Current password is required'),
   body('new_password')
     .isLength({ min: 6 })
@@ -195,4 +196,4 @@ router.post('/change-password', [
     .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
 ], validateRequest, authController.changePassword);
 
-module.exports = router; 
+module.exports = router;

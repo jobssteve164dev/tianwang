@@ -159,6 +159,10 @@ class EventService extends EventEmitter {
         return filteredEvents;
     }
 
+    getEvent(eventId) {
+        return this.events.find(event => event.id === eventId) || null;
+    }
+
     // 获取事件统计
     getEventStats() {
         const stats = {
@@ -243,8 +247,14 @@ class EventService extends EventEmitter {
         ]);
 
         return [headers, ...rows]
-            .map(row => row.map(field => `"${field}"`).join(','))
+            .map(row => row.map(field => this.escapeCSVField(field)).join(','))
             .join('\n');
+    }
+
+    escapeCSVField(field) {
+        let value = field === null || field === undefined ? '' : String(field);
+        if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`;
+        return `"${value.replace(/"/g, '""')}"`;
     }
 
     // 生成事件ID

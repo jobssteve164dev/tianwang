@@ -9,36 +9,37 @@
     "client"
   ],
   "scripts": {
-    "dev": "./scripts/dev-start.sh",
-    "dev:stop": "./scripts/dev-stop.sh",
+    "dev": "concurrently --kill-others-on-fail \"npm run server:dev\" \"npm run client:dev\" \"npm run ai:dev\"",
+    "dev:test": "npm run verify",
     "dev:status": "./scripts/dev-status.sh",
-    "dev:cleanup": "./scripts/dev-cleanup.sh",
-    "dev:test": "./scripts/dev-test.sh",
-    "dev:legacy": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "db:enable": "./scripts/enable-database.sh",
-    "server:dev": "cd server && npm run dev",
-    "client:dev": "cd client && npm run dev",
-    "build": "npm run server:build && npm run client:build",
-    "server:build": "cd server && npm run build",
-    "client:build": "cd client && npm run build",
-    "test": "npm run server:test && npm run client:test",
-    "server:test": "cd server && npm test",
-    "client:test": "cd client && npm test",
+    "server:dev": "npm --prefix server run dev",
+    "client:dev": "npm --prefix client start",
+    "ai:dev": "node scripts/ai-environment.js run",
+    "build": "npm run server:build && npm run client:build && npm run agent:build",
+    "server:build": "npm --prefix server run build",
+    "client:build": "npm --prefix client run build",
+    "agent:build": "npm --prefix agents run build",
+    "test": "npm run server:test && npm run client:test && npm run agent:test && npm run integration:test && npm run ai:test",
+    "server:test": "npm --prefix server test -- --runInBand",
+    "client:test": "CI=true npm --prefix client test -- --runInBand --watchAll=false",
+    "agent:test": "npm --prefix agents test -- --runInBand",
+    "integration:test": "jest --config jest.config.js --runInBand",
+    "ai:test": "node scripts/ai-environment.js test",
+    "ai:setup": "node scripts/ai-environment.js setup",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "setup": "npm install && cd server && npm install && cd ../client && npm install",
-    "clean": "rm -rf node_modules server/node_modules client/node_modules",
-    "lint": "eslint . --ext .js,.ts,.tsx",
-    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
-    "db:migrate": "cd server && npm run db:migrate",
-    "db:seed": "cd server && npm run db:seed",
-    "agents:build": "npm run agents:build:windows && npm run agents:build:linux && npm run agents:build:macos",
-    "agents:build:windows": "cd agents/windows && npm run build",
-    "agents:build:linux": "cd agents/linux && make build",
-    "agents:build:macos": "cd agents/macos && make build",
-    "agents:build:openwrt": "cd agents/openwrt && make build",
+    "setup": "npm install && npm --prefix agents install && npm run ai:setup",
+    "lint": "npm run server:lint && npm run client:lint && npm run agent:lint",
+    "server:lint": "npm --prefix server run lint",
+    "client:lint": "npm --prefix client run lint",
+    "agent:lint": "npm --prefix agents run lint",
+    "type-check": "npm --prefix client run type-check",
+    "verify": "npm run lint && npm run type-check && npm test && npm run build",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "agents:build": "npm run agent:build",
     "build:fast": "node scripts/build-with-cache.js",
     "build:quick": "./scripts/quick-build.sh",
     "build:clean": "node scripts/build-with-cache.js --clean-cache",
@@ -74,8 +75,18 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0"
   },
+  "overrides": {
+    "path-to-regexp@>=8.0.0 <8.4.0": "8.4.0",
+    "minimatch@>=9.0.0 <9.0.7": "9.0.9",
+    "router": {
+      "path-to-regexp": "8.4.0"
+    },
+    "sequelize": {
+      "uuid": "11.1.1"
+    }
+  },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0",
     "npm": ">=8.0.0"
   }
-} 
+}

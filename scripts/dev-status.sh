@@ -55,9 +55,11 @@ check_service_status() {
                 echo -e "${YELLOW}进程存在但端口不可访问${NC} (PID: $pid, 端口: $port)"
             fi
         else
-            echo -e "${RED}进程已停止${NC} (PID: $pid)"
-            rm -f "$pid_file"
+            echo -e "${RED}PID 记录已过期${NC} (PID: $pid)"
         fi
+    elif nc -z localhost "$port" 2>/dev/null; then
+        echo -e "${GREEN}运行中${NC} (端口: $port)"
+        echo -e "  ${CYAN}访问地址: $url${NC}"
     else
         echo -e "${YELLOW}未启动${NC}"
     fi
@@ -132,10 +134,10 @@ check_app_services() {
     check_service_status "server/ai-engine/.ai_engine.pid" "AI 引擎" "8888" "http://localhost:8888"
     
     # 检查服务端
-    check_service_status "server/.server.pid" "服务端" "5555" "http://localhost:5555/api"
+    check_service_status "server/.server.pid" "服务端" "8000" "http://localhost:8000/health"
     
     # 检查客户端
-    check_service_status "client/.client.pid" "客户端" "3333" "http://localhost:3333"
+    check_service_status "client/.client.pid" "客户端" "3000" "http://localhost:3000"
 }
 
 # 检查端口占用
@@ -147,8 +149,8 @@ check_ports() {
     echo "           端口占用情况"
     echo "=========================================="
     
-    check_port_usage "3333" "客户端"
-    check_port_usage "5555" "服务端"
+    check_port_usage "3000" "客户端"
+    check_port_usage "8000" "服务端"
     check_port_usage "8888" "AI 引擎"
     check_port_usage "5432" "PostgreSQL"
     check_port_usage "6379" "Redis"
@@ -225,9 +227,9 @@ main() {
     echo "=========================================="
     echo "           快速操作"
     echo "=========================================="
-    echo -e "启动服务:   ${CYAN}./scripts/dev-start.sh${NC}"
-    echo -e "停止服务:   ${CYAN}./scripts/dev-stop.sh${NC}"
-    echo -e "查看状态:   ${CYAN}./scripts/dev-status.sh${NC}"
+    echo -e "启动服务:   ${CYAN}npm run dev${NC}"
+    echo -e "停止服务:   ${CYAN}在运行终端按 Ctrl+C${NC}"
+    echo -e "查看状态:   ${CYAN}npm run dev:status${NC}"
     echo ""
 }
 

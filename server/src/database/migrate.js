@@ -1,13 +1,14 @@
-const { getSequelize } = require('../config/database');
+const { initializePostgreSQL } = require('../config/database');
 const { Umzug, SequelizeStorage } = require('umzug');
 const path = require('path');
 const logger = require('../utils/logger');
+const models = require('../models');
 
 const runMigrations = async () => {
   let sequelize;
   try {
     logger.info('🚀 [DB Migration] Starting migration process...');
-    sequelize = getSequelize();
+    sequelize = initializePostgreSQL();
 
     const umzug = new Umzug({
       migrations: {
@@ -30,20 +31,24 @@ const runMigrations = async () => {
     const pendingMigrations = await umzug.pending();
     
     if (pendingMigrations.length === 0) {
-      logger.info('✅ [DB Migration] No pending migrations found. Database is up to date.');
-      return;
+      logger.info('✅ [DB Migration] No pending migrations found.');
+    } else {
+      logger.info(`⏳ [DB Migration] Found ${pendingMigrations.length} pending migrations. Applying...`);
+      pendingMigrations.forEach(mig => logger.info(`  -> ${mig.name}`));
+      await umzug.up();
+      logger.info('✅ [DB Migration] All pending migrations have been applied successfully.');
     }
 
-    logger.info(`⏳ [DB Migration] Found ${pendingMigrations.length} pending migrations. Applying...`);
-    pendingMigrations.forEach(mig => logger.info(`  -> ${mig.name}`));
-
-    await umzug.up();
-
-    logger.info('✅ [DB Migration] All pending migrations have been applied successfully.');
+    const initialized = models.initializeModels();
+    if (!initialized.models) {
+      throw new Error('Database models failed to initialize after migrations');
+    }
+    await sequelize.sync();
+    logger.info('✅ [DB Migration] Model schema synchronization completed.');
 
   } catch (error) {
     logger.error('❌ [DB Migration] Migration failed:', error);
-    process.exit(1);
+    throw error;
   } finally {
     if (sequelize) {
       await sequelize.close();
@@ -52,5 +57,10 @@ const runMigrations = async () => {
   }
 };
 
-runMigrations();
+if (require.main === module) {
+  runMigrations().catch(() => {
+    process.exitCode = 1;
+  });
+}
 
+module.exports = { runMigrations };

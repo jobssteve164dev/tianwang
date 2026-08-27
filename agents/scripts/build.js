@@ -1135,12 +1135,12 @@ const htmlContent = `<!DOCTYPE html>
                     '<h3 style="margin-bottom: 15px; font-size: 16px; color: #007AFF;">🌐 服务器配置</h3>' +
                     '<div style="margin-bottom: 15px;">' +
                         '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">WebSocket服务器地址:</label>' +
-                        '<input type="text" id="server-url" placeholder="ws://localhost:5555" ' +
+                        '<input type="text" id="server-url" placeholder="ws://localhost:8000" ' +
                         'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
                     '</div>' +
                     '<div style="margin-bottom: 15px;">' +
                         '<label style="display: block; margin-bottom: 8px; font-size: 13px; color: #cccccc;">API服务器地址:</label>' +
-                        '<input type="text" id="api-url" placeholder="http://localhost:5555/api" ' +
+                        '<input type="text" id="api-url" placeholder="http://localhost:8000/api" ' +
                         'style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333333; background: #000000; color: white; font-size: 14px;">' +
                     '</div>' +
                     '<div style="display: flex; gap: 10px; margin-bottom: 15px;">' +
@@ -1343,8 +1343,8 @@ const htmlContent = `<!DOCTYPE html>
 
         // 重置服务器配置
         function resetServerConfig() {
-            document.getElementById('server-url').value = 'ws://localhost:5555';
-            document.getElementById('api-url').value = 'http://localhost:5555/api';
+            document.getElementById('server-url').value = 'ws://localhost:8000';
+            document.getElementById('api-url').value = 'http://localhost:8000/api';
         }
         
         // 验证注册码
@@ -1390,9 +1390,29 @@ const htmlContent = `<!DOCTYPE html>
         }
 
         // 运行网络诊断
-        function runDiagnostics() {
+        async function runDiagnostics() {
             addLog('正在运行网络诊断...', 'info');
-            // TODO: 实现网络诊断
+            try {
+                const result = await window.electronAPI.runNetworkDiagnostics();
+                if (!result.success) {
+                    addLog('网络诊断失败: ' + result.error, 'error');
+                    return;
+                }
+                const tests = result.data.tests || {};
+                const dnsResults = tests.dns || [];
+                const latencyResults = tests.latency || [];
+                const dnsPassed = dnsResults.filter(item => item.success).length;
+                const validLatencies = latencyResults.filter(item => Number.isFinite(item.latency));
+                const averageLatency = validLatencies.length
+                    ? Math.round(validLatencies.reduce((sum, item) => sum + item.latency, 0) / validLatencies.length)
+                    : null;
+                const summary = '网络诊断完成：DNS ' + dnsPassed + '/' + dnsResults.length +
+                    '，外网连通性' + (tests.connectivity?.success ? '正常' : '异常') +
+                    (averageLatency === null ? '' : '，平均延迟 ' + averageLatency + 'ms');
+                addLog(summary, dnsPassed > 0 && tests.connectivity?.success ? 'success' : 'warning');
+            } catch (error) {
+                addLog('网络诊断失败: ' + error.message, 'error');
+            }
         }
 
         // 添加日志
@@ -1562,30 +1582,42 @@ const htmlContent = `<!DOCTYPE html>
             eventDiv.id = 'event-' + event.id;
             
             const timestamp = new Date(event.timestamp).toLocaleString('zh-CN');
+            const encodedEventId = encodeURIComponent(String(event.id));
+            const tags = Array.isArray(event.tags) ? event.tags : [];
             
             eventDiv.innerHTML = \`
                 <div class="event-header">
-                    <div class="event-title">\${event.title}</div>
+                    <div class="event-title">\${escapeHtml(event.title)}</div>
                     <div class="event-timestamp">\${timestamp}</div>
                 </div>
                 <div class="event-meta">
-                    <span class="event-type">\${event.type}</span>
-                    <span class="event-level \${event.level}">\${event.level}</span>
-                    <span class="event-status \${event.status}">\${getStatusText(event.status)}</span>
+                    <span class="event-type">\${escapeHtml(event.type)}</span>
+                    <span class="event-level \${safeClassName(event.level)}">\${escapeHtml(event.level)}</span>
+                    <span class="event-status \${safeClassName(event.status)}">\${escapeHtml(getStatusText(event.status))}</span>
                 </div>
-                <div class="event-description">\${event.description}</div>
+                <div class="event-description">\${escapeHtml(event.description)}</div>
                 <div class="event-tags">
-                    \${event.tags.map(tag => \`<span class="event-tag">\${tag}</span>\`).join('')}
+                    \${tags.map(tag => \`<span class="event-tag">\${escapeHtml(tag)}</span>\`).join('')}
                 </div>
                 <div class="event-actions">
-                    <button class="event-action-btn" onclick="markEventFeedback('\${event.id}', '已处理')">标记已处理</button>
-                    <button class="event-action-btn" onclick="markEventFeedback('\${event.id}', '忽略')">标记忽略</button>
-                    <button class="event-action-btn" onclick="showEventDetails('\${event.id}')">查看详情</button>
+                    <button class="event-action-btn" onclick="markEventFeedback(decodeURIComponent('\${encodedEventId}'), '已处理')">标记已处理</button>
+                    <button class="event-action-btn" onclick="markEventFeedback(decodeURIComponent('\${encodedEventId}'), '忽略')">标记忽略</button>
+                    <button class="event-action-btn" onclick="showEventDetails(decodeURIComponent('\${encodedEventId}'))">查看详情</button>
                 </div>
-                \${event.feedback ? \`<div class="event-feedback">反馈: \${event.feedback}</div>\` : ''}
+                \${event.feedback ? \`<div class="event-feedback">反馈: \${escapeHtml(event.feedback)}</div>\` : ''}
             \`;
             
             return eventDiv;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+            })[character]);
+        }
+
+        function safeClassName(value) {
+            return String(value ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
         }
 
         // 获取状态文本
@@ -1684,9 +1716,28 @@ const htmlContent = `<!DOCTYPE html>
         }
 
         // 显示事件详情
-        function showEventDetails(eventId) {
-            // TODO: 实现事件详情弹窗
-            addLog('事件详情功能开发中...', 'info');
+        async function showEventDetails(eventId) {
+            try {
+                const result = await window.electronAPI.getEvent(eventId);
+                if (!result.success) {
+                    addLog('获取事件详情失败: ' + result.error, 'error');
+                    return;
+                }
+                const record = result.data;
+                const lines = [
+                    record.title,
+                    '时间：' + new Date(record.timestamp).toLocaleString('zh-CN'),
+                    '类型：' + record.type,
+                    '级别：' + record.level,
+                    '状态：' + getStatusText(record.status),
+                    record.description || '无详细描述',
+                    record.tags?.length ? '标签：' + record.tags.join('、') : '',
+                    record.feedback ? '处理结果：' + record.feedback : ''
+                ].filter(Boolean);
+                window.alert(lines.join('\n\n'));
+            } catch (error) {
+                addLog('获取事件详情失败: ' + error.message, 'error');
+            }
         }
 
         // 清理旧事件
@@ -2058,11 +2109,11 @@ const settingsHtmlContent = `<!DOCTYPE html>
                     <div class="settings-section-content">
                         <div class="form-group">
                             <label class="form-label">WebSocket服务器地址</label>
-                            <input type="text" id="serverUrl" class="form-input" placeholder="ws://localhost:5555">
+                            <input type="text" id="serverUrl" class="form-input" placeholder="ws://localhost:8000">
                         </div>
                         <div class="form-group">
                             <label class="form-label">API服务器地址</label>
-                            <input type="text" id="apiUrl" class="form-input" placeholder="http://localhost:5555/api">
+                            <input type="text" id="apiUrl" class="form-input" placeholder="http://localhost:8000/api">
                         </div>
                         <div class="button-group">
                             <button class="button button-primary" onclick="saveServerConfig()">保存配置</button>
@@ -2120,8 +2171,8 @@ const settingsHtmlContent = `<!DOCTYPE html>
 
         // 重置服务器配置
         function resetServerConfig() {
-            document.getElementById('serverUrl').value = 'ws://localhost:5555';
-            document.getElementById('apiUrl').value = 'http://localhost:5555/api';
+            document.getElementById('serverUrl').value = 'ws://localhost:8000';
+            document.getElementById('apiUrl').value = 'http://localhost:8000/api';
         }
 
         // 测试连接
@@ -2161,7 +2212,7 @@ const settingsHtmlContent = `<!DOCTYPE html>
 
 fs.writeFileSync(path.join(buildDir, 'settings.html'), settingsHtmlContent);
 
-// 创建基本的图标文件（占位符）
+// 生成应用品牌图标
 const iconSvg = `<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
     <defs>
         <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -2174,10 +2225,10 @@ const iconSvg = `<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http
     <text x="128" y="200" font-family="Arial, sans-serif" font-size="24" fill="white" text-anchor="middle" opacity="0.8">TianWang</text>
 </svg>`;
 
-// 保存SVG图标（在实际部署中应该使用真正的PNG图标）
+// 保存可直接用于 Electron 窗口与安装包的 SVG 图标
 fs.writeFileSync(path.join(assetsDir, 'icon.svg'), iconSvg);
 
-// 创建托盘图标的占位符
+// 生成托盘与告警图标
 fs.writeFileSync(path.join(assetsDir, 'tray-icon.svg'), iconSvg);
 fs.writeFileSync(path.join(assetsDir, 'warning-icon.svg'), iconSvg);
 
@@ -2186,4 +2237,4 @@ console.log('📁 输出目录:', buildDir);
 console.log('🎨 资源目录:', assetsDir);
 console.log('');
 console.log('🚀 运行以下命令启动应用:');
-console.log('   npm start'); 
+console.log('   npm start');

@@ -17,6 +17,10 @@ let redisClient = null;
  * PostgreSQL连接配置
  */
 function initializePostgreSQL() {
+  if (sequelize) {
+    return sequelize;
+  }
+
   const { postgres } = config.database;
   
   sequelize = new Sequelize({
@@ -268,10 +272,11 @@ async function healthCheck() {
 }
 
 module.exports = {
+  initializePostgreSQL,
   connectDatabases,
   closeDatabases,
   getSequelize,
   getInfluxDB,
   getRedisClient,
   healthCheck
-}; 
+};

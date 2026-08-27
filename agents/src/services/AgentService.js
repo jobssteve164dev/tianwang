@@ -24,8 +24,8 @@ class AgentService extends EventEmitter {
         
         // 从持久化存储加载配置，如果没有则使用默认值
         this.config = {
-            serverUrl: this.store.get('serverUrl', 'ws://localhost:5555'),
-            apiUrl: this.store.get('apiUrl', 'http://localhost:5555/api'),
+            serverUrl: this.store.get('serverUrl', 'ws://localhost:8000'),
+            apiUrl: this.store.get('apiUrl', 'http://localhost:8000/api'),
             reconnectInterval: this.store.get('reconnectInterval', 5000),
             maxReconnectAttempts: this.store.get('maxReconnectAttempts', 10),
             heartbeatInterval: this.store.get('heartbeatInterval', 30000)
@@ -34,6 +34,7 @@ class AgentService extends EventEmitter {
         this.reconnectAttempts = 0;
         this.isConnected = false;
         this.heartbeatTimer = null;
+        this.reconnectTimer = null;
         this.agentId = this.generateAgentId();
         this.authToken = null;
         this.registrationCode = null; // 注册码
@@ -82,7 +83,7 @@ class AgentService extends EventEmitter {
         // 如果当前已连接，需要重新连接
         if (this.isConnected) {
             logger.info('检测到配置变更，重新连接服务器...');
-            this.disconnect().then(() => {
+            Promise.resolve(this.disconnect()).then(() => {
                 this.connect().catch(error => {
                     logger.error('重新连接失败:', error);
                 });
@@ -540,6 +541,10 @@ class AgentService extends EventEmitter {
             }
         }
 
+        if (!this.connectionKey?.key || !this.connectionKey?.timestamp || !this.connectionKey?.signature) {
+            throw new Error('认证响应缺少完整连接密钥，无法建立安全连接');
+        }
+
         return new Promise((resolve, reject) => {
             // 构建WebSocket URL，包含token和连接密钥
             let wsUrl = `${this.config.serverUrl}/ws?token=${this.authToken}`;
@@ -571,22 +576,7 @@ class AgentService extends EventEmitter {
                         hasPlusInEncoded: encodedConnectionKey.includes('+'),
                         hasPercent2BInEncoded: encodedConnectionKey.includes('%2B')
                     });
-                } else if (this.connectionKey.signature) {
-                    // 向后兼容：如果只有signature，使用signature作为连接密钥
-                    const encodedSignature = encodeURIComponent(this.connectionKey.signature).replace(/\+/g, '%2B');
-                    wsUrl += `&connectionKey=${encodedSignature}`;
-                    logger.warn('使用签名作为连接密钥（向后兼容）:', {
-                        signatureLength: this.connectionKey.signature.length,
-                        encodedSignatureLength: encodedSignature.length,
-                        hasPlusInOriginal: this.connectionKey.signature.includes('+'),
-                        hasPlusInEncoded: encodedSignature.includes('+'),
-                        hasPercent2BInEncoded: encodedSignature.includes('%2B')
-                    });
-                } else {
-                    logger.warn('连接密钥格式不正确，无法建立安全连接');
                 }
-            } else {
-                logger.warn('未提供连接密钥，连接可能被拒绝');
             }
             
             logger.info('连接到服务器...', { 
@@ -681,7 +671,10 @@ class AgentService extends EventEmitter {
                     this.emit('connection-timeout');
                 }
                 
-                this.emit('error', error);
+                this.emit('connection-error', error);
+                if (this.listenerCount('error') > 0) {
+                    this.emit('error', error);
+                }
                 
                 // 只有在连接建立失败时才reject
                 if (!this.isConnected) {
@@ -940,18 +933,21 @@ class AgentService extends EventEmitter {
     flushDataBuffer() {
         if (this.dataBuffer.length > 0) {
             logger.info(`发送缓存数据: ${this.dataBuffer.length} 条`);
-            this.dataBuffer.forEach(data => {
+            const buffered = this.dataBuffer;
+            this.dataBuffer = [];
+            buffered.forEach(data => {
                 this.sendMessage(data);
             });
-            this.dataBuffer = [];
         }
     }
 
     // 开始心跳
     startHeartbeat() {
+        this.stopHeartbeat();
         this.heartbeatTimer = setInterval(() => {
             this.sendHeartbeat();
         }, this.config.heartbeatInterval);
+        this.heartbeatTimer.unref?.();
     }
 
     // 停止心跳
@@ -964,6 +960,7 @@ class AgentService extends EventEmitter {
 
     // 计划重连
     scheduleReconnect() {
+        if (this.reconnectTimer) return;
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             logger.error('达到最大重连次数，停止重连');
             this.emit('max-reconnect-reached');
@@ -978,7 +975,8 @@ class AgentService extends EventEmitter {
         
         logger.info(`计划在 ${delay}ms 后重连 (尝试 ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
-        setTimeout(async () => {
+        this.reconnectTimer = setTimeout(async () => {
+            this.reconnectTimer = null;
             // 检查是否仍然需要重连
             if (!this.isConnected && this.reconnectAttempts <= this.config.maxReconnectAttempts) {
                 try {
@@ -991,11 +989,11 @@ class AgentService extends EventEmitter {
                     logger.info('重连成功');
                 } catch (error) {
                     logger.error('重连失败:', error.message);
-                    // 重连失败不增加重连次数，让scheduleReconnect继续处理
-                    this.reconnectAttempts--;
+                    this.scheduleReconnect();
                 }
             }
         }, delay);
+        this.reconnectTimer.unref?.();
     }
 
     // 断开连接
@@ -1003,6 +1001,10 @@ class AgentService extends EventEmitter {
         logger.info('断开服务器连接');
         this.isConnected = false;
         this.stopHeartbeat();
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
         this.reconnectAttempts = 0; // 重置重连次数
         
         if (this.ws) {

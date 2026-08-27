@@ -9,7 +9,7 @@
 ### 必需软件
 - **Node.js** >= 18.0.0
 - **npm** >= 8.0.0
-- **Python 3** >= 3.8
+- **Python 3.11**
 - **PostgreSQL** >= 12
 - **Redis** >= 6.0
 
@@ -32,7 +32,7 @@ cd tianwang
 # 数据库配置
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=tianwang_dev
+DB_NAME=tianwang
 DB_USER=tianwang
 DB_PASSWORD=tianwang123
 
@@ -42,21 +42,33 @@ REDIS_PORT=6379
 REDIS_PASSWORD=tianwang123
 ```
 
-### 3. 启动开发环境
-```bash
-# 使用新的开发脚本（推荐）
-npm run dev
+### 3. 安装依赖
 
-# 或者直接运行脚本
-./scripts/dev-start.sh
+```bash
+npm run setup
 ```
 
-### 4. 访问应用
+### 4. 启动依赖服务并应用表结构
+
+```bash
+docker compose up -d postgres redis influxdb zookeeper kafka
+npm run db:migrate
+```
+
+### 5. 启动开发环境
+
+```bash
+npm run dev
+```
+
+该命令同时启动 Web 管理端、服务端和 AI 引擎。依赖服务保持由 Docker Compose 管理。
+
+### 6. 访问应用
 启动成功后，你可以访问以下地址：
 
-- **前端应用**: http://localhost:3333
-- **后端API**: http://localhost:5555/api
-- **API文档**: http://localhost:5555/api-docs
+- **前端应用**: http://localhost:3000
+- **后端API**: http://localhost:8000/api
+- **API文档**: http://localhost:8000/api-docs
 - **AI引擎**: http://localhost:8888
 
 ## 开发脚本使用
@@ -64,30 +76,13 @@ npm run dev
 ### 启动所有服务
 ```bash
 npm run dev
-# 或
-./scripts/dev-start.sh
 ```
 
-这个脚本会：
-- 检查环境变量文件
-- 验证依赖服务（PostgreSQL、Redis等）
-- 安装项目依赖
-- 启动AI引擎（端口8888）
-- 启动后端服务（端口5555）
-- 启动前端应用（端口3333）
-- 显示服务状态和访问地址
+该命令会在任一核心进程失败时停止整组进程，避免留下看似可用、实际断链的开发环境。
 
-### 停止所有服务
-```bash
-npm run dev:stop
-# 或
-./scripts/dev-stop.sh
-```
+### 停止开发进程
 
-这个脚本会：
-- 停止所有运行的服务
-- 清理PID文件
-- 清理残留进程
+在运行 `npm run dev` 的终端按 `Ctrl+C`。Docker 依赖服务可使用 `docker compose stop postgres redis influxdb zookeeper kafka` 停止。
 
 ### 查看服务状态
 ```bash
@@ -114,7 +109,7 @@ npm run dev:status
 APP_NAME=tianwang
 APP_VERSION=1.0.0-alpha.1
 NODE_ENV=development
-APP_PORT=5555
+APP_PORT=8000
 APP_HOST=localhost
 ```
 
@@ -123,7 +118,7 @@ APP_HOST=localhost
 # PostgreSQL
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=tianwang_dev
+DB_NAME=tianwang
 DB_USER=tianwang
 DB_PASSWORD=tianwang123
 
@@ -207,10 +202,10 @@ bin/kafka-topics.sh --create --topic security-alerts-dev --bootstrap-server loca
 然后手动停止占用端口的进程：
 ```bash
 # 查看端口占用
-lsof -i :5555
+lsof -i :8000
 
-# 停止进程
-kill -9 <PID>
+# 确认目标后请求进程正常退出
+kill <PID>
 ```
 
 #### 2. 数据库连接失败
@@ -242,12 +237,11 @@ redis-cli ping
 #### 4. 依赖安装失败
 如果遇到依赖安装问题，可以尝试：
 ```bash
-# 清理缓存
-npm cache clean --force
-
-# 删除node_modules并重新安装
-rm -rf node_modules server/node_modules client/node_modules
-npm install
+# 校验缓存并根据锁文件恢复依赖
+npm cache verify
+npm ci
+npm --prefix agents ci
+npm run ai:setup
 ```
 
 ### 日志查看
@@ -275,8 +269,7 @@ npm run dev
 # 在另一个终端查看状态
 npm run dev:status
 
-# 开发完成后停止服务
-npm run dev:stop
+# 开发完成后在运行终端按 Ctrl+C
 ```
 
 ### 2. 调试模式
@@ -290,11 +283,8 @@ npm run dev:stop
 # 运行数据库迁移
 npm run db:migrate
 
-# 填充测试数据
-npm run db:seed
-
-# 重置数据库
-npm run db:reset
+# 反复执行也只会应用待执行迁移并对齐缺失表
+npm run db:migrate
 ```
 
 ## 性能优化

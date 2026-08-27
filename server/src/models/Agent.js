@@ -2,18 +2,18 @@ const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   const Agent = sequelize.define('Agent', {
-    id: { 
-      type: DataTypes.UUID, 
-      defaultValue: DataTypes.UUIDV4, 
-      primaryKey: true 
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
     },
     agent_id: {
       type: DataTypes.STRING(100),
       allowNull: false,
       comment: '代理唯一标识符'
     },
-    name: { 
-      type: DataTypes.STRING(100), 
+    name: {
+      type: DataTypes.STRING(100),
       allowNull: false,
       comment: '代理名称'
     },
@@ -32,18 +32,18 @@ module.exports = (sequelize) => {
       allowNull: true,
       comment: '系统架构'
     },
-    version: { 
-      type: DataTypes.STRING(20), 
+    version: {
+      type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: '1.0.0',
       comment: '代理版本'
     },
-    status: { 
-      type: DataTypes.STRING(20), 
+    status: {
+      type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'offline',
       validate: {
-        isIn: [['online', 'offline', 'error']]
+        isIn: [['online', 'offline', 'maintenance', 'error']]
       },
       comment: '代理状态'
     },
@@ -79,23 +79,23 @@ module.exports = (sequelize) => {
       references: { model: 'organizations', key: 'id' },
       comment: '所属组织ID'
     },
-    last_heartbeat: { 
+    last_heartbeat: {
       type: DataTypes.DATE,
       allowNull: true,
       comment: '最后心跳时间'
     },
-    configuration: { 
-      type: DataTypes.JSONB, 
+    configuration: {
+      type: DataTypes.JSONB,
       defaultValue: {},
       comment: '代理配置'
     },
-    device_id: { 
-      type: DataTypes.UUID, 
+    device_id: {
+      type: DataTypes.UUID,
       references: { model: 'devices', key: 'id' },
       allowNull: true,
       comment: '关联设备ID'
     }
-  }, { 
+  }, {
     tableName: 'agents',
     timestamps: true,
     createdAt: 'created_at',
@@ -126,4 +126,4 @@ module.exports = (sequelize) => {
   };
 
   return Agent;
-}; 
+};

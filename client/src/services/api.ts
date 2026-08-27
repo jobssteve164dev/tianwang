@@ -1,3 +1,5 @@
+import { io, Socket } from 'socket.io-client';
+
 // API服务层 - 统一管理所有API调用
 
 // eslint-disable-next-line no-undef
@@ -10,16 +12,17 @@ const getAuthToken = () => {
 };
 
 // 通用请求函数
-const request = async (endpoint: string, options: any = {}) => {
+const request = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken();
+  const { headers = {}, ...requestOptions } = options;
 
-  const config: any = {
+  const config: RequestInit = {
+    ...requestOptions,
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
+      ...headers,
     },
-    ...options,
   };
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
@@ -31,11 +34,12 @@ const request = async (endpoint: string, options: any = {}) => {
     } catch {
       errorData = { message: '网络错误' };
     }
-    
+
     const errorMessage = errorData.message || errorData.error || `HTTP Error: ${response.status}`;
     throw new Error(errorMessage);
   }
 
+  if (response.status === 204) return null;
   return response.json();
 };
 
@@ -108,7 +112,7 @@ export const alertAPI = {
     dateRange?: [string, string];
   } = {}) => {
     const queryString = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         if (Array.isArray(value)) {
@@ -163,7 +167,7 @@ export const deviceAPI = {
     platform?: string;
   } = {}) => {
     const queryString = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryString.append(key, String(value));
@@ -211,7 +215,7 @@ export const deviceAPI = {
     level?: string;
   } = {}) => {
     const queryString = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryString.append(key, String(value));
@@ -231,7 +235,7 @@ export const userAPI = {
     role?: string;
   } = {}) => {
     const queryString = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryString.append(key, String(value));
@@ -279,7 +283,7 @@ export const systemAPI = {
     service?: string;
   } = {}) => {
     const queryString = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryString.append(key, String(value));
@@ -299,66 +303,66 @@ export const systemAPI = {
 
 // WebSocket连接管理
 export class WebSocketManager {
-  private ws: WebSocket | null = null;
-  private url: string;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectInterval = 3000;
+  private socket: Socket | null = null;
+  private url?: string;
   private listeners: { [key: string]: Function[] } = {};
 
   constructor(url?: string) {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    this.url = url || `${wsProtocol}//${wsHost}/ws`;
+    this.url = url;
   }
 
   connect() {
     try {
       const token = getAuthToken();
-      
-      this.ws = new WebSocket(`${this.url}?token=${token}`);
-      
-      this.ws.onopen = () => {
-        console.log('WebSocket连接已建立');
-        this.reconnectAttempts = 0;
+      if (!token) {
+        this.emit('error', new Error('用户尚未登录'));
+        return false;
+      }
+
+      this.disconnect();
+      this.socket = io(this.url, {
+        auth: { token },
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 3000,
+      });
+
+      this.socket.on('connect', () => {
         this.emit('connected');
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.emit(data.type, data.payload);
-        } catch (error) {
-          console.error('WebSocket消息解析失败:', error);
-        }
-      };
-
-      this.ws.onclose = () => {
-        console.log('WebSocket连接已关闭');
-        this.emit('disconnected');
-        this.reconnect();
-      };
-
-      this.ws.onerror = (error) => {
-        console.error('WebSocket错误:', error);
+      });
+      this.socket.on('disconnect', reason => {
+        this.emit('disconnected', reason);
+      });
+      this.socket.on('connect_error', error => {
         this.emit('error', error);
-      };
+      });
+      this.socket.onAny((event, payload) => {
+        if (!['connect', 'disconnect', 'connect_error'].includes(event)) {
+          this.emit(event, payload);
+        }
+      });
+      return true;
     } catch (error) {
-      console.error('WebSocket连接失败:', error);
+      this.emit('error', error);
+      return false;
     }
   }
 
   disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+      this.emit('disconnected', 'client disconnect');
     }
   }
 
-  send(type: string, payload: any) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type, payload }));
+  send(type: string, payload: unknown) {
+    if (this.socket?.connected) {
+      this.socket.emit(type, payload);
+      return true;
     }
+    return false;
   }
 
   on(event: string, callback: Function) {
@@ -374,22 +378,9 @@ export class WebSocketManager {
     }
   }
 
-  private emit(event: string, data?: any) {
+  private emit(event: string, data?: unknown) {
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => callback(data));
-    }
-  }
-
-  private reconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      console.log(`尝试重连WebSocket (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      
-      setTimeout(() => {
-        this.connect();
-      }, this.reconnectInterval);
-    } else {
-      console.error('WebSocket重连失败，已达到最大重试次数');
     }
   }
 }
@@ -418,7 +409,7 @@ export const registrationCodeApi = {
   disableRegistrationCode: (code: string) => request(`/admin/registration-codes/${code}`, {
     method: 'DELETE',
   }),
-  extendRegistrationCode: (code: string, additionalExpiry: number) => 
+  extendRegistrationCode: (code: string, additionalExpiry: number) =>
     request(`/admin/registration-codes/${code}/extend`, {
       method: 'PATCH',
       body: JSON.stringify({ additionalExpiry }),
@@ -430,13 +421,13 @@ export const registrationCodeApi = {
 export const securityRulesApi = {
   getRuleSources: () => request('/security/rules/sources'),
   getRuleStatistics: () => request('/security/rules/statistics'),
-  updateRules: (data?: { source_type?: string; source_name?: string }) => 
+  updateRules: (data?: { source_type?: string; source_name?: string }) =>
     request('/security/rules/update', {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
   getRuleStatus: () => request('/security/rules/status'),
-  
+
   // 自定义规则管理
   getCustomRules: () => request('/security/rules/custom'),
   getCustomRule: (id: string) => request(`/security/rules/custom/${id}`),
@@ -464,7 +455,7 @@ export const notificationApi = {
     method: 'PUT',
     body: JSON.stringify(config),
   }),
-  sendTestNotification: (data: { type: string; recipient: string }) => 
+  sendTestNotification: (data: { type: string; recipient: string }) =>
     request('/notifications/test', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -480,7 +471,7 @@ export const aiModelApi = {
     body: JSON.stringify(config),
   }),
   getUsageStats: () => request('/system/ai-model/usage-stats'),
-  testConnection: (data: { provider: string; api_key: string; model?: string }) => 
+  testConnection: (data: { provider: string; api_key: string; model?: string }) =>
     request('/system/ai-model/test-connection', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -491,94 +482,88 @@ export const aiModelApi = {
 export const localAIModelApi = {
   // 获取所有模型状态
   getModelStatus: () => request('/system/ai-models/status'),
-  
+
   // 获取特定模型状态
   getModelStatusByName: (modelName: string) => request(`/system/ai-models/${modelName}/status`),
-  
+
   // 训练模型
-  trainModel: (data: { model_name: string; training_data?: any[] }) => 
+  trainModel: (data: { model_name: string; training_data?: any[] }) =>
     request('/system/ai-models/train', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  
+
   // 获取训练状态
   getTrainingStatus: (taskId: string) => request(`/system/ai-models/training/${taskId}/status`),
-  
+
   // 测试模型
-  testModel: (data: { model_name: string; test_data: any }) => 
+  testModel: (data: { model_name: string; test_data: any }) =>
     request('/system/ai-models/test', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  
+
   // 训练数据管理
-  uploadTrainingData: (data: { model_name: string; data_type: string; data: any[] }) => 
+  uploadTrainingData: (data: { model_name: string; data_type: string; data: any[] }) =>
     request('/system/ai-models/training-data', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  
+
   getTrainingDataList: (params?: { model_name?: string; page?: number; limit?: number }) => {
     const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     return request(`/system/ai-models/training-data${queryString}`);
   },
-  
+
   getTrainingDataDetail: (dataId: string) => request(`/system/ai-models/training-data/${dataId}`),
-  
-  deleteTrainingData: (dataId: string) => 
+
+  deleteTrainingData: (dataId: string) =>
     request(`/system/ai-models/training-data/${dataId}`, {
       method: 'DELETE',
     }),
-  
+
   exportTrainingData: (params?: { model_name?: string; data_type?: string; format?: string }) => {
     const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     return request(`/system/ai-models/training-data/export${queryString}`);
   },
-  
+
   // 性能监控
   getModelPerformance: (modelName?: string) => {
     const queryString = modelName ? `?model_name=${modelName}` : '';
     return request(`/system/ai-models/performance${queryString}`);
   },
-  
+
   getPerformanceHistory: (params?: { model_name?: string; days?: number }) => {
     const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     return request(`/system/ai-models/performance/history${queryString}`);
   },
-  
+
   getSystemPerformanceOverview: () => request('/system/ai-models/performance/overview'),
-  
+
   // 资源管理
   getResourceList: () => request('/system/ai-models/resources'),
-  
-  downloadResource: (data: { resource_id: string; category: string; model_name?: string }) => 
+
+  downloadResource: (data: { resource_id: string; category: string; model_name?: string }) =>
     request('/system/ai-models/resources/download', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  
-  loadModel: (data: { model_path: string; model_name: string; category: string }) => 
-    request('/system/ai-models/resources/load', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  deleteResource: (resourceId: string) => 
+
+  deleteResource: (resourceId: string) =>
     request(`/system/ai-models/resources/${resourceId}`, {
       method: 'DELETE',
     }),
-  
+
   // 模型管理
   getLoadedModels: () => request('/system/ai-models/loaded-models'),
-  
-  toggleModel: (data: { model_id: string; status: 'active' | 'inactive' }) => 
+
+  toggleModel: (data: { model_id: string; status: 'active' | 'inactive' }) =>
     request('/system/ai-models/toggle-model', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  
-  reloadModel: (modelId: string) => 
+
+  reloadModel: (modelId: string) =>
     request(`/system/ai-models/reload-model/${modelId}`, {
       method: 'POST',
     }),
@@ -610,4 +595,4 @@ export default {
   notification: notificationApi,
   aiModel: aiModelApi,
   threatIntelligence: threatIntelligenceApi,
-}; 
+};

@@ -4,179 +4,97 @@ const { encrypt, decrypt } = require('../utils/encryption');
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
+const crypto = require('crypto');
+const appConfig = require('../config');
+
+const trainingDataDir = path.resolve(__dirname, '../../data/training');
+const defaultProviderConfig = {
+  openai: {
+    enabled: false,
+    api_key: '',
+    default_model: 'gpt-3.5-turbo',
+    models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
+  },
+  claude: {
+    enabled: false,
+    api_key: '',
+    default_model: 'claude-3-haiku',
+    models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
+  },
+  openrouter: {
+    enabled: false,
+    api_key: '',
+    default_model: 'openai/gpt-4',
+    models: [
+      'openai/gpt-4',
+      'anthropic/claude-3-haiku',
+      'google/gemini-pro',
+      'meta-llama/llama-2-70b-chat',
+      'mistralai/mixtral-8x7b-instruct'
+    ]
+  },
+  deepseek: {
+    enabled: false,
+    api_key: '',
+    default_model: 'deepseek-chat',
+    models: ['deepseek-chat', 'deepseek-coder']
+  }
+};
+
+function trainingDataPath(dataId) {
+  if (!/^data_[a-f0-9]{32}$/.test(dataId)) throw new Error('训练数据ID无效');
+  return path.join(trainingDataDir, `${dataId}.json`);
+}
+
+async function readTrainingRecords() {
+  await fs.promises.mkdir(trainingDataDir, { recursive: true });
+  const files = (await fs.promises.readdir(trainingDataDir)).filter(file => /^data_[a-f0-9]{32}\.json$/.test(file));
+  return Promise.all(files.map(async file => JSON.parse(await fs.promises.readFile(path.join(trainingDataDir, file), 'utf8'))));
+}
 
 /**
  * AI模型配置控制器
  * 处理外部AI模型的API密钥配置和使用量统计
  */
 class AIModelController {
+  constructor() {
+    for (const methodName of Object.getOwnPropertyNames(AIModelController.prototype)) {
+      if (methodName !== 'constructor' && typeof this[methodName] === 'function') {
+        this[methodName] = this[methodName].bind(this);
+      }
+    }
+  }
+
   /**
    * 获取AI模型配置
    */
   async getConfig(req, res) {
     try {
-      console.log('🔍 开始获取AI模型配置...');
-      
-      // 确保数据库模型已初始化
-      const { initializeModels } = models;
-      const result = initializeModels();
-
-      // 如果数据库被跳过，直接返回默认配置
-      if (!result || !result.models) {
-        console.log('⚠️  Skipping database initialization in development mode');
-        // 返回默认配置
-        return res.json({
-          success: true,
-          config: {
-            openai: {
-              enabled: false,
-              api_key: '',
-              default_model: 'gpt-3.5-turbo',
-              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-            },
-            claude: {
-              enabled: false,
-              api_key: '',
-              default_model: 'claude-3-haiku',
-              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-            },
-            openrouter: {
-              enabled: false,
-              api_key: '',
-              default_model: 'openai/gpt-4',
-              models: [
-                'openai/gpt-4',
-                'anthropic/claude-3-haiku',
-                'google/gemini-pro',
-                'meta-llama/llama-2-70b-chat',
-                'mistralai/mixtral-8x7b-instruct'
-              ]
-            },
-            deepseek: {
-              enabled: false,
-              api_key: '',
-              default_model: 'deepseek-chat',
-              models: ['deepseek-chat', 'deepseek-coder']
-            }
-          }
-        });
-      }
-
       const SystemConfig = models.SystemConfig;
       if (!SystemConfig) {
         throw new Error('SystemConfig model not initialized');
       }
 
-      console.log('🔍 查询数据库中的AI模型配置...');
       const systemConfig = await SystemConfig.findOne({
         where: { key: 'ai_model_config' }
       });
 
       if (!systemConfig) {
-        console.log('🔍 未找到配置，返回默认配置');
-        // 返回默认配置
         return res.json({
           success: true,
-          config: {
-            openai: {
-              enabled: false,
-              api_key: '',
-              default_model: 'gpt-3.5-turbo',
-              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-            },
-            claude: {
-              enabled: false,
-              api_key: '',
-              default_model: 'claude-3-haiku',
-              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-            },
-            openrouter: {
-              enabled: false,
-              api_key: '',
-              default_model: 'openai/gpt-4',
-              models: [
-                'openai/gpt-4',
-                'anthropic/claude-3-haiku',
-                'google/gemini-pro',
-                'meta-llama/llama-2-70b-chat',
-                'mistralai/mixtral-8x7b-instruct'
-              ]
-            },
-            deepseek: {
-              enabled: false,
-              api_key: '',
-              default_model: 'deepseek-chat',
-              models: ['deepseek-chat', 'deepseek-coder']
-            }
-          }
+          config: this.maskApiKeys(defaultProviderConfig)
         });
       }
 
-      console.log('🔍 找到配置，解密API密钥...');
-      // 解密API密钥
       const decryptedConfig = this.decryptApiKeys(systemConfig.value);
 
-      console.log('🔍 返回解密后的配置');
       res.json({
         success: true,
-        config: decryptedConfig
+        config: this.maskApiKeys(decryptedConfig)
       });
 
     } catch (error) {
-      console.error('🔍 获取AI模型配置失败 - 详细错误:', error);
-      console.error('🔍 错误堆栈:', error.stack);
-      
-      // 使用更安全的错误处理
-      try {
-        logger.error('获取AI模型配置失败:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
-      } catch (logError) {
-        console.error('🔍 日志记录失败:', logError);
-      }
-      
-      // 如果是数据库表不存在，返回默认配置
-      if (error.message.includes('relation "system_configs" does not exist')) {
-        console.log('🔍 数据库表不存在，返回默认配置');
-        return res.json({
-          success: true,
-          config: {
-            openai: {
-              enabled: false,
-              api_key: '',
-              default_model: 'gpt-3.5-turbo',
-              models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-            },
-            claude: {
-              enabled: false,
-              api_key: '',
-              default_model: 'claude-3-haiku',
-              models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-            },
-            openrouter: {
-              enabled: false,
-              api_key: '',
-              default_model: 'openai/gpt-4',
-              models: [
-                'openai/gpt-4',
-                'anthropic/claude-3-haiku',
-                'google/gemini-pro',
-                'meta-llama/llama-2-70b-chat',
-                'mistralai/mixtral-8x7b-instruct'
-              ]
-            },
-            deepseek: {
-              enabled: false,
-              api_key: '',
-              default_model: 'deepseek-chat',
-              models: ['deepseek-chat', 'deepseek-coder']
-            }
-          }
-        });
-      }
-      
+      logger.error('获取AI模型配置失败:', error);
       res.status(500).json({
         success: false,
         message: '获取配置失败',
@@ -199,15 +117,19 @@ class AIModelController {
         });
       }
 
-      // 加密API密钥
-      const encryptedConfig = this.encryptApiKeys(config);
-
       // 保存或更新配置
       const SystemConfig = models.SystemConfig;
       if (!SystemConfig) {
         throw new Error('SystemConfig model not initialized');
       }
       
+      const existingRecord = await SystemConfig.findOne({ where: { key: 'ai_model_config' } });
+      const existingConfig = existingRecord ? this.decryptApiKeys(existingRecord.value) : {};
+      const mergedConfig = this.mergeProviderConfig(config, existingConfig);
+
+      await this.syncToAIEngine(mergedConfig);
+      const encryptedConfig = this.encryptApiKeys(mergedConfig);
+
       const [systemConfig, created] = await SystemConfig.findOrCreate({
         where: { key: 'ai_model_config' },
         defaults: {
@@ -225,8 +147,6 @@ class AIModelController {
       }
 
       // 同步更新AI引擎配置
-      await this.syncToAIEngine(encryptedConfig);
-
       res.json({
         success: true,
         message: '配置更新成功'
@@ -252,25 +172,7 @@ class AIModelController {
       const response = await fetch(`${aiEngineUrl}/api/api-status?detailed=true`);
       
       if (!response.ok) {
-        // 如果AI引擎不可用，返回默认统计
-        logger.warn(`AI引擎响应错误: ${response.status}，返回默认统计`);
-        const defaultStats = {
-          total_requests: 0,
-          total_cost: 0,
-          daily_cost: 0,
-          monthly_cost: 0,
-          providers: {
-            openai: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            claude: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            openrouter: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            deepseek: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 }
-          }
-        };
-        
-        return res.json({
-          success: true,
-          stats: defaultStats
-        });
+        return res.status(503).json({ success: false, message: 'AI引擎不可用' });
       }
 
       let data;
@@ -287,28 +189,6 @@ class AIModelController {
 
       const externalApis = data.status?.external_apis || {};
       
-      // 如果external_apis为空，返回默认统计
-      if (!externalApis || Object.keys(externalApis).length === 0) {
-        logger.warn('AI引擎返回的external_apis为空，返回默认统计');
-        const defaultStats = {
-          total_requests: 0,
-          total_cost: 0,
-          daily_cost: 0,
-          monthly_cost: 0,
-          providers: {
-            openai: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            claude: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            openrouter: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 },
-            deepseek: { status: 'unavailable', request_count: 0, failure_count: 0, daily_cost: 0, monthly_cost: 0 }
-          }
-        };
-        
-        return res.json({
-          success: true,
-          stats: defaultStats
-        });
-      }
-      
       // 格式化统计数据
       const stats = {
         total_requests: 0,
@@ -318,17 +198,12 @@ class AIModelController {
         providers: {}
       };
 
-      // 处理各提供商的统计
-      Object.entries(externalApis).forEach(([provider, providerData]) => {
-        if (provider === 'api_status' || provider === 'failure_counts' || provider === 'request_counts' || provider === 'cost_tracking') {
-          return;
-        }
-
+      const statusMap = externalApis.api_status || {};
+      Object.keys(statusMap).forEach(provider => {
         const requestCount = externalApis.request_counts?.[provider] || 0;
         const costData = externalApis.cost_tracking || {};
         
         stats.total_requests += requestCount;
-        stats.total_cost += costData.daily_cost || 0;
         stats.daily_cost = costData.daily_cost || 0;
         stats.monthly_cost = costData.monthly_cost || 0;
 
@@ -340,6 +215,7 @@ class AIModelController {
           monthly_cost: costData.monthly_cost || 0
         };
       });
+      stats.total_cost = stats.monthly_cost;
 
       res.json({
         success: true,
@@ -373,16 +249,16 @@ class AIModelController {
       // 调用AI引擎的测试接口
       const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
       
-      const response = await fetch(`${aiEngineUrl}/llm-analysis`, {
+      const response = await fetch(`${aiEngineUrl}/api/external-apis/test`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Internal-Token': process.env.AI_INTERNAL_TOKEN || 'tianwang-local-ai-internal'
         },
         body: JSON.stringify({
-          content: 'Hello, this is a test message.',
-          analysis_type: 'test',
-          preferred_provider: provider,
-          use_cache: false
+          provider,
+          api_key,
+          model
         })
       });
 
@@ -396,8 +272,8 @@ class AIModelController {
         res.json({
           success: true,
           message: 'API连接测试成功',
-          provider: data.results.provider,
-          model: data.results.model
+          provider: data.provider,
+          model: data.model
         });
       } else {
         res.json({
@@ -421,7 +297,10 @@ class AIModelController {
    * 加密API密钥
    */
   encryptApiKeys(config) {
-    const encryptedConfig = { ...config };
+    const encryptedConfig = Object.fromEntries(Object.entries(config).map(([provider, providerConfig]) => [
+      provider,
+      { ...providerConfig }
+    ]));
     
     Object.keys(encryptedConfig).forEach(provider => {
       if (encryptedConfig[provider] && encryptedConfig[provider].api_key) {
@@ -436,7 +315,10 @@ class AIModelController {
    * 解密API密钥
    */
   decryptApiKeys(config) {
-    const decryptedConfig = { ...config };
+    const decryptedConfig = Object.fromEntries(Object.entries(config).map(([provider, providerConfig]) => [
+      provider,
+      { ...providerConfig }
+    ]));
     
     Object.keys(decryptedConfig).forEach(provider => {
       if (decryptedConfig[provider] && decryptedConfig[provider].api_key) {
@@ -452,20 +334,48 @@ class AIModelController {
     return decryptedConfig;
   }
 
+  maskApiKeys(config) {
+    return Object.fromEntries(Object.entries(config).map(([provider, providerConfig]) => [provider, {
+      ...providerConfig,
+      api_key: '',
+      has_api_key: !!providerConfig?.api_key
+    }]));
+  }
+
+  mergeProviderConfig(incoming, existing) {
+    const providers = new Set([...Object.keys(existing), ...Object.keys(incoming)]);
+    return Object.fromEntries([...providers].map(provider => [provider, {
+      ...(existing[provider] || {}),
+      ...(incoming[provider] || {}),
+      api_key: incoming[provider]?.api_key || existing[provider]?.api_key || ''
+    }]));
+  }
+
   /**
    * 同步配置到AI引擎
    */
-  async syncToAIEngine(config) {
-    try {
-      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
-      
-      // 这里可以调用AI引擎的配置更新接口
-      // 目前AI引擎通过环境变量读取配置，所以这里只是记录日志
-      logger.info('AI模型配置已更新，需要重启AI引擎以应用新配置');
-      
-    } catch (error) {
-      logger.error('同步配置到AI引擎失败:', error);
+  async syncToAIEngine(providerConfig) {
+    const response = await fetch(`${appConfig.ai.engineUrl}/api/external-apis/config`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Token': process.env.AI_INTERNAL_TOKEN || 'tianwang-local-ai-internal'
+      },
+      body: JSON.stringify({ providers: providerConfig })
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`AI引擎拒绝配置同步: ${response.status} ${body}`);
     }
+  }
+
+  async restoreRuntimeConfig() {
+    const SystemConfig = models.SystemConfig;
+    if (!SystemConfig) throw new Error('SystemConfig model not initialized');
+    const stored = await SystemConfig.findOne({ where: { key: 'ai_model_config' } });
+    if (!stored) return false;
+    await this.syncToAIEngine(this.decryptApiKeys(stored.value));
+    return true;
   }
 
   // ==================== 本地AI模型管理API ====================
@@ -483,7 +393,7 @@ class AIModelController {
       let aiEngineAvailable = false;
       
       try {
-        const response = await fetch(`${aiEngineUrl}/api/api-status`, {
+        const response = await fetch(`${aiEngineUrl}/api/models/status`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -498,65 +408,65 @@ class AIModelController {
           logger.warn(`AI引擎响应错误: ${response.status}`);
         }
       } catch (fetchError) {
-        logger.warn('AI引擎连接失败，使用默认数据:', fetchError.message);
+        logger.warn('AI引擎连接失败:', fetchError.message);
       }
       
       // 构建本地模型状态响应
       const localModels = {
         anomaly_detection: {
           model_name: '异常检测模型',
-          status: aiEngineAvailable && data?.status?.ai_service ? 'trained' : 'untrained',
+          status: aiEngineAvailable && data?.status?.models_loaded?.includes('anomaly_detection') ? 'trained' : 'untrained',
           last_trained: null,
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.anomaly_detection || 0.92) : 0.92,
+          accuracy: aiEngineAvailable ? (data?.status?.metrics?.model_accuracy?.anomaly_detection ?? null) : null,
           training_samples: 0,
           version: '1.0.0',
           performance_metrics: {
-            precision: 0.89,
-            recall: 0.94,
-            f1_score: 0.91,
-            inference_time: 0.05
+            precision: null,
+            recall: null,
+            f1_score: null,
+            inference_time: null
           }
         },
         malware_detection: {
           model_name: '恶意软件检测模型',
-          status: aiEngineAvailable && data?.status?.ai_service ? 'trained' : 'untrained',
+          status: aiEngineAvailable && data?.status?.models_loaded?.includes('malware_detection') ? 'trained' : 'untrained',
           last_trained: null,
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.malware_detection || 0.88) : 0.88,
+          accuracy: aiEngineAvailable ? (data?.status?.metrics?.model_accuracy?.malware_detection ?? null) : null,
           training_samples: 0,
           version: '1.0.0',
           performance_metrics: {
-            precision: 0.87,
-            recall: 0.92,
-            f1_score: 0.89,
-            inference_time: 0.08
+            precision: null,
+            recall: null,
+            f1_score: null,
+            inference_time: null
           }
         },
         network_intrusion: {
           model_name: '网络入侵检测模型',
-          status: aiEngineAvailable && data?.status?.ai_service ? 'trained' : 'untrained',
+          status: aiEngineAvailable && data?.status?.models_loaded?.includes('network_intrusion') ? 'trained' : 'untrained',
           last_trained: null,
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.network_intrusion || 0.85) : 0.85,
+          accuracy: aiEngineAvailable ? (data?.status?.metrics?.model_accuracy?.network_intrusion ?? null) : null,
           training_samples: 0,
           version: '1.0.0',
           performance_metrics: {
-            precision: 0.85,
-            recall: 0.90,
-            f1_score: 0.87,
-            inference_time: 0.12
+            precision: null,
+            recall: null,
+            f1_score: null,
+            inference_time: null
           }
         },
         user_behavior: {
           model_name: '用户行为分析模型',
-          status: aiEngineAvailable && data?.status?.ai_service ? 'trained' : 'untrained',
+          status: aiEngineAvailable && data?.status?.models_loaded?.includes('user_behavior') ? 'trained' : 'untrained',
           last_trained: null,
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.user_behavior || 0.83) : 0.83,
+          accuracy: aiEngineAvailable ? (data?.status?.metrics?.model_accuracy?.user_behavior ?? null) : null,
           training_samples: 0,
           version: '1.0.0',
           performance_metrics: {
-            precision: 0.83,
-            recall: 0.88,
-            f1_score: 0.85,
-            inference_time: 0.06
+            precision: null,
+            recall: null,
+            f1_score: null,
+            inference_time: null
           }
         }
       };
@@ -564,7 +474,7 @@ class AIModelController {
       res.json({
         success: true,
         models: localModels,
-        ai_engine_status: aiEngineAvailable ? (data?.status?.ai_service ? 'running' : 'stopped') : 'unavailable',
+        ai_engine_status: aiEngineAvailable ? (data?.status?.service_status === 'healthy' ? 'running' : 'stopped') : 'unavailable',
         timestamp: new Date().toISOString()
       });
 
@@ -601,7 +511,7 @@ class AIModelController {
       let aiEngineAvailable = false;
       
       try {
-        const response = await fetch(`${aiEngineUrl}/api/api-status`, {
+        const response = await fetch(`${aiEngineUrl}/api/models/status`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -616,21 +526,21 @@ class AIModelController {
           logger.warn(`AI引擎响应错误: ${response.status}`);
         }
       } catch (fetchError) {
-        logger.warn('AI引擎连接失败，使用默认数据:', fetchError.message);
+        logger.warn('AI引擎连接失败:', fetchError.message);
       }
       
       const modelStatus = {
         model_name: model_name,
-        status: aiEngineAvailable && data?.status?.ai_service ? 'trained' : 'untrained',
+        status: aiEngineAvailable && data?.status?.models_loaded?.includes(model_name) ? 'trained' : 'untrained',
         last_trained: null,
-        accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.[model_name] || 0.85) : 0.85,
+        accuracy: aiEngineAvailable ? (data?.status?.metrics?.model_accuracy?.[model_name] ?? null) : null,
         training_samples: 0,
         version: '1.0.0',
         performance_metrics: {
-          precision: 0.85,
-          recall: 0.90,
-          f1_score: 0.87,
-          inference_time: 0.08
+          precision: null,
+          recall: null,
+          f1_score: null,
+          inference_time: null
         }
       };
 
@@ -679,10 +589,10 @@ class AIModelController {
 
       res.json({
         success: true,
-        message: `模型 ${model_name} 训练已开始`,
-        task_id: `task_${Date.now()}`,
-        model_name: model_name,
-        training_samples: training_data?.length || 0,
+        message: data.message || `模型 ${model_name} 训练已开始`,
+        task_id: data.task_id,
+        model_name: data.model_name || model_name,
+        training_samples: data.training_samples ?? training_data?.length ?? 0,
         timestamp: new Date().toISOString()
       });
 
@@ -704,22 +614,16 @@ class AIModelController {
       const { task_id } = req.params;
       logger.info(`🔍 获取训练状态: ${task_id}`);
       
-      // 这里应该从数据库或缓存中获取训练状态
-      // 目前返回模拟数据
-      const trainingStatus = {
-        task_id: task_id,
-        status: 'completed', // running, completed, failed
-        progress: 100,
-        start_time: new Date(Date.now() - 3600000).toISOString(),
-        estimated_completion: new Date().toISOString(),
-        training_samples: 5000,
-        current_accuracy: 0.92,
-        current_loss: 0.08
-      };
+      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
+      const response = await fetch(`${aiEngineUrl}/api/training/${encodeURIComponent(task_id)}/status`);
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json({ success: false, message: data.detail || '获取训练状态失败' });
+      }
 
       res.json({
         success: true,
-        training_status: trainingStatus,
+        training_status: data.training_status,
         timestamp: new Date().toISOString()
       });
 
@@ -755,7 +659,7 @@ class AIModelController {
         endpoint = '/api/detect/network';
         break;
       case 'user_behavior':
-        endpoint = '/api/detect/behavior';
+        endpoint = '/api/analyze/behavior';
         break;
       default:
         throw new Error(`不支持的模型类型: ${model_name}`);
@@ -815,8 +719,7 @@ class AIModelController {
         throw new Error('训练数据不能为空');
       }
 
-      // 生成数据ID
-      const dataId = `data_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const dataId = `data_${crypto.randomUUID().replace(/-/g, '')}`;
       
       // 构建训练数据记录
       const trainingDataRecord = {
@@ -833,9 +736,10 @@ class AIModelController {
         }
       };
 
-      // 这里应该将数据保存到数据库或文件系统
-      // 目前先返回成功响应
-      res.json({
+      await fs.promises.mkdir(trainingDataDir, { recursive: true });
+      await fs.promises.writeFile(trainingDataPath(dataId), JSON.stringify(trainingDataRecord), { encoding: 'utf8', flag: 'wx' });
+
+      res.status(201).json({
         success: true,
         message: '训练数据上传成功',
         data_id: dataId,
@@ -863,44 +767,17 @@ class AIModelController {
       const { model_name, page = 1, limit = 10 } = req.query;
       logger.info(`📋 获取训练数据列表: ${model_name || 'all'}`);
       
-      // 这里应该从数据库查询训练数据
-      // 目前返回模拟数据
-      const mockData = [
-        {
-          id: 'data_1234567890_abc123',
-          model_name: 'anomaly_detection',
-          data_type: 'anomaly',
-          sample_count: 1000,
-          upload_time: new Date(Date.now() - 86400000).toISOString(),
-          status: 'uploaded',
-          metadata: {
-            format: 'json',
-            version: '1.0.0'
-          }
-        },
-        {
-          id: 'data_1234567891_def456',
-          model_name: 'malware_detection',
-          data_type: 'malware',
-          sample_count: 500,
-          upload_time: new Date(Date.now() - 172800000).toISOString(),
-          status: 'uploaded',
-          metadata: {
-            format: 'json',
-            version: '1.0.0'
-          }
-        }
-      ];
+      const records = await readTrainingRecords();
 
       // 根据模型名称过滤
       const filteredData = model_name 
-        ? mockData.filter(item => item.model_name === model_name)
-        : mockData;
+        ? records.filter(item => item.model_name === model_name)
+        : records;
 
       // 分页处理
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + parseInt(limit);
-      const paginatedData = filteredData.slice(startIndex, endIndex);
+      const paginatedData = filteredData.slice(startIndex, endIndex).map(({ data: _data, ...metadata }) => metadata);
 
       res.json({
         success: true,
@@ -932,8 +809,12 @@ class AIModelController {
       const { data_id } = req.params;
       logger.info(`🗑️ 删除训练数据: ${data_id}`);
       
-      // 这里应该从数据库删除训练数据
-      // 目前返回成功响应
+      try {
+        await fs.promises.unlink(trainingDataPath(data_id));
+      } catch (error) {
+        if (error.code === 'ENOENT') return res.status(404).json({ success: false, message: '训练数据不存在' });
+        throw error;
+      }
       res.json({
         success: true,
         message: '训练数据删除成功',
@@ -959,46 +840,19 @@ class AIModelController {
       const { data_id } = req.params;
       logger.info(`📄 获取训练数据详情: ${data_id}`);
       
-      // 这里应该从数据库查询训练数据详情
-      // 目前返回模拟数据
-      const mockDetail = {
-        id: data_id,
-        model_name: 'anomaly_detection',
-        data_type: 'anomaly',
-        sample_count: 1000,
-        upload_time: new Date(Date.now() - 86400000).toISOString(),
-        status: 'uploaded',
-        metadata: {
-          format: 'json',
-          version: '1.0.0'
-        },
-        data_preview: [
-          {
-            cpu_usage: 0.8,
-            memory_usage: 0.6,
-            disk_usage: 0.7,
-            network_activity: 0.9,
-            is_anomaly: 1
-          },
-          {
-            cpu_usage: 0.3,
-            memory_usage: 0.4,
-            disk_usage: 0.5,
-            network_activity: 0.2,
-            is_anomaly: 0
-          }
-        ],
-        data_quality: {
-          completeness: 0.95,
-          accuracy: 0.92,
-          consistency: 0.88,
-          validity: 0.90
-        }
-      };
+      let record;
+      try {
+        record = JSON.parse(await fs.promises.readFile(trainingDataPath(data_id), 'utf8'));
+      } catch (error) {
+        if (error.code === 'ENOENT') return res.status(404).json({ success: false, message: '训练数据不存在' });
+        throw error;
+      }
+      const { data, ...metadata } = record;
+      const detail = { ...metadata, data_preview: data.slice(0, 10) };
 
       res.json({
         success: true,
-        data: mockDetail,
+        data: detail,
         timestamp: new Date().toISOString()
       });
 
@@ -1019,20 +873,12 @@ class AIModelController {
     try {
       logger.info('📋 获取资源列表');
       
-      // 这里应该从数据库查询已下载的资源
-      // 目前返回模拟数据
-      const mockResources = [
-        {
-          id: 'nsl-kdd-dataset',
-          status: 'downloaded',
-          local_path: './data/nsl-kdd-dataset.csv',
-          download_progress: 100
-        }
-      ];
+      if (!models.AIResource) return res.status(503).json({ success: false, message: '资源数据库不可用' });
+      const resources = await models.AIResource.findAll({ order: [['updatedAt', 'DESC']] });
 
       res.json({
         success: true,
-        data: mockResources,
+        data: resources,
         timestamp: new Date().toISOString()
       });
 
@@ -1214,34 +1060,6 @@ class AIModelController {
   }
 
   /**
-   * 加载模型
-   */
-  async loadModel(req, res) {
-    try {
-      const { model_path, model_name, category } = req.body;
-      logger.info(`🤖 加载模型: ${model_name}`);
-      
-      // 这里应该实现实际的模型加载逻辑
-      // 目前返回成功响应
-      res.json({
-        success: true,
-        message: '模型加载成功',
-        model_name: model_name,
-        category: category,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      logger.error('加载模型失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '加载模型失败',
-        error: error.message
-      });
-    }
-  }
-
-  /**
    * 删除资源
    */
   async deleteResource(req, res) {
@@ -1249,8 +1067,19 @@ class AIModelController {
       const { resource_id } = req.params;
       logger.info(`🗑️ 删除资源: ${resource_id}`);
       
-      // 这里应该实现实际的删除逻辑
-      // 目前返回成功响应
+      if (!models.AIResource) return res.status(503).json({ success: false, message: '资源数据库不可用' });
+      const resource = await models.AIResource.findOne({ where: { resource_id } });
+      if (!resource) return res.status(404).json({ success: false, message: '资源不存在' });
+      if (resource.local_path) {
+        const downloadRoot = path.resolve(__dirname, '../../downloads');
+        const localPath = path.resolve(resource.local_path);
+        if (localPath !== downloadRoot && localPath.startsWith(`${downloadRoot}${path.sep}`)) {
+          await fs.promises.unlink(localPath).catch(error => {
+            if (error.code !== 'ENOENT') throw error;
+          });
+        }
+      }
+      await resource.destroy();
       res.json({
         success: true,
         message: '资源删除成功',
@@ -1275,50 +1104,23 @@ class AIModelController {
     try {
       logger.info('📋 获取已加载模型列表');
       
-      // 这里应该从AI引擎获取实际加载的模型
-      // 目前返回模拟数据
-      const mockLoadedModels = [
-        {
-          id: 'anomaly_detection_default',
-          name: '异常检测模型',
-          category: 'anomaly_detection',
-          version: '1.0.0',
-          status: 'active',
-          accuracy: 0.85,
-          last_updated: new Date().toISOString(),
-          file_path: './models/anomaly_detection.joblib',
-          model_type: 'IsolationForest',
-          description: '默认的异常检测模型'
-        },
-        {
-          id: 'malware_detection_default',
-          name: '恶意软件检测模型',
-          category: 'malware_detection',
-          version: '1.0.0',
-          status: 'inactive',
-          accuracy: 0.78,
-          last_updated: new Date(Date.now() - 86400000).toISOString(),
-          file_path: './models/malware_detection.joblib',
-          model_type: 'RandomForest',
-          description: '默认的恶意软件检测模型'
-        },
-        {
-          id: 'network_intrusion_default',
-          name: '网络入侵检测模型',
-          category: 'network_intrusion',
-          version: '1.0.0',
-          status: 'active',
-          accuracy: 0.92,
-          last_updated: new Date(Date.now() - 172800000).toISOString(),
-          file_path: './models/network_intrusion.h5',
-          model_type: 'GradientBoosting',
-          description: '默认的网络入侵检测模型'
-        }
-      ];
+      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
+      const response = await fetch(`${aiEngineUrl}/api/models/status`);
+      const result = await response.json();
+      if (!response.ok) return res.status(response.status).json({ success: false, message: result.detail || '获取模型状态失败' });
+      const status = result.status || {};
+      const loadedModels = (status.models_loaded || []).map(modelName => ({
+        id: modelName,
+        name: modelName,
+        category: modelName,
+        status: 'active',
+        accuracy: status.metrics?.model_accuracy?.[modelName] ?? null,
+        last_updated: status.timestamp
+      }));
 
       res.json({
         success: true,
-        data: mockLoadedModels,
+        data: loadedModels,
         timestamp: new Date().toISOString()
       });
 
@@ -1340,15 +1142,17 @@ class AIModelController {
       const { model_id, status } = req.body;
       logger.info(`🔄 切换模型状态: ${model_id} -> ${status}`);
       
-      // 这里应该实现实际的模型状态切换逻辑
-      // 目前返回成功响应
-      res.json({
-        success: true,
-        message: `模型${status === 'active' ? '激活' : '停用'}成功`,
-        model_id: model_id,
-        status: status,
-        timestamp: new Date().toISOString()
+      if (!model_id || !['active', 'inactive'].includes(status)) {
+        return res.status(400).json({ success: false, message: '模型ID或目标状态无效' });
+      }
+      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
+      const response = await fetch(`${aiEngineUrl}/api/models/${encodeURIComponent(model_id)}/toggle`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: status === 'active' })
       });
+      const result = await response.json();
+      res.status(response.status).json(response.ok
+        ? { success: true, model_id, status: result.model.status, timestamp: new Date().toISOString() }
+        : { success: false, message: result.detail || '切换模型状态失败' });
 
     } catch (error) {
       logger.error('切换模型状态失败:', error);
@@ -1368,14 +1172,12 @@ class AIModelController {
       const { model_id } = req.params;
       logger.info(`🔄 重新加载模型: ${model_id}`);
       
-      // 这里应该实现实际的模型重新加载逻辑
-      // 目前返回成功响应
-      res.json({
-        success: true,
-        message: '模型重新加载成功',
-        model_id: model_id,
-        timestamp: new Date().toISOString()
-      });
+      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8888';
+      const response = await fetch(`${aiEngineUrl}/api/models/${encodeURIComponent(model_id)}/reload`, { method: 'POST' });
+      const result = await response.json();
+      res.status(response.status).json(response.ok
+        ? { success: true, message: '模型重新加载成功', model_id, timestamp: new Date().toISOString() }
+        : { success: false, message: result.detail || '重新加载模型失败' });
 
     } catch (error) {
       logger.error('重新加载模型失败:', error);
@@ -1395,37 +1197,13 @@ class AIModelController {
       const { model_name, data_type, format = 'json' } = req.query;
       logger.info(`📤 导出训练数据: ${model_name || 'all'}, 类型: ${data_type || 'all'}, 格式: ${format}`);
       
-      // 这里应该从数据库查询训练数据
-      // 目前返回模拟数据
-      const mockData = [
-        {
-          id: 'data_1234567890_abc123',
-          model_name: 'anomaly_detection',
-          data_type: 'anomaly',
-          sample_count: 1000,
-          upload_time: new Date(Date.now() - 86400000).toISOString(),
-          status: 'uploaded',
-          metadata: {
-            format: 'json',
-            version: '1.0.0'
-          }
-        },
-        {
-          id: 'data_1234567891_def456',
-          model_name: 'malware_detection',
-          data_type: 'malware',
-          sample_count: 500,
-          upload_time: new Date(Date.now() - 172800000).toISOString(),
-          status: 'uploaded',
-          metadata: {
-            format: 'json',
-            version: '1.0.0'
-          }
-        }
-      ];
+      if (format !== 'json') {
+        return res.status(400).json({ success: false, message: '当前仅支持 JSON 导出格式' });
+      }
+      const records = await readTrainingRecords();
 
       // 根据条件过滤数据
-      let filteredData = mockData;
+      let filteredData = records;
       if (model_name) {
         filteredData = filteredData.filter(item => item.model_name === model_name);
       }
@@ -1481,7 +1259,7 @@ class AIModelController {
       let aiEngineAvailable = false;
       
       try {
-        const response = await fetch(`${aiEngineUrl}/api/api-status`, {
+        const response = await fetch(`${aiEngineUrl}/api/models/status`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -1496,53 +1274,56 @@ class AIModelController {
           logger.warn(`AI引擎响应错误: ${response.status}`);
         }
       } catch (fetchError) {
-        logger.warn('AI引擎连接失败，使用默认数据:', fetchError.message);
+        logger.warn('AI引擎连接失败:', fetchError.message);
       }
+      if (!aiEngineAvailable) return res.status(503).json({ success: false, message: 'AI引擎不可用' });
+      const engineMetrics = data?.status?.metrics || {};
+      const loadedModels = data?.status?.models_loaded || [];
       
       // 构建性能指标响应
       const performanceMetrics = {
         anomaly_detection: {
           model_name: '异常检测模型',
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.anomaly_detection || 0.92) : 0.92,
-          precision: 0.89,
-          recall: 0.94,
-          f1_score: 0.91,
-          inference_time: 0.05,
-          throughput: 1000, // 每秒处理请求数
-          error_rate: 0.08,
+          accuracy: engineMetrics.model_accuracy?.anomaly_detection ?? null,
+          precision: null,
+          recall: null,
+          f1_score: null,
+          inference_time: null,
+          throughput: null,
+          error_rate: null,
           last_updated: new Date().toISOString()
         },
         malware_detection: {
           model_name: '恶意软件检测模型',
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.malware_detection || 0.88) : 0.88,
-          precision: 0.87,
-          recall: 0.92,
-          f1_score: 0.89,
-          inference_time: 0.08,
-          throughput: 800,
-          error_rate: 0.12,
+          accuracy: engineMetrics.model_accuracy?.malware_detection ?? null,
+          precision: null,
+          recall: null,
+          f1_score: null,
+          inference_time: null,
+          throughput: null,
+          error_rate: null,
           last_updated: new Date().toISOString()
         },
         network_intrusion: {
           model_name: '网络入侵检测模型',
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.network_intrusion || 0.85) : 0.85,
-          precision: 0.85,
-          recall: 0.90,
-          f1_score: 0.87,
-          inference_time: 0.12,
-          throughput: 600,
-          error_rate: 0.15,
+          accuracy: engineMetrics.model_accuracy?.network_intrusion ?? null,
+          precision: null,
+          recall: null,
+          f1_score: null,
+          inference_time: null,
+          throughput: null,
+          error_rate: null,
           last_updated: new Date().toISOString()
         },
         user_behavior: {
           model_name: '用户行为分析模型',
-          accuracy: aiEngineAvailable ? (data?.metrics?.model_accuracy?.user_behavior || 0.83) : 0.83,
-          precision: 0.83,
-          recall: 0.88,
-          f1_score: 0.85,
-          inference_time: 0.06,
-          throughput: 1200,
-          error_rate: 0.17,
+          accuracy: engineMetrics.model_accuracy?.user_behavior ?? null,
+          precision: null,
+          recall: null,
+          f1_score: null,
+          inference_time: null,
+          throughput: null,
+          error_rate: null,
           last_updated: new Date().toISOString()
         }
       };
@@ -1554,10 +1335,10 @@ class AIModelController {
         success: true,
         performance_metrics: result,
         system_overview: {
-          total_models: Object.keys(performanceMetrics).length,
-          avg_accuracy: Object.values(performanceMetrics).reduce((sum, model) => sum + model.accuracy, 0) / Object.keys(performanceMetrics).length,
-          avg_inference_time: Object.values(performanceMetrics).reduce((sum, model) => sum + model.inference_time, 0) / Object.keys(performanceMetrics).length,
-          total_throughput: Object.values(performanceMetrics).reduce((sum, model) => sum + model.throughput, 0)
+          total_models: loadedModels.length,
+          predictions: engineMetrics.predictions_count || 0,
+          anomalies: engineMetrics.anomalies_detected || 0,
+          threats: engineMetrics.threats_identified || 0
         },
         timestamp: new Date().toISOString()
       });
@@ -1589,55 +1370,20 @@ class AIModelController {
       const { model_name, days = 7 } = req.query;
       logger.info(`📈 获取性能历史记录: ${model_name || 'all'}, 天数: ${days}`);
       
-      // 生成模拟的历史数据
-      const generateHistoryData = (modelName, days) => {
-        const history = [];
-        const now = new Date();
-        
-        for (let i = days - 1; i >= 0; i--) {
-          const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-          const baseAccuracy = {
-            'anomaly_detection': 0.92,
-            'malware_detection': 0.88,
-            'network_intrusion': 0.85,
-            'user_behavior': 0.83
-          }[modelName] || 0.85;
-          
-          // 添加一些随机波动
-          const randomVariation = (Math.random() - 0.5) * 0.1;
-          const accuracy = Math.max(0.5, Math.min(1.0, baseAccuracy + randomVariation));
-          
-          history.push({
-            date: date.toISOString().split('T')[0],
-            accuracy: parseFloat(accuracy.toFixed(3)),
-            precision: parseFloat((accuracy - 0.03 + (Math.random() - 0.5) * 0.06).toFixed(3)),
-            recall: parseFloat((accuracy + 0.02 + (Math.random() - 0.5) * 0.06).toFixed(3)),
-            f1_score: parseFloat((accuracy - 0.01 + (Math.random() - 0.5) * 0.04).toFixed(3)),
-            inference_time: parseFloat((0.05 + (Math.random() - 0.5) * 0.02).toFixed(3)),
-            throughput: Math.floor(800 + Math.random() * 400),
-            error_rate: parseFloat((0.1 + (Math.random() - 0.5) * 0.1).toFixed(3))
-          });
-        }
-        
-        return history;
-      };
-
-      const historyData = model_name 
-        ? { [model_name]: generateHistoryData(model_name, parseInt(days)) }
-        : {
-          anomaly_detection: generateHistoryData('anomaly_detection', parseInt(days)),
-          malware_detection: generateHistoryData('malware_detection', parseInt(days)),
-          network_intrusion: generateHistoryData('network_intrusion', parseInt(days)),
-          user_behavior: generateHistoryData('user_behavior', parseInt(days))
-        };
+      const requestedDays = Math.min(90, Math.max(1, Number.parseInt(days, 10) || 7));
+      const modelNames = model_name
+        ? [model_name]
+        : ['anomaly_detection', 'malware_detection', 'network_intrusion', 'user_behavior'];
+      const historyData = Object.fromEntries(modelNames.map(name => [name, []]));
 
       res.json({
         success: true,
         history_data: historyData,
         query_params: {
           model_name: model_name || 'all',
-          days: parseInt(days)
+          days: requestedDays
         },
+        availability: '历史指标尚未持久化，未返回推测数据',
         timestamp: new Date().toISOString()
       });
 
@@ -1664,7 +1410,7 @@ class AIModelController {
       let aiEngineAvailable = false;
       
       try {
-        const response = await fetch(`${aiEngineUrl}/api/api-status`, {
+        const response = await fetch(`${aiEngineUrl}/api/models/status`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -1679,33 +1425,21 @@ class AIModelController {
           logger.warn(`AI引擎响应错误: ${response.status}`);
         }
       } catch (fetchError) {
-        logger.warn('AI引擎连接失败，使用默认数据:', fetchError.message);
+        logger.warn('AI引擎连接失败:', fetchError.message);
       }
+      if (!aiEngineAvailable) return res.status(503).json({ success: false, message: 'AI引擎不可用' });
+      const engineStatus = data?.status || {};
+      const metrics = engineStatus.metrics || {};
       
       const overview = {
-        system_status: aiEngineAvailable ? (data?.status?.ai_service ? 'running' : 'stopped') : 'unavailable',
-        total_models: aiEngineAvailable ? (data?.status?.ai_service ? 4 : 0) : 4,
-        total_predictions: aiEngineAvailable ? (data?.metrics?.predictions_count || 0) : 1250,
-        total_anomalies: aiEngineAvailable ? (data?.metrics?.anomalies_detected || 0) : 89,
-        total_threats: aiEngineAvailable ? (data?.metrics?.threats_identified || 0) : 23,
-        last_prediction_time: aiEngineAvailable ? (data?.metrics?.last_prediction_time || null) : new Date().toISOString(),
-        uptime: {
-          start_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          current_time: new Date().toISOString(),
-          duration_hours: 24
-        },
-        performance_summary: {
-          avg_accuracy: 0.87,
-          avg_inference_time: 0.08,
-          total_throughput: 3600,
-          error_rate: 0.13
-        },
-        recent_activity: {
-          predictions_last_hour: 150,
-          anomalies_last_hour: 12,
-          threats_last_hour: 3,
-          training_sessions_today: 2
-        }
+        system_status: engineStatus.service_status === 'healthy' ? 'running' : 'stopped',
+        total_models: engineStatus.models_loaded?.length || 0,
+        loaded_models: engineStatus.models_loaded || [],
+        total_predictions: metrics.predictions_count || 0,
+        total_anomalies: metrics.anomalies_detected || 0,
+        total_threats: metrics.threats_identified || 0,
+        last_prediction_time: metrics.last_prediction_time || null,
+        model_accuracy: metrics.model_accuracy || {}
       };
 
       res.json({

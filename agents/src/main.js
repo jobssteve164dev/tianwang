@@ -645,6 +645,17 @@ ipcMain.handle('get-monitoring-status', async () => {
     }
 });
 
+ipcMain.handle('run-network-diagnostics', async () => {
+    try {
+        if (!networkMonitor) return { success: false, error: '网络监控服务未初始化' };
+        const data = await networkMonitor.runNetworkDiagnostics();
+        return { success: true, data };
+    } catch (error) {
+        logger.error('运行网络诊断失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // 防火墙相关IPC处理
 ipcMain.handle('firewall-block-ip', async (event, ip, reason) => {
     try {
@@ -785,8 +796,8 @@ ipcMain.handle('get-server-config', async () => {
             return agentService.getServerConfig();
         }
         return {
-            serverUrl: store.get('serverUrl', 'ws://localhost:5555'),
-            apiUrl: store.get('apiUrl', 'http://localhost:5555/api'),
+            serverUrl: store.get('serverUrl', 'ws://localhost:8000'),
+            apiUrl: store.get('apiUrl', 'http://localhost:8000/api'),
             reconnectInterval: store.get('reconnectInterval', 5000),
             maxReconnectAttempts: store.get('maxReconnectAttempts', 10),
             heartbeatInterval: store.get('heartbeatInterval', 30000)
@@ -901,6 +912,18 @@ ipcMain.handle('get-events', async (event, filters = {}) => {
         return { success: false, error: '事件服务未初始化' };
     } catch (error) {
         logger.error('获取事件列表失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('get-event', async (event, eventId) => {
+    try {
+        if (!eventService) return { success: false, error: '事件服务未初始化' };
+        const record = eventService.getEvent(eventId);
+        if (!record) return { success: false, error: '事件不存在或已被清理' };
+        return { success: true, data: record };
+    } catch (error) {
+        logger.error('获取事件详情失败:', error);
         return { success: false, error: error.message };
     }
 });

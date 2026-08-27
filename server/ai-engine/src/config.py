@@ -3,29 +3,37 @@ AI引擎配置文件
 """
 import os
 from typing import Dict, Any
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AIEngineConfig(BaseSettings):
     """AI引擎配置类"""
-    
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="AI_",
+        protected_namespaces=(),
+        validate_assignment=True,
+    )
+
     # 应用基础配置
     app_name: str = "tianwang-ai-engine"
     app_version: str = "1.0.0-alpha.1"
     host: str = "0.0.0.0"
     port: int = 8888
     debug: bool = True
-    
+    internal_token: str = "tianwang-local-ai-internal"
+
     # 数据库配置
     influxdb_url: str = "http://localhost:8086"
     influxdb_token: str = "tianwang-super-secret-auth-token"
     influxdb_org: str = "tianwang"
     influxdb_bucket: str = "security_logs"
-    
+
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""  # 开发环境不使用密码
     redis_db: int = 0
-    
+
     # Kafka配置
     kafka_brokers: str = "localhost:9092"
     kafka_group_id: str = "ai-engine-consumer"
@@ -34,13 +42,13 @@ class AIEngineConfig(BaseSettings):
         "alerts": "security-alerts-dev",
         "actions": "protection-actions-dev"
     }
-    
+
     # AI模型配置 - 重命名以避免与Pydantic受保护命名空间冲突
     ai_model_path: str = "./models"  # 原 model_path
     confidence_threshold: float = 0.8
     batch_size: int = 32
     max_sequence_length: int = 512
-    
+
     # 本地AI模型配置
     models: Dict[str, Dict[str, Any]] = {
         "anomaly_detection": {
@@ -68,7 +76,7 @@ class AIEngineConfig(BaseSettings):
             "random_state": 42
         }
     }
-    
+
     # 外部API配置
     openai_api_key: str = ""
     claude_api_key: str = ""
@@ -169,18 +177,18 @@ class AIEngineConfig(BaseSettings):
             "behavior_analysis": 3600  # 行为分析缓存1小时
         }
     }
-    
+
     # 威胁情报配置
-    misp_url: str = "https://misp.example.com"  # 替换为真实的MISP服务器URL
-    misp_api_key: str = "your-misp-api-key-here"  # 替换为真实的MISP API密钥
-    otx_api_key: str = "your-otx-api-key-here"  # 替换为真实的OTX API密钥
-    
+    misp_url: str = ""
+    misp_api_key: str = ""
+    otx_api_key: str = ""
+
     # MISP配置验证
     @property
     def misp_configured(self) -> bool:
         """检查MISP是否已正确配置"""
         return bool(self.misp_url and self.misp_api_key)
-    
+
     @property
     def misp_config(self) -> Dict[str, str]:
         """获取MISP配置字典"""
@@ -188,7 +196,7 @@ class AIEngineConfig(BaseSettings):
             "misp_url": self.misp_url,
             "misp_api_key": self.misp_api_key
         }
-    
+
     # 开源规则库配置
     rules_config: Dict[str, Dict[str, Any]] = {
         "suricata": {
@@ -212,26 +220,18 @@ class AIEngineConfig(BaseSettings):
             "update_interval": 3600
         }
     }
-    
+
     # 日志配置
     log_level: str = "DEBUG"
     log_format: str = "{time} | {level} | {name} | {message}"
     log_file: str = "./logs/ai-engine.log"
     log_rotation: str = "1 day"
     log_retention: str = "30 days"
-    
+
     # 性能配置
     max_workers: int = 4
     queue_size: int = 1000
     processing_timeout: int = 300  # 5分钟
-    
-    class Config:
-        env_file = ".env"
-        env_prefix = "AI_"
-        # 设置受保护的命名空间，避免与我们的字段冲突
-        protected_namespaces = ()
-        # 禁用受保护命名空间检查，避免与我们的字段冲突
-        validate_assignment = True
 
 # 全局配置实例
 config = AIEngineConfig()
@@ -239,22 +239,26 @@ config = AIEngineConfig()
 # 配置验证
 def validate_config() -> bool:
     """验证配置的有效性"""
+    if not config.debug and config.internal_token == "tianwang-local-ai-internal":
+        print("错误: 非调试环境必须设置 AI_INTERNAL_TOKEN")
+        return False
+
     if not os.path.exists(config.ai_model_path):
         os.makedirs(config.ai_model_path, exist_ok=True)
-    
+
     # 检查必需的API密钥
     api_keys = [
         config.openai_api_key,
         config.claude_api_key,
         config.gemini_api_key
     ]
-    
+
     if not any(api_keys):
         print("警告: 未配置任何外部AI API密钥，将只使用本地模型")
-    
+
     # 检查威胁情报配置
     threat_intel_configured = False
-    
+
     if config.misp_configured:
         print("✅ MISP威胁情报配置完整")
         threat_intel_configured = True
@@ -263,18 +267,18 @@ def validate_config() -> bool:
         print("  请配置以下环境变量:")
         print("    AI_MISP_URL=https://your-misp-instance.com")
         print("    AI_MISP_API_KEY=your-misp-api-key")
-    
+
     if config.otx_api_key:
         print("✅ OTX威胁情报配置完整")
         threat_intel_configured = True
     else:
         print("⚠️  OTX API密钥未配置")
         print("  请配置环境变量: AI_OTX_API_KEY=your-otx-api-key")
-    
+
     if not threat_intel_configured:
         print("⚠️  警告: 未配置任何威胁情报源，威胁情报功能将不可用")
         print("  系统将继续启动，但建议配置至少一个威胁情报源")
-    
+
     # 检查规则目录
     for rule_type, rule_config in config.rules_config.items():
         if rule_config.get("enabled", False):
@@ -283,5 +287,5 @@ def validate_config() -> bool:
                 if not os.path.exists(rule_path):
                     os.makedirs(rule_path, exist_ok=True)
                     print(f"创建规则目录: {rule_path}")
-    
-    return True 
+
+    return True

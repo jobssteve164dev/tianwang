@@ -218,11 +218,12 @@ router.get('/health', authenticate, async (req, res) => {
   try {
     const isInitialized = dataStorageService.isInitialized;
     
-    res.json({
-      success: true,
+    const healthy = isInitialized && !!dataStorageService.queryApi;
+    res.status(healthy ? 200 : 503).json({
+      success: healthy,
       data: {
         service: 'data-storage',
-        status: isInitialized ? 'healthy' : 'unhealthy',
+        status: healthy ? 'healthy' : 'unhealthy',
         initialized: isInitialized,
         timestamp: new Date().toISOString()
       }

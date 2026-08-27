@@ -100,7 +100,7 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       license: 'MIT',
       stars: 1200,
       downloads: 8500,
-      status: 'downloaded'
+      status: 'available'
     },
     {
       id: 'cicids2017-dataset',
@@ -266,37 +266,10 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       if (response.success) {
         setLoadedModels(response.data);
       } else {
-        // 使用模拟数据
-        setLoadedModels([
-          {
-            id: 'anomaly_detection_default',
-            name: '异常检测模型',
-            category: 'anomaly_detection',
-            version: '1.0.0',
-            status: 'active',
-            accuracy: 0.85,
-            last_updated: new Date().toISOString(),
-            file_path: './models/anomaly_detection.joblib',
-            model_type: 'IsolationForest',
-            description: '默认的异常检测模型'
-          },
-          {
-            id: 'malware_detection_default',
-            name: '恶意软件检测模型',
-            category: 'malware_detection',
-            version: '1.0.0',
-            status: 'inactive',
-            accuracy: 0.78,
-            last_updated: new Date(Date.now() - 86400000).toISOString(),
-            file_path: './models/malware_detection.joblib',
-            model_type: 'RandomForest',
-            description: '默认的恶意软件检测模型'
-          }
-        ]);
+        setLoadedModels([]);
       }
     } catch (error) {
       console.error('加载模型列表失败:', error);
-      // 使用模拟数据
       setLoadedModels([]);
     } finally {
       setModelManagementLoading(false);
@@ -327,11 +300,7 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       });
 
       if (response.success) {
-        if (response.message.includes('模拟模式')) {
-          messageApi.success('资源下载已开始（模拟模式），请稍后查看进度');
-        } else {
-          messageApi.success(`资源下载成功！文件大小: ${(response.file_size / 1024 / 1024).toFixed(2)} MB`);
-        }
+        messageApi.success(`资源下载成功！文件大小: ${(response.file_size / 1024 / 1024).toFixed(2)} MB`);
         setDownloadModalVisible(false);
         downloadForm.resetFields();
         setSelectedResource(null);
@@ -355,33 +324,6 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
       messageApi.error('下载失败，请重试');
     } finally {
       setDownloading(false);
-    }
-  };
-
-  // 加载模型
-  const handleLoadModel = async (resource: ResourceItem) => {
-    try {
-      if (!resource.localPath) {
-        messageApi.error('模型路径不存在');
-        return;
-      }
-      
-      const response = await localAIModelApi.loadModel({
-        model_path: resource.localPath,
-        model_name: resource.name.replace(/\s+/g, '_').toLowerCase(),
-        category: resource.category
-      });
-
-      if (response.success) {
-        messageApi.success('模型加载成功');
-        loadResourceList();
-        onResourceChange?.();
-      } else {
-        messageApi.error(`加载失败: ${response.message}`);
-      }
-    } catch (error) {
-      console.error('加载失败:', error);
-      messageApi.error('加载失败，请重试');
     }
   };
 
@@ -545,15 +487,6 @@ const ModelResourceManager: React.FC<ModelResourceManagerProps> = ({ onResourceC
               onClick={() => handleDownloadResource(record)}
             >
               下载
-            </Button>
-          )}
-          {record.status === 'downloaded' && record.type === 'model' && (
-            <Button
-              size="small"
-              icon={<RobotOutlined />}
-              onClick={() => handleLoadModel(record)}
-            >
-              加载
             </Button>
           )}
           {record.status === 'downloaded' && (

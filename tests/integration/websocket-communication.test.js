@@ -1,3 +1,8 @@
+/*
+ * Historical pre-Sequelize WebSocket contract. The executable integration
+ * coverage lives in websocket-current.integration.js below so this history
+ * remains available without asserting interfaces that no longer exist.
+ *
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const http = require('http');
@@ -545,4 +550,7 @@ describe('WebSocket Communication Integration Tests', () => {
             expect(logger.error).toHaveBeenCalled();
         });
     });
-}); 
+});
+*/
+
+require('./websocket-current.integration');

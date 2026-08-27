@@ -6,6 +6,7 @@ const deviceFingerprintService = require('../services/DeviceFingerprintService')
 const registrationCodeService = require('../services/RegistrationCodeService');
 const securityEventService = require('../services/SecurityEventService');
 const config = require('../config');
+const fetch = require('node-fetch');
 
 class AgentController {
   // 注册代理
@@ -645,12 +646,44 @@ class AgentController {
   // 威胁检测
   async detectThreats(data) {
     try {
-      // TODO: 实现AI威胁检测逻辑
-      // 这里可以集成机器学习模型或规则引擎
-            
-      logger.debug('威胁检测完成:', { agent_id: data.agent_id });
+      const analysisTypes = data.type === 'network'
+        ? ['anomaly', 'network']
+        : data.type === 'system'
+          ? ['anomaly']
+          : ['anomaly', 'malware', 'network', 'behavior'];
+      const response = await fetch(`${config.ai.engineUrl}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: data.data, analysis_types: analysisTypes }),
+        timeout: config.ai.timeout
+      });
+      if (!response.ok) {
+        logger.warn('AI威胁检测未完成', { agent_id: data.agent_id, status: response.status });
+        return;
+      }
+      const analysis = await response.json();
+      const results = analysis.results || {};
+      const detections = [
+        ['anomaly_detection', 'is_anomaly', 'ai_anomaly'],
+        ['malware_detection', 'is_malware', 'ai_malware'],
+        ['network_intrusion', 'is_intrusion', 'ai_network_intrusion']
+      ];
+      for (const [resultKey, flag, eventType] of detections) {
+        const detection = results[resultKey];
+        if (detection?.[flag]) {
+          await this.createSecurityEvent({
+            agent_id: data.agent_id,
+            type: eventType,
+            severity: detection.confidence >= 0.9 ? 'critical' : detection.confidence >= 0.7 ? 'high' : 'medium',
+            title: `AI检测到${eventType.replace('ai_', '')}`,
+            description: `AI模型检测到异常，置信度 ${Math.round((detection.confidence || 0) * 100)}%`,
+            metadata: { source_type: data.type, analysis: detection }
+          });
+        }
+      }
+      logger.debug('AI威胁检测完成', { agent_id: data.agent_id, analysisTypes });
     } catch (error) {
-      logger.error('威胁检测失败:', error);
+      logger.warn('AI威胁检测不可用', { agent_id: data.agent_id, error: error.message });
     }
   }
 
@@ -859,7 +892,7 @@ class AgentController {
     try {
       const { code } = req.params;
 
-      const result = registrationCodeService.disableRegistrationCode(code);
+      const result = await registrationCodeService.disableRegistrationCode(code);
 
       if (result.success) {
         res.json({
@@ -897,7 +930,7 @@ class AgentController {
         });
       }
 
-      const result = registrationCodeService.extendRegistrationCode(code, additionalExpiry);
+      const result = await registrationCodeService.extendRegistrationCode(code, additionalExpiry);
 
       if (result.success) {
         res.json({
@@ -982,7 +1015,7 @@ class AgentController {
       const { agent_id } = req.params;
       const { status } = req.body;
 
-      if (!['online', 'offline', 'maintenance'].includes(status)) {
+      if (!['online', 'offline', 'maintenance', 'error'].includes(status)) {
         return res.status(400).json({
           success: false,
           message: '无效的状态值'

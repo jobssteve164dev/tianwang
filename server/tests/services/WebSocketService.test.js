@@ -1,478 +1,154 @@
-const WebSocketService = require('../../src/services/WebSocketService');
-const jwt = require('jsonwebtoken');
+const EventEmitter = require('events');
 const WebSocket = require('ws');
-const http = require('http');
+const jwt = require('jsonwebtoken');
 
-// Mock dependencies
-jest.mock('../../src/models/Agent');
-jest.mock('../../src/utils/logger');
+const mockAgentModel = { findOne: jest.fn() };
+jest.mock('../../src/models', () => ({ Agent: mockAgentModel }));
+jest.mock('../../src/services/KeyManagementService', () => ({
+  verifyConnectionKeyMatch: jest.fn((provided, expected) => ({
+    isValid: provided === expected,
+    error: provided === expected ? null : '连接密钥不匹配'
+  }))
+}));
+jest.mock('../../src/utils/logger', () => ({
+  info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn()
+}));
 
-const Agent = require('../../src/models/Agent');
+const service = require('../../src/services/WebSocketService');
 const logger = require('../../src/utils/logger');
-
-describe('WebSocketService', () => {
-    let server;
-    let wsServer;
-    
-    beforeEach(() => {
-        // Create HTTP server for testing
-        server = http.createServer();
-        
-        // Mock logger methods
-        logger.info = jest.fn();
-        logger.error = jest.fn();
-        logger.warn = jest.fn();
-        logger.debug = jest.fn();
-        
-        // Clear all mocks
-        jest.clearAllMocks();
-    });
-    
-    afterEach(async () => {
-        // Close WebSocket service
-        if (wsServer) {
-            WebSocketService.close();
-            wsServer = null;
-        }
-        
-        // Close HTTP server
-        if (server) {
-            await new Promise(resolve => server.close(resolve));
-            server = null;
-        }
-    });
-
-    describe('initialize', () => {
-        it('should initialize WebSocket server successfully', () => {
-            const result = WebSocketService.initialize(server);
-            
-            expect(result).toBeDefined();
-            expect(logger.info).toHaveBeenCalledWith('WebSocket服务器已启动');
-        });
-
-        it('should handle initialization errors', () => {
-            expect(() => {
-                WebSocketService.initialize(null);
-            }).toThrow();
-        });
-    });
-
-    describe('authentication', () => {
-        beforeEach(() => {
-            WebSocketService.initialize(server);
-            server.listen(0); // Use random port
-        });
-
-        it('should authenticate valid JWT token', async () => {
-            const mockAgent = {
-                _id: 'agent123',
-                hostname: 'test-host',
-                isActive: true
-            };
-
-            Agent.findOne = jest.fn().mockResolvedValue(mockAgent);
-            
-            const token = jwt.sign(
-                { agentId: 'agent123', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=${token}`);
-            
-            return new Promise((resolve, reject) => {
-                ws.on('open', () => {
-                    expect(Agent.findOne).toHaveBeenCalledWith({ _id: 'agent123' });
-                    ws.close();
-                    resolve();
-                });
-                
-                ws.on('error', reject);
-                
-                setTimeout(() => reject(new Error('Connection timeout')), 5000);
-            });
-        });
-
-        it('should reject invalid JWT token', async () => {
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=invalid-token`);
-            
-            return new Promise((resolve, reject) => {
-                ws.on('close', (code) => {
-                    expect(code).toBe(1008); // Policy violation
-                    resolve();
-                });
-                
-                ws.on('open', () => {
-                    reject(new Error('Connection should not open with invalid token'));
-                });
-                
-                setTimeout(() => reject(new Error('Test timeout')), 5000);
-            });
-        });
-
-        it('should reject connection for non-existent agent', async () => {
-            Agent.findOne = jest.fn().mockResolvedValue(null);
-            
-            const token = jwt.sign(
-                { agentId: 'nonexistent', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/nonexistent?token=${token}`);
-            
-            return new Promise((resolve, reject) => {
-                ws.on('close', (code) => {
-                    expect(code).toBe(1008); // Policy violation
-                    expect(Agent.findOne).toHaveBeenCalled();
-                    resolve();
-                });
-                
-                ws.on('open', () => {
-                    reject(new Error('Connection should not open for non-existent agent'));
-                });
-                
-                setTimeout(() => reject(new Error('Test timeout')), 5000);
-            });
-        });
-    });
-
-    describe('message handling', () => {
-        let ws;
-        let mockAgent;
-
-        beforeEach(async () => {
-            mockAgent = {
-                _id: 'agent123',
-                hostname: 'test-host',
-                isActive: true,
-                save: jest.fn().mockResolvedValue(true)
-            };
-
-            Agent.findOne = jest.fn().mockResolvedValue(mockAgent);
-            Agent.findOneAndUpdate = jest.fn().mockResolvedValue(mockAgent);
-
-            WebSocketService.initialize(server);
-            server.listen(0);
-
-            const token = jwt.sign(
-                { agentId: 'agent123', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=${token}`);
-
-            // Wait for connection to open
-            await new Promise((resolve, reject) => {
-                ws.on('open', resolve);
-                ws.on('error', reject);
-                setTimeout(() => reject(new Error('Connection timeout')), 5000);
-            });
-        });
-
-        afterEach(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.close();
-            }
-        });
-
-        it('should handle heartbeat messages', (done) => {
-            const heartbeatMessage = JSON.stringify({
-                type: 'heartbeat',
-                timestamp: Date.now(),
-                agentId: 'agent123'
-            });
-
-            ws.send(heartbeatMessage);
-
-            // Wait a bit for message processing
-            setTimeout(() => {
-                expect(Agent.findOneAndUpdate).toHaveBeenCalledWith(
-                    { _id: 'agent123' },
-                    { lastSeen: expect.any(Date) },
-                    { new: true }
-                );
-                done();
-            }, 100);
-        });
-
-        it('should handle data messages', (done) => {
-            const dataMessage = JSON.stringify({
-                type: 'data',
-                dataType: 'system',
-                data: {
-                    cpu: 50,
-                    memory: 80,
-                    timestamp: Date.now()
-                },
-                agentId: 'agent123'
-            });
-
-            ws.send(dataMessage);
-
-            // Wait a bit for message processing
-            setTimeout(() => {
-                expect(logger.debug).toHaveBeenCalledWith(
-                    '收到代理数据:',
-                    expect.objectContaining({
-                        agentId: 'agent123',
-                        dataType: 'system'
-                    })
-                );
-                done();
-            }, 100);
-        });
-
-        it('should handle status update messages', (done) => {
-            const statusMessage = JSON.stringify({
-                type: 'status',
-                status: 'active',
-                agentId: 'agent123'
-            });
-
-            ws.send(statusMessage);
-
-            // Wait a bit for message processing
-            setTimeout(() => {
-                expect(Agent.findOneAndUpdate).toHaveBeenCalledWith(
-                    { _id: 'agent123' },
-                    { status: 'active', lastSeen: expect.any(Date) },
-                    { new: true }
-                );
-                done();
-            }, 100);
-        });
-
-        it('should handle invalid JSON messages gracefully', (done) => {
-            ws.send('invalid json message');
-
-            // Wait a bit for message processing
-            setTimeout(() => {
-                expect(logger.error).toHaveBeenCalledWith(
-                    '处理WebSocket消息失败:',
-                    expect.objectContaining({
-                        agentId: 'agent123'
-                    })
-                );
-                done();
-            }, 100);
-        });
-
-        it('should handle unknown message types', (done) => {
-            const unknownMessage = JSON.stringify({
-                type: 'unknown',
-                data: 'test'
-            });
-
-            ws.send(unknownMessage);
-
-            // Wait a bit for message processing
-            setTimeout(() => {
-                expect(logger.warn).toHaveBeenCalledWith(
-                    '未知消息类型:',
-                    expect.objectContaining({
-                        agentId: 'agent123',
-                        type: 'unknown'
-                    })
-                );
-                done();
-            }, 100);
-        });
-    });
-
-    describe('client management', () => {
-        it('should track connected clients', async () => {
-            const mockAgent = {
-                _id: 'agent123',
-                hostname: 'test-host',
-                isActive: true
-            };
-
-            Agent.findOne = jest.fn().mockResolvedValue(mockAgent);
-
-            WebSocketService.initialize(server);
-            server.listen(0);
-
-            const token = jwt.sign(
-                { agentId: 'agent123', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=${token}`);
-
-            await new Promise((resolve, reject) => {
-                ws.on('open', () => {
-                    // Check if client is tracked
-                    const clients = WebSocketService.getConnectedClients();
-                    expect(clients).toContain('agent123');
-                    ws.close();
-                    resolve();
-                });
-                
-                ws.on('error', reject);
-                setTimeout(() => reject(new Error('Connection timeout')), 5000);
-            });
-        });
-
-        it('should remove clients on disconnect', async () => {
-            const mockAgent = {
-                _id: 'agent123',
-                hostname: 'test-host',
-                isActive: true
-            };
-
-            Agent.findOne = jest.fn().mockResolvedValue(mockAgent);
-
-            WebSocketService.initialize(server);
-            server.listen(0);
-
-            const token = jwt.sign(
-                { agentId: 'agent123', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=${token}`);
-
-            await new Promise((resolve, reject) => {
-                ws.on('open', () => {
-                    ws.close();
-                });
-                
-                ws.on('close', () => {
-                    // Wait a bit for cleanup
-                    setTimeout(() => {
-                        const clients = WebSocketService.getConnectedClients();
-                        expect(clients).not.toContain('agent123');
-                        resolve();
-                    }, 100);
-                });
-                
-                ws.on('error', reject);
-                setTimeout(() => reject(new Error('Connection timeout')), 5000);
-            });
-        });
-    });
-
-    describe('broadcast functionality', () => {
-        let ws1, ws2;
-
-        beforeEach(async () => {
-            const mockAgent1 = { _id: 'agent1', hostname: 'host1', isActive: true };
-            const mockAgent2 = { _id: 'agent2', hostname: 'host2', isActive: true };
-
-            Agent.findOne = jest.fn()
-                .mockResolvedValueOnce(mockAgent1)
-                .mockResolvedValueOnce(mockAgent2);
-
-            WebSocketService.initialize(server);
-            server.listen(0);
-
-            const token1 = jwt.sign(
-                { agentId: 'agent1', hostname: 'host1' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const token2 = jwt.sign(
-                { agentId: 'agent2', hostname: 'host2' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            
-            ws1 = new WebSocket(`ws://localhost:${port}/agents/agent1?token=${token1}`);
-            ws2 = new WebSocket(`ws://localhost:${port}/agents/agent2?token=${token2}`);
-
-            // Wait for both connections to open
-            await Promise.all([
-                new Promise(resolve => ws1.on('open', resolve)),
-                new Promise(resolve => ws2.on('open', resolve))
-            ]);
-        });
-
-        afterEach(() => {
-            if (ws1 && ws1.readyState === WebSocket.OPEN) ws1.close();
-            if (ws2 && ws2.readyState === WebSocket.OPEN) ws2.close();
-        });
-
-        it('should broadcast messages to all connected clients', (done) => {
-            let receivedCount = 0;
-            const testMessage = { type: 'broadcast', data: 'test broadcast' };
-
-            const messageHandler = (data) => {
-                const message = JSON.parse(data);
-                expect(message).toEqual(testMessage);
-                receivedCount++;
-                
-                if (receivedCount === 2) {
-                    done();
-                }
-            };
-
-            ws1.on('message', messageHandler);
-            ws2.on('message', messageHandler);
-
-            // Broadcast message
-            WebSocketService.broadcast(testMessage);
-        });
-
-        it('should send message to specific client', (done) => {
-            const testMessage = { type: 'direct', data: 'test direct message' };
-
-            ws1.on('message', (data) => {
-                const message = JSON.parse(data);
-                expect(message).toEqual(testMessage);
-                done();
-            });
-
-            ws2.on('message', () => {
-                done(new Error('Message should not be received by agent2'));
-            });
-
-            // Send message to specific client
-            WebSocketService.sendToClient('agent1', testMessage);
-        });
-    });
-
-    describe('error handling', () => {
-        it('should handle database errors gracefully', async () => {
-            Agent.findOne = jest.fn().mockRejectedValue(new Error('Database error'));
-
-            WebSocketService.initialize(server);
-            server.listen(0);
-
-            const token = jwt.sign(
-                { agentId: 'agent123', hostname: 'test-host' },
-                process.env.JWT_SECRET || 'test-secret',
-                { expiresIn: '24h' }
-            );
-
-            const port = server.address().port;
-            const ws = new WebSocket(`ws://localhost:${port}/agents/agent123?token=${token}`);
-
-            return new Promise((resolve, reject) => {
-                ws.on('close', (code) => {
-                    expect(code).toBe(1011); // Internal error
-                    expect(logger.error).toHaveBeenCalled();
-                    resolve();
-                });
-                
-                ws.on('open', () => {
-                    reject(new Error('Connection should not open with database error'));
-                });
-                
-                setTimeout(() => reject(new Error('Test timeout')), 5000);
-            });
-        });
-    });
-}); 
+const config = require('../../src/config');
+
+function agent(overrides = {}) {
+  return {
+    agent_id: 'node-1', hostname: 'node', platform: 'linux', status: 'offline',
+    save: jest.fn().mockResolvedValue(undefined), ...overrides
+  };
+}
+
+function socket() {
+  const ws = new EventEmitter();
+  ws.readyState = WebSocket.OPEN;
+  ws.send = jest.fn();
+  ws.close = jest.fn();
+  return ws;
+}
+
+function credentials(overrides = {}) {
+  const connectionKey = 'key:1700000000000:signature';
+  const token = jwt.sign({
+    agent_id: 'node-1', hostname: 'node', type: 'agent', connectionKey, ...overrides
+  }, config.jwt.secret, { expiresIn: 60 });
+  return { token, connectionKey };
+}
+
+describe('WebSocketService current node contract', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service.clients.clear();
+    service.pendingTasks.clear();
+    for (const timer of service.heartbeatTimers.values()) clearInterval(timer);
+    service.heartbeatTimers.clear();
+    service.heartbeatInterval = 30000;
+  });
+
+  afterEach(() => {
+    for (const timer of service.heartbeatTimers.values()) clearInterval(timer);
+    service.heartbeatTimers.clear();
+  });
+
+  test('accepts only an agent token with the exact connection key', async () => {
+    const stored = agent();
+    mockAgentModel.findOne.mockResolvedValue(stored);
+    const { token, connectionKey } = credentials();
+    const req = { url: `/ws?token=${encodeURIComponent(token)}&connectionKey=${encodeURIComponent(connectionKey)}` };
+
+    await expect(service.verifyClient({ req })).resolves.toBe(true);
+    expect(req.agent_id).toBe('node-1');
+    expect(req.agent).toBe(stored);
+  });
+
+  test.each([
+    ['missing key', credentials().token, null],
+    ['mismatched key', credentials().token, 'wrong'],
+    ['invalid token', 'invalid-token', 'key']
+  ])('rejects %s', async (_name, token, connectionKey) => {
+    mockAgentModel.findOne.mockResolvedValue(agent());
+    const suffix = connectionKey ? `&connectionKey=${encodeURIComponent(connectionKey)}` : '';
+    await expect(service.verifyClient({ req: { url: `/ws?token=${encodeURIComponent(token)}${suffix}` } })).resolves.toBe(false);
+  });
+
+  test('rejects a valid credential for a node that no longer exists', async () => {
+    mockAgentModel.findOne.mockResolvedValue(null);
+    const { token, connectionKey } = credentials();
+    await expect(service.verifyClient({
+      req: { url: `/ws?token=${encodeURIComponent(token)}&connectionKey=${encodeURIComponent(connectionKey)}` }
+    })).resolves.toBe(false);
+  });
+
+  test('tracks a connected node, marks it online and sends a welcome message', async () => {
+    const stored = agent();
+    const ws = socket();
+    await service.handleConnection(ws, { agent_id: 'node-1', agent: stored });
+
+    expect(service.getConnectedClients()).toEqual(['node-1']);
+    expect(stored.status).toBe('online');
+    expect(stored.save).toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls[0][0])).toMatchObject({ type: 'welcome', agent_id: 'node-1' });
+  });
+
+  test('handles heartbeat and acknowledges the same node', async () => {
+    const stored = agent();
+    const ws = socket();
+    service.clients.set('node-1', ws);
+    mockAgentModel.findOne.mockResolvedValue(stored);
+
+    await service.handleMessage('node-1', Buffer.from(JSON.stringify({ type: 'heartbeat', status: 'online' })));
+    expect(stored.status).toBe('online');
+    expect(stored.save).toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls[0][0]).type).toBe('heartbeat_ack');
+  });
+
+  test('logs malformed and unknown messages without tearing down the channel', async () => {
+    await service.handleMessage('node-1', Buffer.from('{broken'));
+    await service.handleMessage('node-1', Buffer.from(JSON.stringify({ type: 'unknown' })));
+    expect(logger.error).toHaveBeenCalledWith('处理WebSocket消息失败:', expect.objectContaining({ agent_id: 'node-1' }));
+    expect(logger.warn).toHaveBeenCalledWith('未知消息类型:', expect.objectContaining({ agent_id: 'node-1', type: 'unknown' }));
+  });
+
+  test('broadcasts only through online sockets', () => {
+    const open = socket();
+    const closed = socket();
+    closed.readyState = WebSocket.CLOSED;
+    service.clients.set('node-1', open);
+    service.clients.set('node-2', closed);
+    expect(service.broadcast({ type: 'policy-update' })).toBe(1);
+    expect(open.send).toHaveBeenCalled();
+    expect(closed.send).not.toHaveBeenCalled();
+  });
+
+  test('resolves a dispatched task only from the addressed node receipt', async () => {
+    const ws = socket();
+    service.clients.set('node-1', ws);
+    const pending = service.dispatchTask('node-1', { task_id: 'task-1', action: 'snapshot' }, { timeoutMs: 1000 });
+    service.handleTaskResult('node-2', { task_id: 'task-1', status: 'succeeded' });
+    expect(service.pendingTasks.has('task-1')).toBe(true);
+    service.handleTaskResult('node-1', { task_id: 'task-1', status: 'succeeded', result: { ok: true } });
+    await expect(pending).resolves.toMatchObject({ result: { ok: true } });
+  });
+
+  test('fails dispatch immediately when the target node is offline', async () => {
+    await expect(service.dispatchTask('missing', { task_id: 'task-offline' }, { timeoutMs: 1000 }))
+      .rejects.toMatchObject({ code: 'NODE_OFFLINE' });
+    expect(service.pendingTasks.has('task-offline')).toBe(false);
+  });
+
+  test('removes a disconnected node and marks it offline', async () => {
+    const stored = agent({ status: 'online' });
+    service.clients.set('node-1', socket());
+    mockAgentModel.findOne.mockResolvedValue(stored);
+    await service.handleDisconnection('node-1', 1000, Buffer.from('done'));
+    expect(service.clients.has('node-1')).toBe(false);
+    expect(stored.status).toBe('offline');
+    expect(stored.save).toHaveBeenCalled();
+  });
+});

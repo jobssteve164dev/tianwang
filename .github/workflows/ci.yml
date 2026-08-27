@@ -1,0 +1,68 @@
+name: Repository verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: tianwang_test
+          POSTGRES_USER: tianwang
+          POSTGRES_PASSWORD: tianwang_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tianwang -d tianwang_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: tianwang_test
+      DB_USER: tianwang
+      DB_PASSWORD: tianwang_test_password
+      JWT_SECRET: ci-only-jwt-secret
+      REDIS_PASSWORD: ci-only-redis-password
+      ENCRYPTION_KEY: ci-only-encryption-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: server/ai-engine/requirements.txt
+
+      - name: Install Node dependencies
+        run: |
+          npm ci
+          npm --prefix agents ci
+
+      - name: Install AI dependencies
+        run: npm run ai:setup
+
+      - name: Validate deployment configuration
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.build.yml config --quiet
+
+      - name: Apply database schema
+        run: npm run db:migrate
+
+      - name: Verify repository
+        run: npm run verify

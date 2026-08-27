@@ -23,7 +23,7 @@
 
 服务端：
 
-- Node.js 18 或更高版本。
+- Node.js 20 或更高版本。
 - PostgreSQL 可用，并在发布前执行 `npm run db:migrate --workspace server`。
 - `JWT_SECRET` 使用部署环境独有的高强度秘密。
 - `MCP_EVIDENCE_PATH` 指向仅服务端进程可读写的持久化目录。
@@ -49,10 +49,13 @@ Linux 节点：
 | `MCP_MAX_CAPTURE_SECONDS` | `120` | 服务端抓包时长上限 |
 | `MCP_MAX_CAPTURE_BYTES` | `52428800` | 服务端抓包字节上限 |
 | `MCP_TASK_TIMEOUT_MS` | `180000` | 等待节点任务回执的最长时间 |
+| `AI_INTERNAL_TOKEN` | 无生产默认值 | 服务端与 AI 引擎同步提供方配置的内部认证令牌 |
 | `KEY_ROTATION_ENABLED` | `false` | 是否启用服务端 RSA 自动轮换；只有节点公钥协调刷新机制已部署时才可开启 |
 | `KEY_ROTATION_INTERVAL_MS` | `86400000` | 显式启用后的轮换间隔 |
 
 生产环境不会接受开发演示令牌。开发演示令牌只在非生产环境生效，并且是一个精确值，不再接受任意 `demo-token-*`。
+
+`AI_INTERNAL_TOKEN` 不对前端或外部智能体暴露；管理端保存的提供方密钥由服务端加密持久化，并通过该内部通道实时同步到 AI 引擎。
 
 ## 4. 授权入口
 
@@ -160,5 +163,6 @@ tianwang://nodes/{nodeId}/investigations/{investigationId}/artifacts/{artifactId
 - 首版调查工具采用同步 MCP 调用并同时保留 `investigation_id` 查询；尚未接入 MCP Tasks 扩展和运行中取消。
 - 节点会持久化已取得回执的执行对象并在重启后恢复 TTL 与精确回滚；节点断电发生在“系统规则已生效、执行对象尚未写入本地存储”的极短窗口时仍需要后续对账能力。
 - 自动 RSA 密钥轮换默认关闭，避免在线节点仍持有旧公钥时拒绝新的签名任务；启用轮换前必须先部署节点公钥协调刷新机制。
-- 兼容版本依赖修复后，生产依赖审计仍有服务端/前端 5 项高危与 5 项中危、节点端 2 项中危；剩余修复需要 React Router、ECharts、Nodemailer、node-cron/uuid 等大版本迁移，不得使用 `npm audit fix --force` 代替兼容性验证。
-- 本主路径的定向回归已独立建立，但仓库历史全量测试仍包含与当前接口不一致的旧 mock、旧断言和一个重复声明的测试文件；发布判断必须同时看本节定向验收与实机验收，不能宣称全仓测试已全绿。
+- 已完成 React Router、ECharts、Nodemailer、间接 UUID 与路由解析依赖的兼容升级；根工作区和节点端执行 `npm audit --omit=dev` 均为 0 项生产依赖漏洞。运行时基线同步提升为 Node.js 20，并已通过全仓类型检查、测试与生产构建。
+- 仓库历史旧契约已从当前测试发现范围隔离，统一验证覆盖服务端、Web 管理端、节点端、WebSocket 集成与 AI 引擎；发布判断仍必须同时看自动化验收与本节实机验收。
+- `agents/openwrt` 是未完成的早期 C 原型，不属于首版支持矩阵；首版节点执行器以 `agents/src` 为准，不能把 OpenWrt 原型宣称为可发布节点。

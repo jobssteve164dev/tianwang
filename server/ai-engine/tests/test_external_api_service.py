@@ -171,9 +171,32 @@ class TestExternalAPIService:
             request = api_service._build_request("openrouter", "测试提示", "threat_detection")
             
             assert request["model"] == "openai/gpt-4"
-            assert "site_url" in request
-            assert "app_name" in request
-            assert request["site_url"] == "https://tianwang-security.com"
+            assert request["model"] == "openai/gpt-4"
+            assert "site_url" not in request
+
+    def test_build_request_claude_uses_messages_contract(self, api_service):
+        with patch.object(config, 'external_apis', {
+            "claude": {"default_model": "claude-3-haiku", "max_tokens": 1024}
+        }):
+            request = api_service._build_request("claude", "测试提示", "threat_detection")
+            assert request["system"]
+            assert request["messages"] == [{"role": "user", "content": "测试提示"}]
+            assert request["max_tokens"] == 1024
+
+    def test_runtime_provider_configuration_requires_keys_for_enabled_providers(self, api_service):
+        with patch.object(config, 'external_apis', {
+            "openai": {"enabled": False, "default_model": "gpt-3.5-turbo"},
+            "claude": {}, "openrouter": {}, "deepseek": {}
+        }):
+            with patch.object(config, 'openai_api_key', ''):
+                with pytest.raises(ValueError, match="API密钥"):
+                    api_service.configure_providers({"openai": {"enabled": True}})
+
+                statuses = api_service.configure_providers({
+                    "openai": {"enabled": True, "api_key": "test-key", "default_model": "gpt-4"}
+                })
+                assert statuses["openai"] == "healthy"
+                assert config.openai_api_key == "test-key"
     
     @pytest.mark.asyncio
     async def test_analyze_with_llm_success(self, api_service):
@@ -254,4 +277,4 @@ class TestExternalAPIService:
         assert api_service.is_healthy() is True
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"]) 
+    pytest.main([__file__, "-v"])

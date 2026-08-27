@@ -45,30 +45,30 @@ class TestDeployment {
   /**
    * 启动服务
    */
-  startService(name, command, cwd, env = {}) {
+  startService(name, command, args, cwd, env = {}) {
     console.log(`🚀 启动 ${name}...`);
     
-    const process = spawn(command, [], {
+    const child = spawn(command, args, {
       cwd: cwd,
       env: { ...process.env, ...env },
       stdio: 'pipe',
-      shell: true
+      shell: false
     });
 
-    process.stdout.on('data', (data) => {
+    child.stdout.on('data', (data) => {
       console.log(`[${name}] ${data.toString().trim()}`);
     });
 
-    process.stderr.on('data', (data) => {
+    child.stderr.on('data', (data) => {
       console.log(`[${name} ERROR] ${data.toString().trim()}`);
     });
 
-    process.on('close', (code) => {
+    child.on('close', (code) => {
       console.log(`[${name}] 进程退出，代码: ${code}`);
     });
 
-    this.processes.push({ name, process });
-    return process;
+    this.processes.push({ name, process: child });
+    return child;
   }
 
   /**
@@ -110,12 +110,12 @@ class TestDeployment {
     const tests = [
       {
         name: '健康检查',
-        url: 'http://localhost:8000/api/health',
+        url: 'http://localhost:8000/health',
         expectedStatus: 200
       },
       {
         name: 'API文档',
-        url: 'http://localhost:8000/api/docs',
+        url: 'http://localhost:8000/api-docs',
         expectedStatus: 200
       }
     ];
@@ -245,9 +245,10 @@ class TestDeployment {
 
     try {
       // 1. 启动后端服务
-      const backendProcess = this.startService(
+      this.startService(
         'Backend Server',
-        'npm run dev',
+        'npm',
+        ['run', 'dev'],
         path.join(__dirname, '../server'),
         { NODE_ENV: 'test' }
       );
@@ -259,9 +260,10 @@ class TestDeployment {
       }
 
       // 2. 启动前端服务
-      const frontendProcess = this.startService(
+      this.startService(
         'Frontend Client',
-        'npm start',
+        'npm',
+        ['start'],
         path.join(__dirname, '../client')
       );
 
@@ -283,12 +285,8 @@ class TestDeployment {
       console.log('='.repeat(30));
       console.log('前端应用: http://localhost:3000');
       console.log('后端API: http://localhost:8000');
-      console.log('API文档: http://localhost:8000/api/docs');
-      console.log('健康检查: http://localhost:8000/api/health');
-
-      console.log('\n📋 测试账户');
-      console.log('用户名: admin');
-      console.log('密码: 123456');
+      console.log('API文档: http://localhost:8000/api-docs');
+      console.log('健康检查: http://localhost:8000/health');
 
       console.log('\n⏰ 系统将在30秒后自动停止...');
       setTimeout(() => {

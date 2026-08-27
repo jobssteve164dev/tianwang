@@ -1,8 +1,6 @@
 # 优化的Docker Compose构建配置
 # Optimized Docker Compose Build Configuration
 
-version: '3.8'
-
 services:
   # 后端服务构建
   server:
@@ -20,6 +18,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8000
+      DB_PASSWORD: tianwang-build-only
+      REDIS_PASSWORD: tianwang-build-only
+      JWT_SECRET: tianwang-build-jwt-secret
+      ENCRYPTION_KEY: tianwang-build-encryption-key
+      AI_ENGINE_URL: http://ai-engine:8888
+      AI_INTERNAL_TOKEN: tianwang-build-ai-internal
     ports:
       - "8000:8000"
     volumes:
@@ -44,7 +48,7 @@ services:
     image: tianwang-client:latest
     container_name: tianwang-client-build
     ports:
-      - "3000:80"
+      - "3000:8080"
     networks:
       - tianwang-network
     restart: unless-stopped
@@ -64,12 +68,13 @@ services:
     container_name: tianwang-ai-engine-build
     environment:
       PYTHONPATH: /app
-      KAFKA_BROKERS: kafka:9092
-      INFLUXDB_URL: http://influxdb:8086
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      AI_KAFKA_BROKERS: kafka:9092
+      AI_INFLUXDB_URL: http://influxdb:8086
+      AI_REDIS_HOST: redis
+      AI_REDIS_PORT: 6379
+      AI_INTERNAL_TOKEN: tianwang-build-ai-internal
     ports:
-      - "8001:8001"
+      - "8888:8888"
     volumes:
       - ./data/models:/app/models
     networks:

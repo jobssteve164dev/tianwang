@@ -98,6 +98,9 @@ class CacheService {
       logger.debug('🔍 开始连接到Redis...');
       // 连接到Redis
       await this.client.connect();
+      // Redis v4 的 connect() 在 ready 事件监听器调度前即可成功返回。
+      // 业务操作不能依赖事件恰好先触发，否则首次连接后会被误判为不可用。
+      this.isConnected = true;
       logger.debug('🔍 Redis连接完成');
 
     } catch (error) {

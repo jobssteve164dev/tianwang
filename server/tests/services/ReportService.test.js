@@ -1,4 +1,11 @@
+jest.mock('../../src/models', () => ({
+  SecurityEvent: { rawAttributes: { id: {}, event_type: {}, severity: {}, createdAt: {} }, findAll: jest.fn() },
+  AuditLog: { rawAttributes: { id: {}, action: {}, createdAt: {} }, findAll: jest.fn() },
+  Alert: { rawAttributes: { id: {}, type: {}, status: {}, createdAt: {} }, findAll: jest.fn() }
+}));
+
 const ReportService = require('../../src/services/ReportService');
+const models = require('../../src/models');
 const logger = require('../../src/utils/logger');
 const fs = require('fs').promises;
 const path = require('path');
@@ -43,6 +50,9 @@ describe('ReportService', () => {
     jest.doMock('../../src/config', () => mockConfig);
     
     reportService = new ReportService();
+    models.SecurityEvent.findAll.mockResolvedValue([{ id: 1, event_type: 'network', severity: 'high' }]);
+    models.AuditLog.findAll.mockResolvedValue([{ id: 1, action: 'login' }]);
+    models.Alert.findAll.mockResolvedValue([{ id: 1, type: 'network-intrusion', status: 'active' }]);
   });
 
   afterEach(async () => {
@@ -237,7 +247,7 @@ describe('ReportService', () => {
   });
 
   describe('模板渲染', () => {
-    test('应该正确渲染威胁汇总模板', () => {
+    test('应该正确渲染威胁汇总模板', async () => {
       const template = reportService.getThreatSummaryTemplate();
       const data = {
         generatedAt: '2023-01-01',
@@ -247,14 +257,14 @@ describe('ReportService', () => {
         lowThreatCount: 1
       };
 
-      const result = reportService.renderReport(template, data);
+      const result = await reportService.renderReport(template, data);
       
       expect(result).toContain('天网安全威胁汇总报告');
       expect(result).toContain('5');
       expect(result).toContain('2');
     });
 
-    test('应该正确渲染系统健康模板', () => {
+    test('应该正确渲染系统健康模板', async () => {
       const template = reportService.getSystemHealthTemplate();
       const data = {
         generatedAt: '2023-01-01',
@@ -264,7 +274,7 @@ describe('ReportService', () => {
         networkTraffic: 12.5
       };
 
-      const result = reportService.renderReport(template, data);
+      const result = await reportService.renderReport(template, data);
       
       expect(result).toContain('天网系统健康报告');
       expect(result).toContain('45.2');
@@ -282,8 +292,8 @@ describe('ReportService', () => {
       const csv = reportService.convertToCSV(data);
       
       expect(csv).toContain('id,name,value');
-      expect(csv).toContain('1,test1,100');
-      expect(csv).toContain('2,test2,200');
+      expect(csv).toContain('1,"test1",100');
+      expect(csv).toContain('2,"test2",200');
     });
 
     test('应该处理空数组', () => {

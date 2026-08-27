@@ -7,7 +7,7 @@ const http = require('http');
 const https = require('https');
 
 const services = [
-  { name: 'API Server', url: 'http://localhost:8000/api/health' },
+  { name: 'API Server', url: 'http://localhost:8000/health' },
   { name: 'Frontend', url: 'http://localhost:3000' },
   { name: 'AI Engine', url: 'http://localhost:8888/health' }
 ];

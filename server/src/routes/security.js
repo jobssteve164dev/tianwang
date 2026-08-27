@@ -4,6 +4,18 @@ const { protect, authorize } = require('../middleware/auth');
 const yaml = require('js-yaml');
 const fs = require('fs').promises;
 const path = require('path');
+const config = require('../config');
+
+const aiEngineUrl = config.ai.engineUrl.replace(/\/$/, '');
+
+async function fetchAi(pathname, options) {
+  const response = await fetch(`${aiEngineUrl}${pathname}`, options);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || data.message || `AI engine request failed with status ${response.status}`);
+  }
+  return data;
+}
 
 // 基础安全路由
 router.get('/', protect, (req, res) => {
@@ -14,8 +26,7 @@ router.get('/', protect, (req, res) => {
 router.get('/rules/status', protect, async (req, res) => {
   try {
     // 调用AI引擎的规则状态API
-    const response = await fetch('http://localhost:8888/api/rules/status');
-    const data = await response.json();
+    const data = await fetchAi('/api/rules/status');
     res.json(data);
   } catch (error) {
     res.status(500).json({ 
@@ -110,15 +121,13 @@ router.post('/rules/update', protect, async (req, res) => {
     const { source_type, source_name } = req.body;
     
     // 调用AI引擎的规则更新API
-    const response = await fetch('http://localhost:8888/api/rules/update', {
+    const data = await fetchAi('/api/rules/update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ source_type, source_name })
     });
-    
-    const data = await response.json();
     res.json(data);
   } catch (error) {
     res.status(500).json({ 
@@ -132,8 +141,7 @@ router.post('/rules/update', protect, async (req, res) => {
 router.get('/rules/statistics', protect, async (req, res) => {
   try {
     // 获取规则统计信息
-    const response = await fetch('http://localhost:8888/api/rules/status');
-    const data = await response.json();
+    const data = await fetchAi('/api/rules/status');
     
     if (data.success) {
       const status = data.status || {};
@@ -170,7 +178,11 @@ router.get('/rules/statistics', protect, async (req, res) => {
 });
 
 // 自定义规则管理API
-const CUSTOM_RULES_DIR = path.join(__dirname, '../../ai-engine/rules/custom');
+const CUSTOM_RULES_DIR = path.join(__dirname, '../../ai-engine/rules/sigma/custom');
+
+async function activateCustomRules() {
+  await fetchAi('/api/rules/reload', { method: 'POST' });
+}
 
 // 确保自定义规则目录存在
 async function ensureCustomRulesDir() {
@@ -295,6 +307,12 @@ router.post('/rules/custom', protect, async (req, res) => {
     
     // 写入文件
     await fs.writeFile(filePath, yaml.dump(ruleContent), 'utf8');
+    try {
+      await activateCustomRules();
+    } catch (error) {
+      await fs.unlink(filePath);
+      throw error;
+    }
     
     res.json({
       success: true,
@@ -364,6 +382,12 @@ router.put('/rules/custom/:id', protect, async (req, res) => {
     
     // 写入文件
     await fs.writeFile(filePath, yaml.dump(updatedRule), 'utf8');
+    try {
+      await activateCustomRules();
+    } catch (error) {
+      await fs.writeFile(filePath, existingContent, 'utf8');
+      throw error;
+    }
     
     res.json({
       success: true,
@@ -402,7 +426,14 @@ router.delete('/rules/custom/:id', protect, async (req, res) => {
     }
     
     const filePath = path.join(CUSTOM_RULES_DIR, ruleFile);
+    const existingContent = await fs.readFile(filePath, 'utf8');
     await fs.unlink(filePath);
+    try {
+      await activateCustomRules();
+    } catch (error) {
+      await fs.writeFile(filePath, existingContent, 'utf8');
+      throw error;
+    }
     
     res.json({
       success: true,
@@ -481,18 +512,15 @@ router.post('/rules/custom/:id/test', protect, async (req, res) => {
     const rule = yaml.load(content);
     
     // 调用AI引擎进行规则测试
-    const response = await fetch('http://localhost:8888/api/rules/match', {
+    const result = await fetchAi('/api/rules/match', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        rule_content: content,
-        test_data: test_data || {}
+        data: test_data || {}
       })
     });
-    
-    const result = await response.json();
     
     res.json({
       success: true,
@@ -513,4 +541,4 @@ router.post('/rules/custom/:id/test', protect, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

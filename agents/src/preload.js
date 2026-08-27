@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startMonitoring: () => ipcRenderer.invoke('start-monitoring'),
     stopMonitoring: () => ipcRenderer.invoke('stop-monitoring'),
     getMonitoringStatus: () => ipcRenderer.invoke('get-monitoring-status'),
+    runNetworkDiagnostics: () => ipcRenderer.invoke('run-network-diagnostics'),
     
     // 防火墙控制
     firewallBlockIP: (ip, reason) => ipcRenderer.invoke('firewall-block-ip', ip, reason),
@@ -67,6 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // 事件管理
     getEvents: (filters) => ipcRenderer.invoke('get-events', filters),
+    getEvent: (eventId) => ipcRenderer.invoke('get-event', eventId),
     getEventStats: () => ipcRenderer.invoke('get-event-stats'),
     updateEventStatus: (eventId, status, feedback) => ipcRenderer.invoke('update-event-status', eventId, status, feedback),
     markEventFeedback: (eventId, feedback) => ipcRenderer.invoke('mark-event-feedback', eventId, feedback),
@@ -93,4 +95,4 @@ contextBridge.exposeInMainWorld('versions', {
     node: () => process.versions.node,
     chrome: () => process.versions.chrome,
     electron: () => process.versions.electron
-}); 
+});

@@ -14,7 +14,6 @@ import {
   Empty,
 } from 'antd';
 import {
-  LineChartOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -86,6 +85,10 @@ const ModelPerformanceMonitor: React.FC<ModelPerformanceMonitorProps> = ({
     if (accuracy >= 0.7) return { level: '一般', color: '#faad14' };
     return { level: '较差', color: '#f5222d' };
   };
+
+  const hasHistoricalMetrics = historyData && Object.values(historyData).some(
+    series => Array.isArray(series) && series.length > 0
+  );
 
   if (!performanceData) {
     return (
@@ -248,19 +251,16 @@ const ModelPerformanceMonitor: React.FC<ModelPerformanceMonitorProps> = ({
       {/* 性能趋势 */}
       <Card title="性能趋势" size="small">
         <Spin spinning={loading}>
-          {historyData ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <LineChartOutlined style={{ fontSize: '48px', color: '#ccc' }} />
-              <div style={{ marginTop: 8, color: '#999' }}>
-                性能趋势图表开发中
-              </div>
-              <div style={{ fontSize: '12px', color: '#ccc', marginTop: 4 }}>
-                将显示准确率、推理时间等指标的历史变化趋势
-              </div>
-            </div>
+          {hasHistoricalMetrics ? (
+            <Alert
+              type="info"
+              showIcon
+              message="已获取历史性能指标"
+              description="历史指标已按所选模型和时间范围载入。"
+            />
           ) : (
             <Empty
-              description="暂无历史数据"
+              description="尚未积累历史性能指标"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           )}

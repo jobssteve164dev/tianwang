@@ -12,7 +12,7 @@ const logger = require('../utils/logger');
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    
+
     // 检查模型是否可用
     if (!models.User) {
       return res.status(503).json({
@@ -26,14 +26,14 @@ const login = async (req, res) => {
       where: { username },
       include: ['organization']
     });
-    
+
     if (!user) {
       return res.status(401).json({
         error: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS'
       });
     }
-    
+
     // 检查账户状态
     if (user.status !== 'active') {
       return res.status(401).json({
@@ -41,49 +41,49 @@ const login = async (req, res) => {
         code: 'ACCOUNT_INACTIVE'
       });
     }
-    
+
     if (user.isLocked()) {
       return res.status(401).json({
         error: 'Account is locked due to too many failed login attempts',
         code: 'ACCOUNT_LOCKED'
       });
     }
-    
+
     // 验证密码
     const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       await user.incrementFailedLogins();
-      
+
       logger.audit('LOGIN_FAILED', user.id, 'login', {
         reason: 'invalid_password',
         ip: req.ip
       });
-      
+
       return res.status(401).json({
         error: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS'
       });
     }
-    
+
     // 登录成功
     await user.resetFailedLogins();
     user.last_login_ip = req.ip;
     await user.save();
-    
+
     // 生成JWT tokens
     const tokens = generateTokens(user.id);
-    
+
     logger.audit('LOGIN_SUCCESS', user.id, 'login', {
       ip: req.ip,
       user_agent: req.get('User-Agent')
     });
-    
+
     res.json({
       message: 'Login successful',
       user: user.toJSON(),
       ...tokens
     });
-    
+
   } catch (error) {
     logger.error('Login error:', error);
     res.status(500).json({
@@ -99,21 +99,21 @@ const login = async (req, res) => {
 const register = async (req, res) => {
   try {
     const { username, email, password, full_name } = req.body;
-    
+
     // 检查用户是否已存在
     const existingUser = await models.User?.findOne({
       where: {
         $or: [{ username }, { email }]
       }
     });
-    
+
     if (existingUser) {
       return res.status(409).json({
         error: 'Username or email already exists',
         code: 'USER_EXISTS'
       });
     }
-    
+
     // 创建用户
     const user = await models.User?.create({
       username,
@@ -122,18 +122,18 @@ const register = async (req, res) => {
       full_name,
       role: 'viewer' // 默认角色
     });
-    
+
     logger.audit('USER_REGISTERED', user.id, 'register', {
       username,
       email,
       ip: req.ip
     });
-    
+
     res.status(201).json({
       message: 'User registered successfully',
       user: user.toJSON()
     });
-    
+
   } catch (error) {
     logger.error('Registration error:', error);
     res.status(500).json({
@@ -147,14 +147,31 @@ const register = async (req, res) => {
  * 刷新访问令牌
  */
 const refreshToken = async (req, res) => {
-  res.json({ message: 'Refresh token - TODO: Implement' });
+  try {
+    const token = req.body.refreshToken;
+    if (!token) {
+      return res.status(400).json({ error: 'Refresh token is required', code: 'MISSING_REFRESH_TOKEN' });
+    }
+    const decoded = verifyRefreshToken(token);
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid refresh token', code: 'INVALID_REFRESH_TOKEN' });
+    }
+    const user = await models.User?.findByPk(decoded.userId);
+    if (!user || user.status !== 'active' || user.isLocked()) {
+      return res.status(401).json({ error: 'Account cannot refresh tokens', code: 'REFRESH_DENIED' });
+    }
+    return res.json(generateTokens(user.id));
+  } catch (error) {
+    logger.error('Refresh token error:', error);
+    return res.status(500).json({ error: 'Token refresh failed', code: 'REFRESH_ERROR' });
+  }
 };
 
 /**
  * 用户登出
  */
 const logout = async (req, res) => {
-  res.json({ message: 'Logout - TODO: Implement' });
+  res.json({ message: 'Logout successful' });
 };
 
 /**
@@ -165,18 +182,18 @@ const getCurrentUser = async (req, res) => {
     const user = await models.User?.findByPk(req.userId, {
       include: ['organization']
     });
-    
+
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
         code: 'USER_NOT_FOUND'
       });
     }
-    
+
     res.json({
       user: user.toJSON()
     });
-    
+
   } catch (error) {
     logger.error('Get current user error:', error);
     res.status(500).json({
@@ -190,7 +207,23 @@ const getCurrentUser = async (req, res) => {
  * 修改密码
  */
 const changePassword = async (req, res) => {
-  res.json({ message: 'Change password - TODO: Implement' });
+  try {
+    const user = await models.User?.findByPk(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
+    }
+    const valid = await user.validatePassword(req.body.current_password);
+    if (!valid) {
+      return res.status(400).json({ error: 'Current password is incorrect', code: 'INVALID_CURRENT_PASSWORD' });
+    }
+    user.password_hash = req.body.new_password;
+    await user.save();
+    logger.audit('PASSWORD_CHANGED', user.id, 'change-password', { ip: req.ip });
+    return res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    logger.error('Change password error:', error);
+    return res.status(500).json({ error: 'Password change failed', code: 'PASSWORD_CHANGE_ERROR' });
+  }
 };
 
 module.exports = {
@@ -200,4 +233,4 @@ module.exports = {
   logout,
   getCurrentUser,
   changePassword
-}; 
+};

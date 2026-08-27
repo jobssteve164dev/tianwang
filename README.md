@@ -37,7 +37,7 @@
 
 ### 环境要求
 
-- Node.js 18+ 
+- Node.js 20+
 - Python 3.9+
 - Docker & Docker Compose
 - PostgreSQL 14+

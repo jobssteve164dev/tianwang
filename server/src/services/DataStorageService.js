@@ -7,6 +7,23 @@ const { InfluxDB, Point } = require('@influxdata/influxdb-client');
 const config = require('../config/index');
 const logger = require('../utils/logger');
 
+function fluxString(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function fluxTime(value, fallback) {
+  if (!value) return fallback;
+  if (value === 'now()' || /^-\d+[smhdw]$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid time value: ${value}`);
+  return `time(v: "${date.toISOString()}")`;
+}
+
+function safeLimit(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Math.min(10000, Math.max(1, Number.isFinite(parsed) ? parsed : 1000));
+}
+
 class DataStorageService {
   constructor() {
     this.influxDB = null;
@@ -31,11 +48,7 @@ class DataStorageService {
 
       // 检查InfluxDB配置
       if (!config.database.influxdb.url || !config.database.influxdb.token) {
-        logger.warn('⚠️ InfluxDB configuration not found, running in mock mode');
-        this.mockMode = true;
-        this.isInitialized = true;
-        logger.info('✅ DataStorageService initialized in mock mode');
-        return;
+        throw new Error('InfluxDB configuration is incomplete');
       }
 
       try {
@@ -68,10 +81,8 @@ class DataStorageService {
         logger.info('✅ DataStorageService initialized successfully');
 
       } catch (influxError) {
-        logger.warn('⚠️ InfluxDB connection failed, running in mock mode:', influxError.message);
-        this.mockMode = true;
-        this.isInitialized = true;
-        logger.info('✅ DataStorageService initialized in mock mode');
+        this.isInitialized = false;
+        throw influxError;
       }
 
     } catch (error) {
@@ -107,10 +118,10 @@ class DataStorageService {
       return;
     }
 
-    try {
-      const points = [...this.batchBuffer];
-      this.batchBuffer = [];
+    const points = [...this.batchBuffer];
+    this.batchBuffer = [];
 
+    try {
       await this.writeApi.writePoints(points);
       await this.writeApi.flush();
 
@@ -119,7 +130,7 @@ class DataStorageService {
     } catch (error) {
       logger.error('❌ Failed to flush batch to InfluxDB:', error);
       // 将失败的点重新加入缓冲区
-      this.batchBuffer.unshift(...this.batchBuffer);
+      this.batchBuffer.unshift(...points);
     }
   }
 
@@ -129,13 +140,7 @@ class DataStorageService {
   async storeSystemData(agent_id, data) {
     try {
       if (!this.isInitialized) {
-        logger.warn('DataStorageService not initialized, skipping system data storage');
-        return;
-      }
-
-      if (this.mockMode) {
-        logger.debug('📊 Mock mode: System data would be stored for agent:', agent_id);
-        return;
+        throw new Error('DataStorageService not initialized');
       }
 
       const point = new Point('system_metrics')
@@ -186,13 +191,7 @@ class DataStorageService {
   async storeNetworkData(agent_id, data) {
     try {
       if (!this.isInitialized) {
-        logger.warn('DataStorageService not initialized, skipping network data storage');
-        return;
-      }
-
-      if (this.mockMode) {
-        logger.debug('🌐 Mock mode: Network data would be stored for agent:', agent_id);
-        return;
+        throw new Error('DataStorageService not initialized');
       }
 
       // 存储网络接口数据
@@ -318,34 +317,15 @@ class DataStorageService {
         throw new Error('DataStorageService not initialized');
       }
 
-      if (this.mockMode) {
-        logger.debug('📊 Mock mode: Returning mock system data for agent:', agent_id);
-        // 返回模拟数据
-        return [
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'system_metrics',
-            agent_id: agent_id,
-            _field: 'cpu_load',
-            _value: 45.2
-          },
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'system_metrics',
-            agent_id: agent_id,
-            _field: 'memory_usage_percent',
-            _value: 65.8
-          }
-        ];
-      }
-
+      const start = fluxTime(startTime, '-1h');
+      const end = fluxTime(endTime, 'now()');
       const query = `
         from(bucket: "${config.database.influxdb.bucket}")
-          |> range(start: ${startTime}, stop: ${endTime})
+          |> range(start: ${start}, stop: ${end})
           |> filter(fn: (r) => r._measurement == "system_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agent_id}")
+          |> filter(fn: (r) => r.agent_id == "${fluxString(agent_id)}")
           |> sort(columns: ["_time"])
-          |> limit(n: ${limit})
+          |> limit(n: ${safeLimit(limit)})
       `;
 
       const results = [];
@@ -371,36 +351,15 @@ class DataStorageService {
         throw new Error('DataStorageService not initialized');
       }
 
-      if (this.mockMode) {
-        logger.debug('🌐 Mock mode: Returning mock network data for agent:', agent_id);
-        // 返回模拟数据
-        return [
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'network_interface_metrics',
-            agent_id: agent_id,
-            interface: 'eth0',
-            _field: 'rx_bytes',
-            _value: 1024000
-          },
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'network_interface_metrics',
-            agent_id: agent_id,
-            interface: 'eth0',
-            _field: 'tx_bytes',
-            _value: 512000
-          }
-        ];
-      }
-
+      const start = fluxTime(startTime, '-1h');
+      const end = fluxTime(endTime, 'now()');
       const query = `
         from(bucket: "${config.database.influxdb.bucket}")
-          |> range(start: ${startTime}, stop: ${endTime})
+          |> range(start: ${start}, stop: ${end})
           |> filter(fn: (r) => r._measurement == "network_interface_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agent_id}")
+          |> filter(fn: (r) => r.agent_id == "${fluxString(agent_id)}")
           |> sort(columns: ["_time"])
-          |> limit(n: ${limit})
+          |> limit(n: ${safeLimit(limit)})
       `;
 
       const results = [];
@@ -426,29 +385,15 @@ class DataStorageService {
         throw new Error('DataStorageService not initialized');
       }
 
-      if (this.mockMode) {
-        logger.debug('🛡️ Mock mode: Returning mock security events for agent:', agent_id);
-        // 返回模拟数据
-        return [
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'security_events',
-            agent_id: agent_id,
-            event_type: 'suspicious_connection',
-            severity: 'medium',
-            _field: 'title',
-            _value: '可疑网络连接'
-          }
-        ];
-      }
-
+      const start = fluxTime(startTime, '-24h');
+      const end = fluxTime(endTime, 'now()');
       const query = `
         from(bucket: "${config.database.influxdb.bucket}")
-          |> range(start: ${startTime}, stop: ${endTime})
+          |> range(start: ${start}, stop: ${end})
           |> filter(fn: (r) => r._measurement == "security_events")
-          |> filter(fn: (r) => r.agent_id == "${agent_id}")
+          |> filter(fn: (r) => r.agent_id == "${fluxString(agent_id)}")
           |> sort(columns: ["_time"])
-          |> limit(n: ${limit})
+          |> limit(n: ${safeLimit(limit)})
       `;
 
       const results = [];
@@ -474,32 +419,12 @@ class DataStorageService {
         throw new Error('DataStorageService not initialized');
       }
 
-      if (this.mockMode) {
-        logger.debug('📊 Mock mode: Returning mock system stats for agent:', agent_id);
-        // 返回模拟数据
-        return [
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'system_metrics',
-            agent_id: agent_id,
-            _field: 'cpu_load',
-            _value: 45.2
-          },
-          {
-            _time: new Date().toISOString(),
-            _measurement: 'system_metrics',
-            agent_id: agent_id,
-            _field: 'memory_usage_percent',
-            _value: 65.8
-          }
-        ];
-      }
-
+      if (!/^\d+[smhdw]$/.test(timeRange)) throw new Error('Invalid time range');
       const query = `
         from(bucket: "${config.database.influxdb.bucket}")
           |> range(start: -${timeRange})
           |> filter(fn: (r) => r._measurement == "system_metrics")
-          |> filter(fn: (r) => r.agent_id == "${agent_id}")
+          |> filter(fn: (r) => r.agent_id == "${fluxString(agent_id)}")
           |> group()
           |> mean()
       `;

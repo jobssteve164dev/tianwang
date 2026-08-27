@@ -24,7 +24,7 @@ from ..utils.feature_extractor import FeatureExtractor
 
 class AIService:
     """AI服务主类"""
-    
+
     def __init__(self):
         self.models: Dict[str, Any] = {}
         self.scalers: Dict[str, StandardScaler] = {}
@@ -39,33 +39,33 @@ class AIService:
             "last_prediction_time": None,
             "model_accuracy": {}
         }
-    
+
     async def initialize(self):
         """初始化AI服务"""
         try:
             logger.info("正在初始化AI服务...")
-            
+
             # 创建模型目录
             os.makedirs(config.ai_model_path, exist_ok=True)
-            
+
             # 初始化各种AI模型
             await self._initialize_anomaly_detection_model()
             await self._initialize_malware_detection_model()
             await self._initialize_network_intrusion_model()
             await self._initialize_user_behavior_model()
-            
+
             self.is_initialized = True
             logger.info("AI服务初始化完成")
-            
+
         except Exception as e:
             logger.error(f"AI服务初始化失败: {e}")
             raise
-    
+
     def set_external_api_service(self, external_api_service):
         """设置外部API服务引用"""
         self.external_api_service = external_api_service
         logger.info("外部API服务引用已设置")
-    
+
     async def analyze_with_hybrid_intelligence(
         self,
         data: Dict[str, Any],
@@ -81,23 +81,23 @@ class AIService:
                 "confidence_score": 0.0,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             # 1. 本地模型分析
             logger.info("开始本地模型分析...")
             local_results = await self._perform_local_analysis(data, analysis_type)
             results["local_analysis"] = local_results
-            
+
             # 2. 外部大模型分析（如果可用且启用）
             if use_external_api and self.external_api_service and self.external_api_service.is_healthy():
                 logger.info("开始外部大模型分析...")
                 llm_prompt = self._generate_llm_prompt(data, local_results, analysis_type)
-                
+
                 llm_result = await self.external_api_service.analyze_with_llm(
                     prompt=llm_prompt,
                     analysis_type=analysis_type,
                     use_cache=True
                 )
-                
+
                 if llm_result.get("success", False):
                     results["llm_analysis"] = {
                         "content": llm_result.get("content", ""),
@@ -109,7 +109,7 @@ class AIService:
                     results["llm_analysis"] = {
                         "error": llm_result.get("error", "外部API调用失败")
                     }
-            
+
             # 3. 混合推理结论
             hybrid_conclusion = await self._generate_hybrid_conclusion(
                 results["local_analysis"],
@@ -117,53 +117,53 @@ class AIService:
             )
             results["hybrid_conclusion"] = hybrid_conclusion
             results["confidence_score"] = hybrid_conclusion.get("confidence", 0.0)
-            
+
             # 4. 更新指标
             self.metrics["predictions_count"] += 1
             self.metrics["last_prediction_time"] = datetime.now().isoformat()
-            
+
             if hybrid_conclusion.get("threat_detected", False):
                 self.metrics["threats_identified"] += 1
-            
+
             if hybrid_conclusion.get("anomaly_detected", False):
                 self.metrics["anomalies_detected"] += 1
-            
+
             return results
-            
+
         except Exception as e:
             logger.error(f"混合智能分析失败: {e}")
             return {
                 "error": str(e),
                 "timestamp": datetime.now().isoformat()
             }
-    
+
     async def _perform_local_analysis(self, data: Dict[str, Any], analysis_type: str) -> Dict[str, Any]:
         """执行本地模型分析"""
         try:
             local_results = {}
-            
+
             if analysis_type in ["comprehensive", "anomaly"]:
                 anomaly_result = await self.detect_anomaly(data)
                 local_results["anomaly_detection"] = anomaly_result
-            
+
             if analysis_type in ["comprehensive", "malware"]:
                 malware_result = await self.detect_malware(data)
                 local_results["malware_detection"] = malware_result
-            
+
             if analysis_type in ["comprehensive", "network"]:
                 network_result = await self.detect_network_intrusion(data)
                 local_results["network_intrusion"] = network_result
-            
+
             if analysis_type in ["comprehensive", "behavior"]:
                 behavior_result = await self.analyze_user_behavior(data)
                 local_results["behavior_analysis"] = behavior_result
-            
+
             return local_results
-            
+
         except Exception as e:
             logger.error(f"本地分析失败: {e}")
             return {"error": str(e)}
-    
+
     def _generate_llm_prompt(
         self,
         data: Dict[str, Any],
@@ -184,7 +184,7 @@ class AIService:
 
 ## 分析类型：{analysis_type}
 """
-            
+
             # 根据分析类型添加特定指导
             if analysis_type == "log_analysis":
                 context += """
@@ -213,7 +213,7 @@ class AIService:
 4. 数据访问异常
 5. 系统操作异常
 """
-            
+
             context += """
 请提供：
 1. 详细的安全分析报告
@@ -230,13 +230,13 @@ class AIService:
 - recommendations: 建议措施列表
 - technical_details: 技术细节
 """
-            
+
             return context
-            
+
         except Exception as e:
             logger.error(f"生成LLM提示词失败: {e}")
             return f"请分析以下安全数据：{json.dumps(data, ensure_ascii=False)}"
-    
+
     async def _generate_hybrid_conclusion(
         self,
         local_results: Dict[str, Any],
@@ -254,28 +254,28 @@ class AIService:
                 "recommendations": [],
                 "analysis_method": "hybrid"
             }
-            
+
             # 分析本地结果
             local_threats = []
             local_confidence = 0.0
-            
+
             for analysis_type, result in local_results.items():
                 if isinstance(result, dict) and result.get("anomaly_detected", False):
                     conclusion["anomaly_detected"] = True
                     local_threats.append(analysis_type)
                     local_confidence += result.get("confidence", 0.5)
-            
+
             # 分析LLM结果
             llm_confidence = 0.0
             llm_threats = []
-            
+
             if llm_results.get("content") and not llm_results.get("error"):
                 try:
                     # 尝试解析LLM的JSON响应
                     llm_content = llm_results["content"]
                     if llm_content.strip().startswith("{"):
                         llm_analysis = json.loads(llm_content)
-                        
+
                         if llm_analysis.get("threat_level", "无") != "无":
                             conclusion["threat_detected"] = True
                             conclusion["threat_level"] = llm_analysis.get("threat_level", "低")
@@ -283,7 +283,7 @@ class AIService:
                             llm_confidence = llm_analysis.get("confidence", 0) / 100.0
                             conclusion["summary"] = llm_analysis.get("summary", "")
                             conclusion["recommendations"] = llm_analysis.get("recommendations", [])
-                    
+
                 except json.JSONDecodeError:
                     # 如果不是JSON格式，进行文本分析
                     content_lower = llm_content.lower()
@@ -291,7 +291,7 @@ class AIService:
                         conclusion["threat_detected"] = True
                         conclusion["summary"] = llm_content[:500] + "..." if len(llm_content) > 500 else llm_content
                         llm_confidence = 0.7  # 默认置信度
-            
+
             # 混合决策逻辑
             if local_threats and llm_threats:
                 # 本地和LLM都检测到威胁
@@ -307,12 +307,12 @@ class AIService:
                 # 都没有检测到威胁
                 conclusion["confidence"] = 0.9  # 高置信度认为安全
                 conclusion["threat_level"] = "无"
-            
+
             # 确保置信度在合理范围内
             conclusion["confidence"] = max(0.0, min(1.0, conclusion["confidence"]))
-            
+
             return conclusion
-            
+
         except Exception as e:
             logger.error(f"生成混合结论失败: {e}")
             return {
@@ -324,12 +324,12 @@ class AIService:
                 "analysis_method": "hybrid",
                 "error": str(e)
             }
-    
+
     async def _initialize_anomaly_detection_model(self):
         """初始化异常检测模型"""
         model_name = "anomaly_detection"
         model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
-        
+
         try:
             if os.path.exists(model_path):
                 # 加载已训练的模型
@@ -344,11 +344,11 @@ class AIService:
                     random_state=model_config["random_state"]
                 )
                 logger.info("已创建新的异常检测模型")
-                
+
         except Exception as e:
             logger.error(f"异常检测模型初始化失败: {e}")
             raise
-    
+
     async def _initialize_malware_detection_model(self):
         """初始化恶意软件检测模型"""
         model_name = "malware_detection"
@@ -363,7 +363,7 @@ class AIService:
         except Exception as e:
             logger.error(f"恶意软件检测模型初始化失败: {e}")
             raise
-    
+
     async def _initialize_network_intrusion_model(self):
         """初始化网络入侵检测模型"""
         model_name = "network_intrusion"
@@ -378,12 +378,12 @@ class AIService:
         except Exception as e:
             logger.error(f"网络入侵检测模型初始化失败: {e}")
             raise
-    
+
     async def _initialize_user_behavior_model(self):
         """初始化用户行为分析模型"""
         model_name = "user_behavior"
         model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
-        
+
         try:
             if os.path.exists(model_path):
                 self.models[model_name] = joblib.load(model_path)
@@ -395,22 +395,38 @@ class AIService:
                     random_state=model_config["random_state"]
                 )
                 logger.info("已创建新的用户行为分析模型")
-                
+
         except Exception as e:
             logger.error(f"用户行为分析模型初始化失败: {e}")
             raise
-    
+
     async def detect_anomaly(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """异常检测"""
         try:
             model = self.models.get("anomaly_detection")
-            if not model:
+            if model is None:
                 raise ValueError("异常检测模型未初始化")
-            
+
+            if not hasattr(model, "estimators_"):
+                system = data.get("system", {})
+                utilization = max(float(system.get(key, 0) or 0) for key in ("cpu_usage", "memory_usage", "disk_usage"))
+                is_anomaly = utilization >= 90
+                self.metrics["predictions_count"] += 1
+                self.metrics["last_prediction_time"] = datetime.now().isoformat()
+                if is_anomaly:
+                    self.metrics["anomalies_detected"] += 1
+                return {
+                    "is_anomaly": is_anomaly,
+                    "anomaly_score": utilization / 100,
+                    "confidence": min(1.0, abs(utilization - 90) / 10),
+                    "model": "resource_threshold_baseline",
+                    "timestamp": datetime.now().isoformat()
+                }
+
             # 特征提取
             features = await self.feature_extractor.extract_anomaly_features(data)
             features_array = np.array(features).reshape(1, -1)
-            
+
             # 标准化
             scaler_name = "anomaly_detection"
             if scaler_name not in self.scalers:
@@ -422,20 +438,20 @@ class AIService:
                 else:
                     # 使用当前数据拟合scaler（在生产环境中应该使用训练数据）
                     self.scalers[scaler_name].fit(features_array)
-            
+
             features_scaled = self.scalers[scaler_name].transform(features_array)
-            
+
             # 预测
             prediction = model.predict(features_scaled)[0]
             anomaly_score = model.score_samples(features_scaled)[0]
-            
+
             # 更新指标
             self.metrics["predictions_count"] += 1
             self.metrics["last_prediction_time"] = datetime.now().isoformat()
-            
+
             if prediction == -1:  # 异常
                 self.metrics["anomalies_detected"] += 1
-            
+
             result = {
                 "is_anomaly": prediction == -1,
                 "anomaly_score": float(anomaly_score),
@@ -443,106 +459,130 @@ class AIService:
                 "model": "isolation_forest",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             logger.debug(f"异常检测结果: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"异常检测失败: {e}")
             raise
-    
+
     async def detect_malware(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """恶意软件检测"""
         try:
             model = self.models.get("malware_detection")
-            if not model:
+            if model is None:
                 raise ValueError("恶意软件检测模型未初始化")
-            
-            # 特征提取
-            features = await self.feature_extractor.extract_malware_features(data)
-            features_array = np.array(features).reshape(1, -1)
-            
-            # 预测（这里假设模型已经训练过）
-            try:
+
+            if not hasattr(model, "estimators_"):
+                suspicious_terms = ("malware", "mimikatz", "ransom", "cryptominer", "suspicious")
+                matched = [
+                    process.get("name", "") for process in data.get("processes", [])
+                    if any(term in process.get("name", "").lower() for term in suspicious_terms)
+                ]
+                prediction = 1 if matched else 0
+                confidence = min(1.0, 0.7 + 0.1 * len(matched)) if matched else 0.7
+                model_name = "process_signature_baseline"
+            else:
+                features = await self.feature_extractor.extract_malware_features(data)
+                features_array = np.array(features).reshape(1, -1)
                 prediction = model.predict(features_array)[0]
                 probabilities = model.predict_proba(features_array)[0]
                 confidence = float(max(probabilities))
-            except Exception:
-                # 如果模型未训练，返回默认结果
-                prediction = 0
-                confidence = 0.5
-            
+                model_name = "random_forest"
+
             # 更新指标
             self.metrics["predictions_count"] += 1
             if prediction == 1:
                 self.metrics["threats_identified"] += 1
-            
+
             result = {
                 "is_malware": prediction == 1,
                 "confidence": confidence,
                 "threat_type": "malware" if prediction == 1 else "benign",
-                "model": "random_forest",
+                "model": model_name,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             logger.debug(f"恶意软件检测结果: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"恶意软件检测失败: {e}")
             raise
-    
+
     async def detect_network_intrusion(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """网络入侵检测"""
         try:
             model = self.models.get("network_intrusion")
-            if not model:
+            if model is None:
                 raise ValueError("网络入侵检测模型未初始化")
-            
-            # 特征提取
-            features = await self.feature_extractor.extract_network_features(data)
-            features_array = np.array(features).reshape(1, -1)
-            
-            # 预测
-            try:
+
+            if hasattr(model, "estimators_"):
+                features = await self.feature_extractor.extract_network_features(data)
+                features_array = np.array(features).reshape(1, -1)
                 prediction = model.predict(features_array)[0]
                 probabilities = model.predict_proba(features_array)[0]
                 confidence = float(max(probabilities))
-            except Exception:
-                prediction = 0
-                confidence = 0.5
-            
+                model_name = "gradient_boosting"
+            else:
+                network = data.get("network", {})
+                connections = network.get("connections", [])
+                high_risk_ports = {23, 445, 1433, 3389, 4444, 5900}
+                matched_ports = [
+                    connection.get("remote_port") or connection.get("dst_port")
+                    for connection in connections
+                    if (connection.get("remote_port") or connection.get("dst_port")) in high_risk_ports
+                ]
+                connection_count = len(connections)
+                prediction = 1 if matched_ports or connection_count > 1000 else 0
+                confidence = min(1.0, 0.7 + 0.05 * len(matched_ports)) if prediction else 0.7
+                model_name = "network_policy_baseline"
+
             # 更新指标
             self.metrics["predictions_count"] += 1
             if prediction == 1:
                 self.metrics["threats_identified"] += 1
-            
+
             result = {
                 "is_intrusion": prediction == 1,
                 "confidence": confidence,
                 "attack_type": "network_intrusion" if prediction == 1 else "normal",
-                "model": "gradient_boosting",
+                "model": model_name,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             logger.debug(f"网络入侵检测结果: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"网络入侵检测失败: {e}")
             raise
-    
+
     async def analyze_user_behavior(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """用户行为分析"""
         try:
             model = self.models.get("user_behavior")
-            if not model:
+            if model is None:
                 raise ValueError("用户行为分析模型未初始化")
-            
+
+            if not hasattr(model, "cluster_centers_"):
+                behavior = data.get("behavior", data.get("user_behavior", {}))
+                failed_logins = int(behavior.get("failed_logins", 0) or 0)
+                privilege_changes = int(behavior.get("privilege_changes", 0) or 0)
+                score = min(1.0, failed_logins / 10 + privilege_changes / 3)
+                return {
+                    "behavior_cluster": -1,
+                    "anomaly_score": score,
+                    "is_suspicious": score >= 0.7,
+                    "model": "behavior_policy_baseline",
+                    "timestamp": datetime.now().isoformat()
+                }
+
             # 特征提取
             features = await self.feature_extractor.extract_behavior_features(data)
             features_array = np.array(features).reshape(1, -1)
-            
+
             # 标准化
             scaler_name = "user_behavior"
             if scaler_name not in self.scalers:
@@ -552,19 +592,14 @@ class AIService:
                     self.scalers[scaler_name] = joblib.load(scaler_path)
                 else:
                     self.scalers[scaler_name].fit(features_array)
-            
+
             features_scaled = self.scalers[scaler_name].transform(features_array)
-            
+
             # 预测聚类
-            try:
-                cluster = model.predict(features_scaled)[0]
-                # 计算到聚类中心的距离作为异常分数
-                distances = model.transform(features_scaled)[0]
-                min_distance = min(distances)
-            except Exception:
-                cluster = 0
-                min_distance = 0.5
-            
+            cluster = model.predict(features_scaled)[0]
+            distances = model.transform(features_scaled)[0]
+            min_distance = min(distances)
+
             result = {
                 "behavior_cluster": int(cluster),
                 "anomaly_score": float(min_distance),
@@ -572,30 +607,30 @@ class AIService:
                 "model": "kmeans",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             logger.debug(f"用户行为分析结果: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"用户行为分析失败: {e}")
             raise
-    
+
     async def train_model(self, model_name: str, training_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """训练指定的模型"""
         try:
             if model_name not in self.models:
                 raise ValueError(f"未知的模型类型: {model_name}")
-            
+
             logger.info(f"开始训练模型: {model_name}")
-            
+
             # 数据预处理
             processed_data = await self.data_processor.process_training_data(
                 training_data, model_name
             )
-            
+
             X = processed_data["features"]
             y = processed_data.get("labels")
-            
+
             # 数据分割
             if y is not None:
                 X_train, X_test, y_train, y_test = train_test_split(
@@ -606,39 +641,39 @@ class AIService:
                 X_test = None
                 y_train = None
                 y_test = None
-            
+
             # 标准化
             scaler = StandardScaler()
             X_train_scaled = scaler.fit_transform(X_train)
-            
+
             # 训练模型
             model = self.models[model_name]
             if y_train is not None:
                 model.fit(X_train_scaled, y_train)
             else:
                 model.fit(X_train_scaled)
-            
+
             # 保存模型和scaler
             model_path = os.path.join(config.ai_model_path, f"{model_name}.joblib")
             scaler_path = os.path.join(config.ai_model_path, f"{model_name}_scaler.joblib")
-            
+
             joblib.dump(model, model_path)
             joblib.dump(scaler, scaler_path)
             self.scalers[model_name] = scaler
-            
+
             # 评估模型
             evaluation_results = {}
             if X_test is not None and y_test is not None:
                 X_test_scaled = scaler.transform(X_test)
                 y_pred = model.predict(X_test_scaled)
-                
+
                 evaluation_results = {
                     "accuracy": float(model.score(X_test_scaled, y_test)),
                     "classification_report": classification_report(y_test, y_pred, output_dict=True)
                 }
-                
+
                 self.metrics["model_accuracy"][model_name] = evaluation_results["accuracy"]
-            
+
             result = {
                 "model_name": model_name,
                 "training_samples": len(X_train),
@@ -647,18 +682,40 @@ class AIService:
                 "evaluation": evaluation_results,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             logger.info(f"模型训练完成: {model_name}")
             return result
-            
+
         except Exception as e:
             logger.error(f"模型训练失败 {model_name}: {e}")
             raise
-    
+
+    async def set_model_enabled(self, model_name: str, enabled: bool) -> Dict[str, Any]:
+        """启用或停用一个内置模型。"""
+        initializers = {
+            "anomaly_detection": self._initialize_anomaly_detection_model,
+            "malware_detection": self._initialize_malware_detection_model,
+            "network_intrusion": self._initialize_network_intrusion_model,
+            "user_behavior": self._initialize_user_behavior_model,
+        }
+        if model_name not in initializers:
+            raise ValueError(f"未知的模型类型: {model_name}")
+        if enabled and model_name not in self.models:
+            await initializers[model_name]()
+        if not enabled:
+            self.models.pop(model_name, None)
+            self.scalers.pop(model_name, None)
+        return {"model_name": model_name, "status": "active" if enabled else "inactive"}
+
+    async def reload_model(self, model_name: str) -> Dict[str, Any]:
+        """从持久化模型文件重新加载内置模型。"""
+        await self.set_model_enabled(model_name, False)
+        return await self.set_model_enabled(model_name, True)
+
     def is_healthy(self) -> bool:
         """检查服务健康状态"""
         return self.is_initialized and len(self.models) > 0
-    
+
     def get_metrics(self) -> Dict[str, Any]:
         """获取服务指标"""
         return {
@@ -667,7 +724,7 @@ class AIService:
             "metrics": self.metrics,
             "timestamp": datetime.now().isoformat()
         }
-    
+
     async def cleanup(self):
         """清理资源"""
         try:
@@ -678,4 +735,4 @@ class AIService:
             logger.info("AI服务资源清理完成")
         except Exception as e:
             logger.error(f"AI服务清理失败: {e}")
-            raise 
+            raise

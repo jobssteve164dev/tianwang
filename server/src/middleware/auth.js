@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const models = require('../models');
 const config = require('../config');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
 
 /**
  * 验证JWT Token
@@ -25,14 +24,12 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     
-    const demoToken = config.app.env === 'production'
-      ? process.env.DEMO_AUTH_TOKEN
-      : (process.env.DEMO_AUTH_TOKEN || 'demo-token-local-development');
-    const demoAllowed = config.app.env !== 'production' && demoToken &&
-      token.length === demoToken.length &&
-      crypto.timingSafeEqual(Buffer.from(token), Buffer.from(demoToken));
+    const demoToken = process.env.DEMO_AUTH_TOKEN;
+    const demoAllowed = config.app.env !== 'production' &&
+      process.env.ENABLE_DEMO_AUTH === 'true' &&
+      demoToken && token === demoToken;
     if (demoAllowed) {
-      // 演示模式 - 创建模拟用户
+      // 本地演示认证必须通过环境变量显式启用。
       req.user = {
         id: '1',
         username: 'admin',
@@ -49,6 +46,13 @@ const authenticate = async (req, res, next) => {
     
     try {
       const decoded = jwt.verify(token, config.jwt.secret);
+
+      if (decoded.tokenUse === 'refresh') {
+        return res.status(401).json({
+          error: 'Refresh token cannot be used as an access token',
+          code: 'INVALID_TOKEN_USE'
+        });
+      }
       
       // 检查是否为代理token
       if (decoded.type === 'agent') {
@@ -79,12 +83,12 @@ const authenticate = async (req, res, next) => {
           });
         }
         
-        // 为代理请求创建模拟用户（具有管理员权限）
+        // 代理身份只保留代理自身权限，不能继承管理端权限。
         req.user = {
           id: 'agent-' + agentId,
           username: 'agent',
           email: 'agent@tianwang.com',
-          role: 'admin',
+          role: 'agent',
           organization_id: agent.organization_id || 'd8ca4979-0e71-409f-8944-acba9b1a9b5c',
           status: 'active',
           isLocked: () => false,
@@ -234,13 +238,11 @@ const requireOrganization = (req, res, next) => {
  * 生成JWT Token
  */
 const generateTokens = (userId) => {
-  const payload = { userId };
-  
-  const accessToken = jwt.sign(payload, config.jwt.secret, {
+  const accessToken = jwt.sign({ userId, tokenUse: 'access' }, config.jwt.secret, {
     expiresIn: config.jwt.expiresIn
   });
   
-  const refreshToken = jwt.sign(payload, config.jwt.secret, {
+  const refreshToken = jwt.sign({ userId, tokenUse: 'refresh' }, config.jwt.secret, {
     expiresIn: config.jwt.refreshExpiresIn
   });
   
@@ -252,7 +254,8 @@ const generateTokens = (userId) => {
  */
 const verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, config.jwt.secret);
+    const decoded = jwt.verify(token, config.jwt.secret);
+    return decoded.tokenUse === 'refresh' ? decoded : null;
   } catch (error) {
     return null;
   }

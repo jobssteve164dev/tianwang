@@ -134,14 +134,12 @@ create_database() {
 # 验证表结构
 check_tables() {
     log_step "检查数据库表结构..."
-    
-    local table_count=$(psql -h localhost -p 5432 -U tianwang -d tianwang -c "\dt" 2>/dev/null | grep -c "table" || echo "0")
-    
-    if [ "$table_count" -gt 0 ]; then
-        log_success "数据库表已存在 ($table_count 个表)"
+
+    if npm run db:migrate; then
+        log_success "数据库迁移与模型表结构已对齐"
         return 0
     else
-        log_warning "数据库表不存在，需要启动服务同步表结构"
+        log_error "数据库迁移失败"
         return 1
     fi
 }
@@ -161,12 +159,12 @@ show_next_steps() {
     echo "   ./scripts/dev-status.sh"
     echo ""
     echo "3. 访问应用："
-    echo "   前端: http://localhost:3333"
-    echo "   后端API: http://localhost:5555/api"
-    echo "   API文档: http://localhost:5555/api-docs"
+    echo "   前端: http://localhost:3000"
+    echo "   后端API: http://localhost:8000/api"
+    echo "   API文档: http://localhost:8000/api-docs"
     echo ""
-    echo "4. 如果需要重置数据库："
-    echo "   cd server && npm run db:reset"
+    echo "4. 数据库结构变更后重新执行："
+    echo "   npm run db:migrate"
     echo ""
     echo "5. 查看数据库日志："
     echo "   tail -f server/logs/dev.log | grep -i database"
@@ -204,7 +202,9 @@ main() {
     fi
     
     # 检查表结构
-    check_tables
+    if ! check_tables; then
+        exit 1
+    fi
     
     # 显示下一步操作
     show_next_steps

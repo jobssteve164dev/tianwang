@@ -21,6 +21,7 @@
     "react-hooks"
   ],
   "rules": {
+    "no-undef": "off",
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
     "@typescript-eslint/no-explicit-any": "warn",
@@ -28,9 +29,18 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn"
   },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "env": {
+        "jest": true,
+        "node": true
+      }
+    }
+  ],
   "settings": {
     "react": {
       "version": "detect"
     }
   }
-} 
+}

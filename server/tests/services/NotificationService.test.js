@@ -11,7 +11,7 @@ jest.mock('../../src/utils/logger', () => ({
 
 // Mock nodemailer
 jest.mock('nodemailer', () => ({
-  createTransporter: jest.fn(() => ({
+  createTransport: jest.fn(() => ({
     verify: jest.fn().mockResolvedValue(true),
     sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
     close: jest.fn()
@@ -20,7 +20,9 @@ jest.mock('nodemailer', () => ({
 
 // Mock axios
 jest.mock('axios', () => ({
-  post: jest.fn().mockResolvedValue({ status: 200 })
+  post: jest.fn((url) => Promise.resolve(url.includes('dysmsapi')
+    ? { status: 200, data: { Code: 'OK', RequestId: 'sms-request-id', Message: 'OK' } }
+    : { status: 200 }))
 }));
 
 describe('NotificationService', () => {
@@ -60,10 +62,11 @@ describe('NotificationService', () => {
       }
     };
 
-    // Mock config模块
-    jest.doMock('../../src/config', () => mockConfig);
-    
     notificationService = new NotificationService();
+    notificationService.config = {
+      ...notificationService.config,
+      ...mockConfig
+    };
   });
 
   afterEach(async () => {
@@ -117,10 +120,12 @@ describe('NotificationService', () => {
         recipients: ['admin@test.com']
       };
 
+      const sent = new Promise(resolve => notificationService.once('notification_sent', resolve));
       const notificationId = await notificationService.sendNotification(notification);
+      await sent;
       
       expect(notificationId).toBeTruthy();
-      expect(notificationService.notificationQueue.length).toBe(1);
+      expect(notificationService.stats.emailSent).toBe(1);
     });
 
     test('应该成功发送短信通知', async () => {
@@ -134,10 +139,12 @@ describe('NotificationService', () => {
         recipients: ['13800138000']
       };
 
+      const sent = new Promise(resolve => notificationService.once('notification_sent', resolve));
       const notificationId = await notificationService.sendNotification(notification);
+      await sent;
       
       expect(notificationId).toBeTruthy();
-      expect(notificationService.notificationQueue.length).toBe(1);
+      expect(notificationService.stats.smsSent).toBe(1);
     });
 
     test('应该成功发送Webhook通知', async () => {
@@ -154,10 +161,12 @@ describe('NotificationService', () => {
         }
       };
 
+      const sent = new Promise(resolve => notificationService.once('notification_sent', resolve));
       const notificationId = await notificationService.sendNotification(notification);
+      await sent;
       
       expect(notificationId).toBeTruthy();
-      expect(notificationService.notificationQueue.length).toBe(1);
+      expect(notificationService.stats.webhookSent).toBe(1);
     });
 
     test('应该在服务未初始化时抛出错误', async () => {
@@ -279,8 +288,8 @@ describe('NotificationService', () => {
       notificationService.on('notification_failed', mockListener);
 
       // 模拟发送失败
-      const nodemailer = require('nodemailer');
-      nodemailer.createTransporter().sendMail.mockRejectedValue(new Error('Send failed'));
+      notificationService.config.retryAttempts = 0;
+      notificationService.emailTransporter.sendMail.mockRejectedValue(new Error('Send failed'));
 
       const notification = {
         type: 'email',

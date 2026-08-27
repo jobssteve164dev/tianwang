@@ -31,8 +31,8 @@ const jwt = require('jsonwebtoken');
 // 导入自定义模块
 const logger = require('./utils/logger');
 const config = require('./config');
-const { connectDatabases } = require('./config/database');
-const { initializeKafka } = require('./config/kafka');
+const { connectDatabases, closeDatabases } = require('./config/database');
+const { initializeKafka, closeKafka } = require('./config/kafka');
 const { router: routes, setServices: setRouteServices } = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { setupSwagger } = require('./config/swagger');
@@ -40,11 +40,11 @@ const WebSocketService = require('./services/WebSocketService');
 const NotificationService = require('./services/NotificationService');
 const ReportService = require('./services/ReportService');
 const keyManagementService = require('./services/KeyManagementService');
-const deviceFingerprintService = require('./services/DeviceFingerprintService');
-const registrationCodeService = require('./services/RegistrationCodeService');
 const dataStorageService = require('./services/DataStorageService');
 const mcpRoutes = require('./routes/mcp');
 const models = require('./models');
+const aiModelController = require('./controllers/aiModelController');
+const threatConfigService = require('./services/ThreatIntelligenceConfigService');
 
 // 创建Express应用
 const app = express();
@@ -122,7 +122,7 @@ async function authenticateSocket(socket, next, modelRegistry = models) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('AUTH_REQUIRED'));
     const decoded = jwt.verify(token, config.jwt.secret);
-    if (decoded.type === 'agent' || !decoded.userId) return next(new Error('USER_TOKEN_REQUIRED'));
+    if (decoded.type === 'agent' || decoded.tokenUse === 'refresh' || !decoded.userId) return next(new Error('USER_TOKEN_REQUIRED'));
     const user = await modelRegistry.User.findByPk(decoded.userId);
     if (!user || user.status !== 'active' || user.isLocked()) return next(new Error('AUTH_DENIED'));
     socket.user = { id: user.id, organization_id: user.organization_id, role: user.role };
@@ -192,14 +192,18 @@ async function initialize() {
     } catch (dbError) {
       console.error('❌ Database connection failed:', dbError.message);
       logger.error('❌ Database connection failed:', dbError);
-      // 继续执行，不阻塞启动
+      throw dbError;
     }
 
-    // 初始化Kafka（暂时跳过）
-    console.log('📨 Skipping Kafka initialization for now...');
-    logger.info('📨 Skipping Kafka initialization for now...');
-    console.log('✅ Kafka initialization skipped');
-    logger.info('✅ Kafka initialization skipped');
+    console.log('📨 Initializing Kafka...');
+    logger.info('📨 Initializing Kafka...');
+    try {
+      await initializeKafka();
+      console.log('✅ Kafka initialized successfully');
+    } catch (kafkaError) {
+      console.error('❌ Kafka initialization failed:', kafkaError.message);
+      logger.error('❌ Kafka initialization failed:', kafkaError);
+    }
 
     // 初始化数据存储服务
     console.log('💾 Initializing data storage service...');
@@ -224,6 +228,7 @@ async function initialize() {
     } catch (wsError) {
       console.error('❌ WebSocket service initialization failed:', wsError.message);
       logger.error('❌ WebSocket service initialization failed:', wsError);
+      throw wsError;
     }
 
     // 初始化通知服务
@@ -259,13 +264,10 @@ async function initialize() {
       await keyManagementService.initialize();
       console.log('✅ Key management service initialized successfully');
       logger.info('✅ Key management service initialized successfully');
-      console.log('✅ Device fingerprint service initialized successfully');
-      logger.info('✅ Device fingerprint service initialized successfully');
-      console.log('✅ Registration code service initialized successfully');
-      logger.info('✅ Registration code service initialized successfully');
     } catch (securityError) {
       console.error('❌ Security services initialization failed:', securityError.message);
       logger.error('❌ Security services initialization failed:', securityError);
+      throw securityError;
     }
 
     // 设置路由服务实例
@@ -276,7 +278,15 @@ async function initialize() {
     } catch (routeError) {
       console.error('❌ Route services configuration failed:', routeError.message);
       logger.error('❌ Route services configuration failed:', routeError);
+      throw routeError;
     }
+
+    logger.info('🔄 Restoring persisted runtime configuration...');
+    await Promise.all([
+      aiModelController.restoreRuntimeConfig(),
+      threatConfigService.restoreRuntimeConfig()
+    ]);
+    logger.info('✅ Persisted runtime configuration restored');
 
     // 启动服务器
     const port = config.app.port;
@@ -310,28 +320,31 @@ async function initialize() {
   }
 }
 
-// 优雅关闭处理
-process.on('SIGTERM', () => {
-  logger.info('🛑 SIGTERM received, shutting down gracefully...');
-  WebSocketService.close();
-  if (notificationService) notificationService.cleanup();
-  if (reportService) reportService.cleanup();
-  server.close(() => {
-    logger.info('✅ Server closed');
-    process.exit(0);
-  });
-});
+let shuttingDown = false;
 
-process.on('SIGINT', () => {
-  logger.info('🛑 SIGINT received, shutting down gracefully...');
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`🛑 ${signal} received, shutting down gracefully...`);
+
   WebSocketService.close();
-  if (notificationService) notificationService.cleanup();
-  if (reportService) reportService.cleanup();
-  server.close(() => {
-    logger.info('✅ Server closed');
-    process.exit(0);
-  });
-});
+  await Promise.allSettled([
+    notificationService?.cleanup(),
+    reportService?.cleanup(),
+    dataStorageService.close(),
+    keyManagementService.cleanup(),
+    closeKafka(),
+    closeDatabases()
+  ]);
+
+  if (server.listening) {
+    await new Promise(resolve => server.close(resolve));
+  }
+  logger.info('✅ Server closed');
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM').catch(error => logger.error('Shutdown failed:', error)));
+process.on('SIGINT', () => shutdown('SIGINT').catch(error => logger.error('Shutdown failed:', error)));
 
 // 未捕获异常处理
 process.on('uncaughtException', (error) => {

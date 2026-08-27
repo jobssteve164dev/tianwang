@@ -247,7 +247,7 @@ const xssProtection = (req, res, next) => {
  */
 const signatureVerification = (req, res, next) => {
   // 跳过不需要签名的路径
-  const skipPaths = ['/api/health', '/api/auth/login', '/api/auth/register'];
+  const skipPaths = ['/health', '/api/auth/login', '/api/auth/register'];
   if (skipPaths.includes(req.path)) {
     return next();
   }
@@ -276,7 +276,11 @@ const signatureVerification = (req, res, next) => {
   }
 
   // 验证签名
-  const secret = process.env.API_SECRET || 'default-secret';
+  const secret = process.env.API_SECRET;
+  if (!secret) {
+    logger.error('请求签名验证未配置 API_SECRET');
+    return res.status(503).json({ success: false, error: '请求签名验证不可用' });
+  }
   const data = `${req.method}${req.path}${timestamp}${nonce}`;
   const expectedSignature = crypto
     .createHmac('sha256', secret)

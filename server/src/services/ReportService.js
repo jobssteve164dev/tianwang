@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const moment = require('moment');
 const logger = require('../utils/logger');
-const config = require('../config');
+const models = require('../models');
 
 /**
  * 报告服务
@@ -21,7 +21,7 @@ class ReportService extends EventEmitter {
       outputPath: './reports',
       retentionDays: 90,
       maxFileSize: '100MB',
-      supportedFormats: ['pdf', 'html', 'json', 'csv', 'xlsx']
+      supportedFormats: ['html', 'json', 'csv']
     };
         
     // 报告类型定义
@@ -156,8 +156,11 @@ class ReportService extends EventEmitter {
       // 处理报告数据
       const processedData = await this.processReportData(type, data, filters);
             
-      // 渲染报告内容
-      const reportContent = await this.renderReport(template, processedData);
+      const reportContent = format === 'html'
+        ? await this.renderReport(template, processedData)
+        : format === 'json'
+          ? JSON.stringify(processedData, null, 2)
+          : this.convertToCSV([processedData]);
             
       // 生成文件名
       const fileName = this.generateFileName(type, format);
@@ -197,8 +200,7 @@ class ReportService extends EventEmitter {
      * 处理报告数据
      */
   async processReportData(type, data, filters) {
-    // 这里应该根据报告类型处理不同的数据
-    // 暂时返回原始数据
+    // 保留调用方提供的数据并附加可追溯的生成元数据。
     return {
       ...data,
       generatedAt: new Date(),
@@ -236,13 +238,11 @@ class ReportService extends EventEmitter {
       await fs.writeFile(filePath, content, 'utf8');
       break;
     case 'json':
-      await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf8');
-      break;
     case 'csv':
-      await fs.writeFile(filePath, this.convertToCSV(content), 'utf8');
+      await fs.writeFile(filePath, content, 'utf8');
       break;
     default:
-      await fs.writeFile(filePath, content, 'utf8');
+      throw new Error(`不支持的报告格式: ${format}`);
     }
   }
     
@@ -259,7 +259,13 @@ class ReportService extends EventEmitter {
       data.forEach(row => {
         const values = headers.map(header => {
           const value = row[header];
-          return typeof value === 'string' ? `"${value}"` : value;
+          if (value === null || value === undefined) return '';
+          if (value instanceof Date) return `"${value.toISOString()}"`;
+          if (typeof value === 'object') {
+            return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+          }
+          if (typeof value === 'string') return `"${value.replace(/"/g, '""')}"`;
+          return value;
         });
         csvRows.push(values.join(','));
       });
@@ -314,12 +320,8 @@ class ReportService extends EventEmitter {
       case 'csv':
         content = this.convertToCSV(data);
         break;
-      case 'xlsx':
-        // 这里应该使用xlsx库生成Excel文件
-        content = JSON.stringify(data);
-        break;
       default:
-        content = JSON.stringify(data);
+        throw new Error(`不支持的数据导出格式: ${format}`);
       }
             
       await fs.writeFile(filePath, content, 'utf8');
@@ -350,24 +352,33 @@ class ReportService extends EventEmitter {
      * 查询数据
      */
   async queryData(type, filters, fields) {
-    // 这里应该实现实际的数据查询逻辑
-    // 暂时返回模拟数据
-    const mockData = {
-      threats: [
-        { id: 1, type: 'malware', severity: 'high', timestamp: new Date() },
-        { id: 2, type: 'intrusion', severity: 'medium', timestamp: new Date() }
-      ],
-      events: [
-        { id: 1, event_type: 'login', user: 'admin', timestamp: new Date() },
-        { id: 2, event_type: 'file_access', user: 'user1', timestamp: new Date() }
-      ],
-      alerts: [
-        { id: 1, alert_type: 'threat_detected', status: 'active', timestamp: new Date() },
-        { id: 2, alert_type: 'system_error', status: 'resolved', timestamp: new Date() }
-      ]
+    const modelByType = {
+      threats: models.SecurityEvent,
+      events: models.AuditLog,
+      alerts: models.Alert
     };
-        
-    return mockData[type] || [];
+    const model = modelByType[type];
+    if (!model) throw new Error(`不支持的数据导出类型: ${type}`);
+
+    const allowedFields = Object.keys(model.rawAttributes || {});
+    const attributes = fields.length > 0
+      ? fields.filter(field => allowedFields.includes(field))
+      : undefined;
+    if (fields.length > 0 && attributes.length === 0) {
+      throw new Error('请求的导出字段均无效');
+    }
+    const where = {};
+    for (const [key, value] of Object.entries(filters || {})) {
+      if (allowedFields.includes(key)) where[key] = value;
+    }
+    const orderField = ['created_at', 'timestamp', 'createdAt'].find(field => allowedFields.includes(field));
+    const rows = await model.findAll({
+      where,
+      attributes,
+      ...(orderField ? { order: [[orderField, 'DESC']] } : {}),
+      raw: true
+    });
+    return rows;
   }
     
   /**

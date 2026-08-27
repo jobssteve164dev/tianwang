@@ -1,5 +1,5 @@
 # 多阶段构建 - 依赖缓存阶段
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 
 # 设置工作目录
 WORKDIR /app
@@ -17,7 +17,7 @@ RUN npm ci --only=production --cache /tmp/npm-cache && \
     npm cache clean --force
 
 # 构建阶段
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -37,6 +37,7 @@ RUN npm ci --cache /tmp/npm-cache && \
 # 复制源代码（分层复制，优化缓存）
 COPY src/ ./src/
 COPY config/ ./config/
+COPY migrations/ ./migrations/
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
 
@@ -44,7 +45,7 @@ COPY tests/ ./tests/
 RUN npm test --if-present
 
 # 生产阶段
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # 安装必要的系统包
 RUN apk add --no-cache dumb-init
@@ -62,11 +63,14 @@ COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
 # 从构建阶段复制源代码
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 COPY --from=builder --chown=nodejs:nodejs /app/config ./config
+COPY --from=builder --chown=nodejs:nodejs /app/migrations ./migrations
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
 # 创建必要的目录
-RUN mkdir -p /app/logs /app/uploads && \
-    chown -R nodejs:nodejs /app/logs /app/uploads
+RUN mkdir -p /app/logs /app/uploads /app/reports /app/keys /app/data/evidence \
+      /app/data/training /app/downloads /app/ai-engine/rules/sigma/custom && \
+    chown -R nodejs:nodejs /app/logs /app/uploads /app/reports /app/keys \
+      /app/data /app/downloads /app/ai-engine
 
 # 切换到非root用户
 USER nodejs
@@ -80,7 +84,7 @@ ENV PORT=8000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:8000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # 使用dumb-init启动
 ENTRYPOINT ["dumb-init", "--"]

@@ -21,12 +21,12 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "generate-icons": "node scripts/generate-macos-icons.js"
+    "generate-icons": "node scripts/generate-macos-icons.js",
+    "lint": "node scripts/check-syntax.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
     "electron-store": "^8.1.0",
-    "node-cron": "^3.0.3",
     "systeminformation": "^5.21.0",
     "winston": "^3.11.0",
     "ws": "^8.14.0"

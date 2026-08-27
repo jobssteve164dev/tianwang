@@ -12,7 +12,12 @@ class EncryptionService {
     this.keyLength = 32; // 256位
     this.ivLength = 16; // 128位
     this.tagLength = 16; // 128位
-    this.secretKey = process.env.ENCRYPTION_KEY || this.generateKey();
+    this.secretKey = process.env.ENCRYPTION_KEY || process.env.CRYPTO_SECRET_KEY;
+    if (!this.secretKey && process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY is required in production');
+    }
+    this.secretKey = this.secretKey || 'tianwang-local-development-encryption-key';
+    this.key = crypto.createHash('sha256').update(this.secretKey).digest();
   }
 
   /**
@@ -39,7 +44,7 @@ class EncryptionService {
       if (!data) return null;
 
       const iv = this.generateIV();
-      const cipher = crypto.createCipher(this.algorithm, this.secretKey);
+      const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
       cipher.setAAD(Buffer.from('tianwang-security', 'utf8'));
 
       let encrypted = cipher.update(data, 'utf8', 'hex');
@@ -69,7 +74,7 @@ class EncryptionService {
 
       const { encrypted, iv, tag } = encryptedData;
       
-      const decipher = crypto.createDecipher(this.algorithm, this.secretKey);
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, Buffer.from(iv, 'hex'));
       decipher.setAAD(Buffer.from('tianwang-security', 'utf8'));
       decipher.setAuthTag(Buffer.from(tag, 'hex'));
 

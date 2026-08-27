@@ -19,7 +19,7 @@ async function initializeKafka() {
     // 等待Kafka服务器完全启动
     logger.info('⏳ Waiting for Kafka server to be ready...');
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // 创建Kafka实例
     kafka = new Kafka({
       clientId: config.kafka.clientId,
@@ -76,11 +76,11 @@ async function validateKafkaConnection() {
   try {
     const admin = kafka.admin();
     await admin.connect();
-    
+
     // 获取集群元数据
     const metadata = await admin.fetchTopicMetadata();
     logger.info(`✅ Kafka connection validated. Found ${metadata.topics.length} topics`);
-    
+
     await admin.disconnect();
   } catch (error) {
     logger.error('❌ Kafka connection validation failed:', error);
@@ -151,7 +151,7 @@ async function setupConsumers() {
       eachMessage: async ({ topic, partition, message }) => {
         try {
           const data = JSON.parse(message.value.toString());
-          
+
           logger.debug(`Kafka message received from ${topic}:`, {
             partition,
             offset: message.offset,
@@ -176,6 +176,7 @@ async function setupConsumers() {
 
         } catch (error) {
           logger.error(`Error processing message from ${topic}:`, error);
+          throw error;
         }
       }
     });
@@ -192,33 +193,52 @@ async function setupConsumers() {
  * 处理日志消息
  */
 async function handleLogMessage(data) {
-  // TODO: 处理安全日志数据
-  // 1. 存储到InfluxDB
-  // 2. 触发威胁检测分析
-  // 3. 更新设备状态
-  logger.debug('Processing log message:', data);
+  if (!data.agent_id || !data.data) throw new Error('日志消息缺少agent_id或data');
+  const dataStorageService = require('../services/DataStorageService');
+  await dataStorageService.storeLogData(data.agent_id, data.data);
+  logger.debug('Kafka日志消息已持久化', { agent_id: data.agent_id });
 }
 
 /**
  * 处理告警消息
  */
 async function handleAlertMessage(data) {
-  // TODO: 处理安全告警
-  // 1. 创建安全事件记录
-  // 2. 触发通知策略
-  // 3. 更新仪表盘数据
-  logger.debug('Processing alert message:', data);
+  if (!data.agent_id || !data.type || !data.title) throw new Error('告警消息缺少必要字段');
+  const securityEventService = require('../services/SecurityEventService');
+  await securityEventService.record({
+    type: data.type,
+    alert_type: data.alert_type,
+    severity: data.severity || 'medium',
+    title: data.title,
+    description: data.description || data.title,
+    details: data.details || {},
+    device_id: data.device_id,
+    agent_id: data.agent_id,
+    organization_id: data.organization_id,
+    source_ip: data.source_ip,
+    target_ip: data.target_ip,
+    source: 'kafka',
+    tags: ['kafka', ...(data.tags || [])]
+  });
+  logger.debug('Kafka告警消息已入库', { agent_id: data.agent_id, type: data.type });
 }
 
 /**
  * 处理防护动作消息
  */
 async function handleActionMessage(data) {
-  // TODO: 处理防护动作
-  // 1. 执行防护策略
-  // 2. 更新设备配置
-  // 3. 记录防护日志
-  logger.debug('Processing action message:', data);
+  let agentId = data.agent_id;
+  if (!agentId && data.device_id) {
+    const models = require('../models');
+    const agent = await models.Agent?.findOne({ where: { device_id: data.device_id } });
+    agentId = agent?.agent_id;
+  }
+  if (!agentId) throw new Error('防护动作消息无法解析目标节点');
+  const action = data.action || data;
+  const WebSocketService = require('../services/WebSocketService');
+  const sent = WebSocketService.sendCommandToAgent(agentId, action);
+  if (!sent) throw new Error(`节点 ${agentId} 当前不在线，防护动作未送达`);
+  logger.info('Kafka防护动作已下发', { agent_id: agentId, action: action.type || action.action });
 }
 
 /**
@@ -328,4 +348,4 @@ module.exports = {
   sendAlertMessage,
   sendActionMessage,
   validateKafkaConnection
-}; 
+};

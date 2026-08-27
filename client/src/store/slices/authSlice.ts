@@ -24,33 +24,11 @@ const initialState: AuthState = {
   error: null,
 };
 
-// 内置测试用户数据
-const DEMO_USER: User = {
-  id: '1',
-  username: 'admin',
-  email: 'admin@tianwang.com',
-  role: 'super_admin',
-  organizationId: '1',
-};
-const DEMO_TOKEN = 'demo-token-local-development';
-
 // 异步登录action
 export const loginAsync = createAsyncThunk(
   'auth/login',
   async (credentials: { username: string; password: string }, { rejectWithValue }) => {
     try {
-      // 内置测试账户验证
-      if (credentials.username === 'admin' && credentials.password === '123456') {
-        const mockToken = DEMO_TOKEN;
-        localStorage.setItem('token', mockToken);
-        
-        return {
-          user: DEMO_USER,
-          token: mockToken,
-        };
-      }
-
-      // 如果不是测试账户，尝试真实API调用
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -65,8 +43,8 @@ export const loginAsync = createAsyncThunk(
       }
 
       const data = await response.json();
-      localStorage.setItem('token', data.token);
-      return data;
+      localStorage.setItem('token', data.accessToken);
+      return { user: data.user, token: data.accessToken };
     } catch (error) {
       return rejectWithValue('网络错误，请稍后重试');
     }
@@ -85,13 +63,8 @@ export const fetchUserProfile = createAsyncThunk(
         return rejectWithValue('未找到认证令牌');
       }
 
-      // 如果是演示token，直接返回演示用户
-      if (token === DEMO_TOKEN) {
-        return DEMO_USER;
-      }
-
       // 真实API调用
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -102,24 +75,11 @@ export const fetchUserProfile = createAsyncThunk(
         return rejectWithValue(error.message || '获取用户信息失败');
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data.user;
     } catch (error) {
       return rejectWithValue('网络错误，请稍后重试');
     }
-  }
-);
-
-// 自动登录演示账户
-export const autoLoginDemo = createAsyncThunk(
-  'auth/autoLoginDemo',
-  async () => {
-    const mockToken = DEMO_TOKEN;
-    localStorage.setItem('token', mockToken);
-    
-    return {
-      user: DEMO_USER,
-      token: mockToken,
-    };
   }
 );
 
@@ -176,23 +136,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.token = null;
         localStorage.removeItem('token');
-      })
-      // 自动登录演示账户
-      .addCase(autoLoginDemo.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(autoLoginDemo.fulfilled, (state, action) => {
-        state.loading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.isAuthenticated = true;
-        state.error = null;
-      })
-      .addCase(autoLoginDemo.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-        state.isAuthenticated = false;
       });
   },
 });
