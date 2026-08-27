@@ -8,6 +8,24 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const models = require('../models');
 const { Op } = require('sequelize');
+const { authenticate } = require('../middleware/auth');
+
+router.use(authenticate);
+
+async function accessibleAgentIds(req) {
+  if (req.user?.isAgent) return [req.agentId];
+  const agents = await models.Agent.findAll({
+    where: { organization_id: req.organizationId },
+    attributes: ['agent_id'],
+    raw: true
+  });
+  return agents.map(agent => agent.agent_id);
+}
+
+async function findAccessibleAlert(req, id) {
+  const Alert = models.Alert;
+  return Alert.findOne({ where: { id, agent_id: { [Op.in]: await accessibleAgentIds(req) } } });
+}
 
 /**
  * 获取告警列表
@@ -40,7 +58,7 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     // 构建查询条件
-    const query = {};
+    const query = { agent_id: { [Op.in]: await accessibleAgentIds(req) } };
     
     if (status && status !== 'all') {
       query.status = status;
@@ -139,7 +157,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const alert = await Alert.findById(id);
+    const alert = await findAccessibleAlert(req, id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -150,7 +168,7 @@ router.get('/:id', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         title: alert.title,
         description: alert.description,
         type: alert.type,
@@ -188,7 +206,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { status, assignedTo, notes } = req.body;
 
-    const alert = await Alert.findById(id);
+    const alert = await findAccessibleAlert(req, id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -207,7 +225,7 @@ router.put('/:id', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         status: alert.status,
         assignedTo: alert.assignedTo,
         notes: alert.notes,
@@ -233,7 +251,7 @@ router.patch('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const alert = await Alert.findById(id);
+    const alert = await findAccessibleAlert(req, id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -249,7 +267,7 @@ router.patch('/:id/status', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         status: alert.status,
         lastUpdated: alert.lastUpdated
       },
@@ -273,7 +291,7 @@ router.post('/:id/acknowledge', async (req, res) => {
     const { id } = req.params;
     const { userId = 'system' } = req.body;
 
-    const alert = await Alert.findById(id);
+    const alert = await findAccessibleAlert(req, id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -286,7 +304,7 @@ router.post('/:id/acknowledge', async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: alert._id,
+        id: alert.id,
         status: alert.status,
         assignedTo: alert.assignedTo,
         lastUpdated: alert.lastUpdated
@@ -311,7 +329,7 @@ router.post('/:id/resolve', async (req, res) => {
     const { id } = req.params;
     const { userId = 'system', notes } = req.body;
 
-    const alert = await Alert.findByPk(id);
+    const alert = await findAccessibleAlert(req, id);
     if (!alert) {
       return res.status(404).json({
         success: false,
@@ -369,17 +387,22 @@ router.post('/threat', async (req, res) => {
       targetIP,
       targetPort,
       deviceId,
-      agent_id,
+      agent_id: requestedAgentId,
       threatDetails,
       evidence
     } = req.body;
 
     // 验证必需字段
+    const agent_id = requestedAgentId || req.agentId;
     if (!title || !description || !type || !severity || !source || !deviceId || !agent_id) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields'
       });
+    }
+
+    if (req.user?.isAgent && agent_id !== req.agentId) {
+      return res.status(403).json({ success: false, error: 'Agent cannot create alerts for another node' });
     }
 
     // 创建新的告警
@@ -436,8 +459,16 @@ router.post('/threat', async (req, res) => {
  */
 router.get('/stats/overview', async (req, res) => {
   try {
-    const stats = await Alert.getAlertStats();
-    const alertStats = stats[0] || {
+    const Alert = models.Alert;
+    const allAlerts = await Alert.findAll({
+      where: { agent_id: { [Op.in]: await accessibleAgentIds(req) } }
+    });
+    const alertStats = allAlerts.reduce((stats, alert) => {
+      stats.total++;
+      if (Object.prototype.hasOwnProperty.call(stats, alert.status)) stats[alert.status]++;
+      if (Object.prototype.hasOwnProperty.call(stats, alert.severity)) stats[alert.severity]++;
+      return stats;
+    }, {
       total: 0,
       active: 0,
       resolved: 0,
@@ -446,10 +477,10 @@ router.get('/stats/overview', async (req, res) => {
       high: 0,
       medium: 0,
       low: 0
-    };
+    });
 
     // 计算平均解决时间
-    const resolvedAlerts = await Alert.find({ status: 'resolved' });
+    const resolvedAlerts = allAlerts.filter(alert => alert.status === 'resolved');
     let averageResolutionTime = 0;
     
     if (resolvedAlerts.length > 0) {

@@ -26,6 +26,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 // 导入自定义模块
 const logger = require('./utils/logger');
@@ -42,6 +43,8 @@ const keyManagementService = require('./services/KeyManagementService');
 const deviceFingerprintService = require('./services/DeviceFingerprintService');
 const registrationCodeService = require('./services/RegistrationCodeService');
 const dataStorageService = require('./services/DataStorageService');
+const mcpRoutes = require('./routes/mcp');
+const models = require('./models');
 
 // 创建Express应用
 const app = express();
@@ -107,37 +110,50 @@ app.get('/health', (req, res) => {
 
 // API路由
 app.use('/api', routes);
+app.use('/mcp', mcpRoutes);
 
 // 设置Swagger文档
 if (config.swagger.enabled) {
   setupSwagger(app);
 }
 
+async function authenticateSocket(socket, next, modelRegistry = models) {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('AUTH_REQUIRED'));
+    const decoded = jwt.verify(token, config.jwt.secret);
+    if (decoded.type === 'agent' || !decoded.userId) return next(new Error('USER_TOKEN_REQUIRED'));
+    const user = await modelRegistry.User.findByPk(decoded.userId);
+    if (!user || user.status !== 'active' || user.isLocked()) return next(new Error('AUTH_DENIED'));
+    socket.user = { id: user.id, organization_id: user.organization_id, role: user.role };
+    return next();
+  } catch (error) {
+    logger.warn('Socket.IO authentication rejected', { reason: error.name || error.message });
+    return next(new Error('AUTH_DENIED'));
+  }
+}
+
+io.use(authenticateSocket);
+
 // Socket.IO事件处理
 io.on('connection', (socket) => {
-  logger.info(`Client connected: ${socket.id}`);
-
-  // 客户端认证
-  socket.on('authenticate', (token) => {
-    // TODO: 实现JWT token验证
-    logger.info(`Client ${socket.id} authenticated`);
-    socket.emit('authenticated', { status: 'success' });
-  });
+  logger.info('Socket.IO client connected', { socketId: socket.id, userId: socket.user.id });
+  socket.emit('authenticated', { status: 'success' });
 
   // 实时威胁数据订阅
-  socket.on('subscribe-threats', (data) => {
-    socket.join('threats');
-    logger.info(`Client ${socket.id} subscribed to threat updates`);
+  socket.on('subscribe-threats', () => {
+    socket.join(`threats:${socket.user.organization_id}`);
+    logger.info('Socket.IO threat subscription enabled', { socketId: socket.id, organizationId: socket.user.organization_id });
   });
 
   // 实时系统状态订阅
-  socket.on('subscribe-system-status', (data) => {
-    socket.join('system-status');
-    logger.info(`Client ${socket.id} subscribed to system status`);
+  socket.on('subscribe-system-status', () => {
+    socket.join(`system-status:${socket.user.organization_id}`);
+    logger.info('Socket.IO system subscription enabled', { socketId: socket.id, organizationId: socket.user.organization_id });
   });
 
   socket.on('disconnect', () => {
-    logger.info(`Client disconnected: ${socket.id}`);
+    logger.info('Socket.IO client disconnected', { socketId: socket.id, userId: socket.user.id });
   });
 });
 
@@ -353,4 +369,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, initialize }; 
+module.exports = { app, server, io, initialize, authenticateSocket };

@@ -121,18 +121,18 @@ router.get('/security-metrics', async (req, res) => {
       const threatType = threatTypeMap[stat.type];
       if (threatType) {
         switch (threatType.category) {
-          case 'malware':
-            metrics.malwareDetections += count;
-            break;
-          case 'network-intrusion':
-            metrics.networkIntrusions += count;
-            break;
-          case 'suspicious-activity':
-            metrics.suspiciousActivities += count;
-            break;
-          case 'data-leak':
-            metrics.policyViolations += count;
-            break;
+        case 'malware':
+          metrics.malwareDetections += count;
+          break;
+        case 'network-intrusion':
+          metrics.networkIntrusions += count;
+          break;
+        case 'suspicious-activity':
+          metrics.suspiciousActivities += count;
+          break;
+        case 'data-leak':
+          metrics.policyViolations += count;
+          break;
         }
       }
     });
@@ -491,7 +491,7 @@ router.get('/device-stats', async (req, res) => {
     platformStats.forEach(stat => {
       const count = parseInt(stat.count);
       const platform = stat.platform?.toLowerCase();
-      if (deviceTypes.hasOwnProperty(platform)) {
+      if (Object.prototype.hasOwnProperty.call(deviceTypes, platform)) {
         deviceTypes[platform] = count;
       }
     });

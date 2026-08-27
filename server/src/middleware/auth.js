@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const models = require('../models');
 const config = require('../config');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
 
 /**
  * 验证JWT Token
@@ -24,8 +25,13 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     
-    // 检查是否为演示token
-    if (token.startsWith('demo-token-')) {
+    const demoToken = config.app.env === 'production'
+      ? process.env.DEMO_AUTH_TOKEN
+      : (process.env.DEMO_AUTH_TOKEN || 'demo-token-local-development');
+    const demoAllowed = config.app.env !== 'production' && demoToken &&
+      token.length === demoToken.length &&
+      crypto.timingSafeEqual(Buffer.from(token), Buffer.from(demoToken));
+    if (demoAllowed) {
       // 演示模式 - 创建模拟用户
       req.user = {
         id: '1',
@@ -54,8 +60,9 @@ const authenticate = async (req, res, next) => {
           });
         }
         
+        const agentId = decoded.agent_id || decoded.agentId;
         const agent = await models.Agent.findOne({
-          where: { agent_id: decoded.agentId }
+          where: { agent_id: agentId }
         });
         
         if (!agent) {
@@ -74,7 +81,7 @@ const authenticate = async (req, res, next) => {
         
         // 为代理请求创建模拟用户（具有管理员权限）
         req.user = {
-          id: 'agent-' + decoded.agentId,
+          id: 'agent-' + agentId,
           username: 'agent',
           email: 'agent@tianwang.com',
           role: 'admin',
@@ -82,13 +89,13 @@ const authenticate = async (req, res, next) => {
           status: 'active',
           isLocked: () => false,
           isAgent: true,
-          agentId: decoded.agentId
+          agentId
         };
-        req.userId = 'agent-' + decoded.agentId;
+        req.userId = 'agent-' + agentId;
         req.organizationId = agent.organization_id || 'd8ca4979-0e71-409f-8944-acba9b1a9b5c';
-        req.agentId = decoded.agentId;
+        req.agentId = agentId;
         
-        logger.debug('代理认证成功:', { agentId: decoded.agentId, hostname: decoded.hostname });
+        logger.debug('代理认证成功:', { agentId, hostname: decoded.hostname });
         return next();
       }
       
@@ -259,4 +266,4 @@ module.exports = {
   requireOrganization,
   generateTokens,
   verifyRefreshToken
-}; 
+};

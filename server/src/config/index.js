@@ -4,6 +4,7 @@
  */
 
 require('dotenv').config();
+const path = require('path');
 
 const config = {
   // 应用基础配置
@@ -175,6 +176,22 @@ const config = {
     metricsPort: parseInt(process.env.METRICS_PORT) || 9090
   },
 
+  mcp: {
+    issuer: process.env.MCP_TOKEN_ISSUER || 'tianwang',
+    audience: process.env.MCP_TOKEN_AUDIENCE || 'tianwang-mcp',
+    tokenTtlSeconds: Math.max(60, Math.min(parseInt(process.env.MCP_TOKEN_TTL_SECONDS) || 3600, 3600)),
+    evidencePath: process.env.MCP_EVIDENCE_PATH || path.join(__dirname, '../../data/evidence'),
+    evidenceTtlSeconds: parseInt(process.env.MCP_EVIDENCE_TTL_SECONDS) || 86400,
+    maxCaptureSeconds: parseInt(process.env.MCP_MAX_CAPTURE_SECONDS) || 120,
+    maxCaptureBytes: parseInt(process.env.MCP_MAX_CAPTURE_BYTES) || 52428800,
+    taskTimeoutMs: parseInt(process.env.MCP_TASK_TIMEOUT_MS) || 180000
+  },
+
+  keyManagement: {
+    rotationEnabled: process.env.KEY_ROTATION_ENABLED === 'true',
+    rotationIntervalMs: parseInt(process.env.KEY_ROTATION_INTERVAL_MS) || 24 * 60 * 60 * 1000
+  },
+
   // 开发工具配置
   development: {
     debugEnabled: process.env.DEBUG_ENABLED === 'true',
@@ -207,4 +224,4 @@ if (config.app.env === 'production') {
   validateConfig();
 }
 
-module.exports = config; 
+module.exports = config;

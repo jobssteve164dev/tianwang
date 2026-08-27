@@ -714,5 +714,6 @@ MCP 主路径复用现有节点、事件和告警心智，不新增一套需要�
 ## 20. 参考
 
 - [现有总体架构](./architecture-design.md)
+- [首版部署与验收说明](./mcp-agent-investigation-response-v1-operations.md)
 - [MCP 官方规范](https://modelcontextprotocol.io/specification/)
 - [MCP 授权规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)

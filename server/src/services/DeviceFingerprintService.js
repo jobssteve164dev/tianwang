@@ -70,7 +70,6 @@ class DeviceFingerprintService {
       console.log('设备指纹生成成功:', { 
         hostname, 
         platform, 
-        fingerprint: fingerprint.substring(0, 16) + '...',
         dataLength: dataString.length
       });
 
@@ -207,7 +206,6 @@ class DeviceFingerprintService {
   verifyFingerprint(fingerprint, deviceInfo) {
     try {
       console.log('开始验证设备指纹:', {
-        providedFingerprint: fingerprint.substring(0, 16) + '...',
         hostname: deviceInfo.hostname,
         platform: deviceInfo.platform
       });
@@ -215,18 +213,11 @@ class DeviceFingerprintService {
       // 生成当前设备指纹
       const currentFingerprint = this.generateFingerprint(deviceInfo);
       
-      console.log('当前生成的指纹:', {
-        currentFingerprint: currentFingerprint.fingerprint.substring(0, 16) + '...',
-        expectedFingerprint: fingerprint.substring(0, 16) + '...'
-      });
-      
       // 比较指纹
       const isValid = currentFingerprint.fingerprint === fingerprint;
       
       console.log('设备指纹验证结果:', { 
         isValid, 
-        expected: fingerprint.substring(0, 16) + '...',
-        actual: currentFingerprint.fingerprint.substring(0, 16) + '...',
         match: isValid ? '完全匹配' : '不匹配'
       });
 

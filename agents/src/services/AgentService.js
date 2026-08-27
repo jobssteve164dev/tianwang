@@ -165,7 +165,7 @@ class AgentService extends EventEmitter {
     async registerAgent(registrationCode = null) {
         try {
             console.log('开始代理注册...', {
-                agentId: this.agentId,
+                agent_id: this.agentId,
                 hostname: os.hostname(),
                 hasRegistrationCode: !!(registrationCode || this.registrationCode)
             });
@@ -175,27 +175,26 @@ class AgentService extends EventEmitter {
                 console.log('生成设备指纹...');
                 this.deviceFingerprint = await this.generateDeviceFingerprint();
             } else {
-                console.log('使用现有设备指纹:', this.deviceFingerprint.substring(0, 16) + '...');
+                console.log('使用现有设备指纹');
             }
 
             const agentInfo = {
-                agentId: this.agentId,
+                agent_id: this.agentId,
                 hostname: os.hostname(),
                 platform: normalizePlatform(os.platform()),
                 arch: os.arch(),
                 version: process.env.npm_package_version || '1.0.0',
                 capabilities: this.getCapabilities(),
-                systemInfo: await this.getSystemInfo(),
+                system_info: await this.getSystemInfo(),
                 registrationCode: registrationCode || this.registrationCode,
-                deviceFingerprint: this.deviceFingerprint
+                device_fingerprint: this.deviceFingerprint
             };
 
             console.log('发送代理注册请求:', {
-                agentId: agentInfo.agentId,
+                agentId: agentInfo.agent_id,
                 hostname: agentInfo.hostname,
                 platform: agentInfo.platform,
-                hasFingerprint: !!agentInfo.deviceFingerprint,
-                fingerprint: agentInfo.deviceFingerprint?.substring(0, 16) + '...'
+                hasFingerprint: !!agentInfo.device_fingerprint
             });
 
             const response = await axios.post(`${this.config.apiUrl}/agents/register`, agentInfo);
@@ -243,9 +242,9 @@ class AgentService extends EventEmitter {
             });
 
             const response = await axios.post(`${this.config.apiUrl}/agents/auth`, {
-                agentId: this.agentId,
+                agent_id: this.agentId,
                 hostname: os.hostname(),
-                deviceFingerprint: this.deviceFingerprint
+                device_fingerprint: this.deviceFingerprint
             });
             
             console.log('代理认证成功:', {
@@ -360,7 +359,6 @@ class AgentService extends EventEmitter {
             console.log('设备指纹生成成功:', {
                 hostname: deviceInfo.hostname,
                 platform: deviceInfo.platform,
-                fingerprint: fingerprint.substring(0, 16) + '...',
                 dataLength: dataString.length
             });
             
@@ -372,7 +370,7 @@ class AgentService extends EventEmitter {
             const basicInfo = `${os.hostname()}-${os.platform()}-${os.arch()}`;
             const crypto = require('crypto');
             const fallbackFingerprint = crypto.createHash('sha256').update(basicInfo).digest('hex');
-            console.log('使用备用指纹:', { basicInfo, fingerprint: fallbackFingerprint.substring(0, 16) + '...' });
+            console.log('使用备用设备指纹');
             return fallbackFingerprint;
         }
     }
@@ -510,7 +508,7 @@ class AgentService extends EventEmitter {
     // 获取代理能力
     getCapabilities() {
         const platform = os.platform();
-        const capabilities = ['system-monitoring', 'network-monitoring', 'log-collection'];
+        const capabilities = ['system-monitoring', 'network-monitoring', 'log-collection', 'network-capture', 'host-snapshot', 'response-plan-v1'];
         
         // 平台特定能力
         switch (platform) {
@@ -554,9 +552,7 @@ class AgentService extends EventEmitter {
                     hasSignature: !!this.connectionKey.signature,
                     keyLength: this.connectionKey.key?.length,
                     timestamp: this.connectionKey.timestamp,
-                    signatureLength: this.connectionKey.signature?.length,
-                    keyPreview: this.connectionKey.key?.substring(0, 16) + '...',
-                    signaturePreview: this.connectionKey.signature?.substring(0, 16) + '...'
+                    signatureLength: this.connectionKey.signature?.length
                 });
 
                 // 连接密钥应该是一个对象，包含key、timestamp、signature等字段
@@ -568,13 +564,9 @@ class AgentService extends EventEmitter {
                     const encodedConnectionKey = encodeURIComponent(fullConnectionKey).replace(/\+/g, '%2B');
                     wsUrl += `&connectionKey=${encodedConnectionKey}`;
                     logger.debug('使用完整连接密钥:', { 
-                        key: this.connectionKey.key.substring(0, 16) + '...',
                         timestamp: this.connectionKey.timestamp,
-                        signature: this.connectionKey.signature.substring(0, 16) + '...',
                         fullConnectionKeyLength: fullConnectionKey.length,
-                        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...',
                         encodedConnectionKeyLength: encodedConnectionKey.length,
-                        encodedConnectionKeyPreview: encodedConnectionKey.substring(0, 32) + '...',
                         hasPlusInOriginal: fullConnectionKey.includes('+'),
                         hasPlusInEncoded: encodedConnectionKey.includes('+'),
                         hasPercent2BInEncoded: encodedConnectionKey.includes('%2B')
@@ -585,24 +577,20 @@ class AgentService extends EventEmitter {
                     wsUrl += `&connectionKey=${encodedSignature}`;
                     logger.warn('使用签名作为连接密钥（向后兼容）:', {
                         signatureLength: this.connectionKey.signature.length,
-                        signaturePreview: this.connectionKey.signature.substring(0, 16) + '...',
                         encodedSignatureLength: encodedSignature.length,
-                        encodedSignaturePreview: encodedSignature.substring(0, 16) + '...',
                         hasPlusInOriginal: this.connectionKey.signature.includes('+'),
                         hasPlusInEncoded: encodedSignature.includes('+'),
                         hasPercent2BInEncoded: encodedSignature.includes('%2B')
                     });
                 } else {
-                    logger.warn('连接密钥格式不正确，无法建立安全连接:', {
-                        connectionKey: this.connectionKey
-                    });
+                    logger.warn('连接密钥格式不正确，无法建立安全连接');
                 }
             } else {
                 logger.warn('未提供连接密钥，连接可能被拒绝');
             }
             
             logger.info('连接到服务器...', { 
-                url: wsUrl.substring(0, 100) + '...',
+                endpoint: `${this.config.serverUrl}/ws`,
                 urlLength: wsUrl.length,
                 hasToken: wsUrl.includes('token='),
                 hasConnectionKey: wsUrl.includes('connectionKey=')
@@ -723,6 +711,10 @@ class AgentService extends EventEmitter {
             case 'policy-update':
                 this.handlePolicyUpdate(message.data);
                 break;
+
+            case 'task':
+                this.emit('task', message.data);
+                break;
                 
             default:
                 logger.warn('未知消息类型:', message.type);
@@ -801,7 +793,7 @@ class AgentService extends EventEmitter {
         try {
             const data = JSON.stringify({
                 ...message,
-                agentId: this.agentId, // 确保每个消息都包含agentId
+                agent_id: this.agentId,
                 timestamp: Date.now()
             });
             this.ws.send(data);
@@ -905,7 +897,8 @@ class AgentService extends EventEmitter {
             const response = await axios.post(`${this.config.apiUrl}/alerts/threat`, alertData, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'User-Agent': 'TianWang-Agent/1.0'
+                    'User-Agent': 'TianWang-Agent/1.0',
+                    'Authorization': `Bearer ${this.authToken}`
                 },
                 timeout: 10000
             });
@@ -1035,13 +1028,13 @@ class AgentService extends EventEmitter {
     // 更新配置
     updateConfig(newConfig) {
         Object.assign(this.config, newConfig);
-        logger.info('配置已更新:', newConfig);
+        logger.info('配置已更新', { keys: Object.keys(newConfig) });
     }
 
     // 设置注册码
     setRegistrationCode(code) {
         this.registrationCode = code;
-        logger.info('注册码已设置', { code: code ? code.substring(0, 8) + '...' : 'null' });
+        logger.info('注册码已设置', { configured: !!code });
     }
 
     // 获取注册码
@@ -1073,7 +1066,6 @@ class AgentService extends EventEmitter {
             logger.info('当前认证状态:', {
                 hasAuthToken: !!this.authToken,
                 authTokenLength: this.authToken?.length,
-                authTokenPreview: this.authToken ? this.authToken.substring(0, 20) + '...' : 'null',
                 agentId: this.agentId,
                 isConnected: this.isConnected
             });
@@ -1148,4 +1140,4 @@ class AgentService extends EventEmitter {
     }
 }
 
-module.exports = AgentService; 
+module.exports = AgentService;

@@ -32,6 +32,7 @@ const DEMO_USER: User = {
   role: 'super_admin',
   organizationId: '1',
 };
+const DEMO_TOKEN = 'demo-token-local-development';
 
 // 异步登录action
 export const loginAsync = createAsyncThunk(
@@ -40,7 +41,7 @@ export const loginAsync = createAsyncThunk(
     try {
       // 内置测试账户验证
       if (credentials.username === 'admin' && credentials.password === '123456') {
-        const mockToken = 'demo-token-' + Date.now();
+        const mockToken = DEMO_TOKEN;
         localStorage.setItem('token', mockToken);
         
         return {
@@ -85,7 +86,7 @@ export const fetchUserProfile = createAsyncThunk(
       }
 
       // 如果是演示token，直接返回演示用户
-      if (token.startsWith('demo-token-')) {
+      if (token === DEMO_TOKEN) {
         return DEMO_USER;
       }
 
@@ -112,7 +113,7 @@ export const fetchUserProfile = createAsyncThunk(
 export const autoLoginDemo = createAsyncThunk(
   'auth/autoLoginDemo',
   async () => {
-    const mockToken = 'demo-token-' + Date.now();
+    const mockToken = DEMO_TOKEN;
     localStorage.setItem('token', mockToken);
     
     return {
@@ -197,4 +198,4 @@ const authSlice = createSlice({
 });
 
 export const { logout, clearError, setToken } = authSlice.actions;
-export default authSlice.reducer; 
+export default authSlice.reducer;

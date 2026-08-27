@@ -20,6 +20,9 @@ const AIResource = require('./AIResource');
 const UserPermission = require('./UserPermission');
 const UserSession = require('./UserSession');
 const AuditLog = require('./AuditLog');
+const Investigation = require('./Investigation');
+const Finding = require('./Finding');
+const ResponsePlan = require('./ResponsePlan');
 
 // 延迟初始化模型
 let sequelize = null;
@@ -51,7 +54,10 @@ function initializeModels() {
         AIResource: AIResource(sequelize),
         UserPermission: UserPermission(sequelize),
         UserSession: UserSession(sequelize),
-        AuditLog: AuditLog(sequelize)
+        AuditLog: AuditLog(sequelize),
+        Investigation: Investigation(sequelize),
+        Finding: Finding(sequelize),
+        ResponsePlan: ResponsePlan(sequelize)
       };
       
       console.log('🔄 初始化Alert模型...');
@@ -140,5 +146,17 @@ module.exports = {
   get AuditLog() { 
     const result = initializeModels();
     return result.models ? result.models.AuditLog : null;
+  },
+  get Investigation() {
+    const result = initializeModels();
+    return result.models ? result.models.Investigation : null;
+  },
+  get Finding() {
+    const result = initializeModels();
+    return result.models ? result.models.Finding : null;
+  },
+  get ResponsePlan() {
+    const result = initializeModels();
+    return result.models ? result.models.ResponsePlan : null;
   }
-}; 
+};

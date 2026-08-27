@@ -152,12 +152,12 @@ class RegistrationCodeService {
       if (!registrationCode && this.memoryCache) {
         registrationCode = this.memoryCache.get(code);
         if (registrationCode) {
-          logger.info('从内存缓存获取注册码:', code);
+          logger.info('从内存缓存获取注册码');
         }
       }
       
       if (!registrationCode) {
-        logger.warn('注册码不存在:', code);
+        logger.warn('注册码不存在');
         return {
           isValid: false,
           error: '注册码不存在',
@@ -167,7 +167,7 @@ class RegistrationCodeService {
 
       // 检查是否过期
       if (Date.now() > registrationCode.expiry) {
-        logger.warn('注册码已过期:', code);
+        logger.warn('注册码已过期');
         return {
           isValid: false,
           error: '注册码已过期',
@@ -177,7 +177,7 @@ class RegistrationCodeService {
 
       // 检查是否已停用
       if (!registrationCode.is_active) {
-        logger.warn('注册码已停用:', code);
+        logger.warn('注册码已停用');
         return {
           isValid: false,
           error: '注册码已停用',
@@ -195,8 +195,7 @@ class RegistrationCodeService {
         // 如果是同一设备重复使用，允许通过
         if (fingerprintValidation.isReuse) {
           logger.info('同一设备重复使用注册码，允许通过:', { 
-            code, 
-            device_fingerprint: deviceInfo.fingerprint.substring(0, 16) + '...' 
+            reused: true
           });
           return {
             isValid: true,
@@ -211,7 +210,7 @@ class RegistrationCodeService {
 
       // 检查使用次数限制（仅对新设备）
       if (registrationCode.used_count >= registrationCode.max_uses) {
-        logger.warn('注册码使用次数已达上限:', code);
+        logger.warn('注册码使用次数已达上限');
         return {
           isValid: false,
           error: '注册码使用次数已达上限',
@@ -221,7 +220,7 @@ class RegistrationCodeService {
 
       // 验证签名
       if (!this.verifyCodeSignature(registrationCode.code, registrationCode.timestamp, registrationCode.signature)) {
-        logger.warn('注册码签名验证失败:', code);
+        logger.warn('注册码签名验证失败');
         return {
           isValid: false,
           error: '注册码签名验证失败',
@@ -231,7 +230,7 @@ class RegistrationCodeService {
 
 
 
-      logger.info('注册码验证成功:', { code, permissions: registrationCode.permissions });
+      logger.info('注册码验证成功:', { permissions: registrationCode.permissions });
 
       return {
         isValid: true,
@@ -262,13 +261,13 @@ class RegistrationCodeService {
       });
       
       if (!registrationCode) {
-        logger.warn('注册码不存在，无法增加使用次数:', code);
+        logger.warn('注册码不存在，无法增加使用次数');
         return false;
       }
 
       await registrationCode.incrementUsage(agent_id, device_fingerprint);
 
-      logger.info('注册码使用次数已增加:', { code, usedCount: registrationCode.used_count });
+      logger.info('注册码使用次数已增加:', { usedCount: registrationCode.used_count });
       return true;
     } catch (error) {
       logger.error('增加注册码使用次数失败:', error);
@@ -392,7 +391,7 @@ class RegistrationCodeService {
         codes.push(code);
       }
 
-      logger.info('批量生成注册码完成:', { count, codes: codes.map(c => c.code) });
+      logger.info('批量生成注册码完成:', { count });
 
       return codes;
     } catch (error) {
@@ -422,7 +421,7 @@ class RegistrationCodeService {
 
       await registrationCode.disable();
 
-      logger.info('注册码已停用:', code);
+      logger.info('注册码已停用');
 
       return {
         success: true,

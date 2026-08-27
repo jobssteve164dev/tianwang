@@ -2,13 +2,15 @@ const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 class KeyManagementService {
   constructor() {
     this.keysPath = path.join(__dirname, '../../keys');
     this.publicKeyPath = path.join(this.keysPath, 'public.pem');
     this.privateKeyPath = path.join(this.keysPath, 'private.pem');
-    this.keyRotationInterval = 24 * 60 * 60 * 1000; // 24小时
+    this.keyRotationInterval = config.keyManagement.rotationIntervalMs;
+    this.rotationTimer = null;
     this.lastRotation = null;
     this.publicKey = null;
     this.privateKey = null;
@@ -122,13 +124,22 @@ class KeyManagementService {
 
   // 启动密钥轮换定时器
   startKeyRotation() {
-    setInterval(async () => {
+    if (!config.keyManagement.rotationEnabled) {
+      logger.info('自动密钥轮换未启用；轮换前必须先完成节点公钥协调刷新');
+      return;
+    }
+
+    this.rotationTimer = setInterval(async () => {
       try {
         await this.rotateKeys();
       } catch (error) {
         logger.error('密钥轮换失败:', error);
       }
     }, this.keyRotationInterval);
+
+    if (typeof this.rotationTimer.unref === 'function') {
+      this.rotationTimer.unref();
+    }
   }
 
   // 轮换密钥
@@ -166,8 +177,7 @@ class KeyManagementService {
     }
 
     try {
-      const key = crypto.createPublicKey(this.publicKey);
-      const keyDetails = key.export({ format: 'jwk' });
+      crypto.createPublicKey(this.publicKey);
       
       return {
         algorithm: 'RSA',
@@ -294,9 +304,7 @@ class KeyManagementService {
         providedSignatureType: typeof providedSignature,
         expectedKeyType: typeof expectedKey,
         providedSignatureLength: typeof providedSignature === 'string' ? providedSignature?.length : 'N/A',
-        expectedKeyLength: typeof expectedKey === 'string' ? expectedKey?.length : 'N/A',
-        providedSignaturePreview: typeof providedSignature === 'string' ? providedSignature?.substring(0, 32) + '...' : 'N/A',
-        expectedKeyPreview: typeof expectedKey === 'string' ? expectedKey?.substring(0, 32) + '...' : 'N/A'
+        expectedKeyLength: typeof expectedKey === 'string' ? expectedKey?.length : 'N/A'
       });
 
       // 如果提供的是完整的连接密钥对象
@@ -324,7 +332,7 @@ class KeyManagementService {
           const parts = providedSignature.split(':');
           logger.debug('解析连接密钥部分:', {
             partsCount: parts.length,
-            parts: parts.map((part, index) => ({ index, length: part.length, preview: part.substring(0, 16) + '...' }))
+            partLengths: parts.map(part => part.length)
           });
 
           if (parts.length >= 3) {
@@ -355,7 +363,6 @@ class KeyManagementService {
             const data = `${key}:${timestamp}`;
             logger.debug('准备验证签名:', {
               dataLength: data.length,
-              dataPreview: data.substring(0, 32) + '...',
               signatureLength: signature.length,
               keyFormat: 'base64',
               dataFormat: 'key:timestamp'
@@ -393,9 +400,7 @@ class KeyManagementService {
     try {
       logger.debug('开始验证连接密钥匹配:', {
         providedKeyLength: providedKey?.length,
-        expectedKeyLength: expectedKey?.length,
-        providedKeyPreview: providedKey?.substring(0, 32) + '...',
-        expectedKeyPreview: expectedKey?.substring(0, 32) + '...'
+        expectedKeyLength: expectedKey?.length
       });
 
       if (!providedKey || !expectedKey) {
@@ -408,28 +413,18 @@ class KeyManagementService {
       // 增加详细的调试信息
       logger.debug('连接密钥详细比较:', {
         isValid,
-        providedKeyFull: providedKey,
-        expectedKeyFull: expectedKey,
         providedKeyLength: providedKey.length,
         expectedKeyLength: expectedKey.length,
-        // 逐字符比较前50个字符
-        first50CharsMatch: providedKey.substring(0, 50) === expectedKey.substring(0, 50),
-        first50Provided: providedKey.substring(0, 50),
-        first50Expected: expectedKey.substring(0, 50),
-        // 检查是否有不可见字符
         providedKeyHasSpaces: providedKey.includes(' '),
         expectedKeyHasSpaces: expectedKey.includes(' '),
         providedKeyHasPlus: providedKey.includes('+'),
-        expectedKeyHasPlus: expectedKey.includes('+'),
-        // 检查编码问题
-        providedKeyEncoded: encodeURIComponent(providedKey),
-        expectedKeyEncoded: encodeURIComponent(expectedKey)
+        expectedKeyHasPlus: expectedKey.includes('+')
       });
 
       logger.debug('连接密钥匹配结果:', {
         isValid,
-        providedKey: providedKey.substring(0, 16) + '...',
-        expectedKey: expectedKey.substring(0, 16) + '...'
+        providedKeyLength: providedKey.length,
+        expectedKeyLength: expectedKey.length
       });
 
       return { isValid, error: isValid ? null : '连接密钥不匹配' };

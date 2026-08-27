@@ -211,13 +211,13 @@ module.exports = (sequelize) => {
     return this.findAll({
       attributes: [
         [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'active' THEN 1 END")), 'active'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'resolved' THEN 1 END")), 'resolved'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'acknowledged' THEN 1 END")), 'acknowledged'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN severity = 'critical' THEN 1 END")), 'critical'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN severity = 'high' THEN 1 END")), 'high'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN severity = 'medium' THEN 1 END")), 'medium'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN severity = 'low' THEN 1 END")), 'low']
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'active\' THEN 1 END')), 'active'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'resolved\' THEN 1 END')), 'resolved'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'acknowledged\' THEN 1 END')), 'acknowledged'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN severity = \'critical\' THEN 1 END')), 'critical'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN severity = \'high\' THEN 1 END')), 'high'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN severity = \'medium\' THEN 1 END')), 'medium'],
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN severity = \'low\' THEN 1 END')), 'low']
       ],
       raw: true
     });

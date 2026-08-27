@@ -21,6 +21,7 @@ const { router: reportRoutes, setServices: setReportServices } = require('./repo
 const threatIntelligenceRoutes = require('./threatIntelligence');
 const dataRoutes = require('./data');
 const cacheRoutes = require('./cache');
+const mcpTokenRoutes = require('./mcpTokens');
 
 // API版本信息
 router.get('/', (req, res) => {
@@ -64,6 +65,7 @@ router.use('/reports', reportRoutes);
 router.use('/threat-intelligence', threatIntelligenceRoutes);
 router.use('/data', dataRoutes);
 router.use('/cache', cacheRoutes);
+router.use('/mcp', mcpTokenRoutes);
 
 // 设置服务实例的方法（将在主应用中调用）
 function setServices(notificationService, reportService) {
@@ -71,4 +73,4 @@ function setServices(notificationService, reportService) {
   setReportServices(reportService);
 }
 
-module.exports = { router, setServices }; 
+module.exports = { router, setServices };

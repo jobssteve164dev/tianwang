@@ -1,18 +1,19 @@
 const EventEmitter = require('events');
 const os = require('os');
-const { exec, spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { exec, execFile } = require('child_process');
+const net = require('net');
 const logger = require('../utils/logger');
 
 class FirewallService extends EventEmitter {
-    constructor() {
+    constructor(options = {}) {
         super();
         this.platform = os.platform();
         this.isEnabled = false;
         this.rules = new Map();
         this.blockedIPs = new Set();
         this.allowedIPs = new Set();
+        this.executions = new Map();
+        this.executionStore = options.executionStore || null;
         this.config = {
             autoBlock: false,
             blockDuration: 3600000, // 1小时
@@ -44,6 +45,16 @@ class FirewallService extends EventEmitter {
             
             // 加载现有规则
             await this.loadExistingRules();
+
+            if (this.platform === 'darwin') {
+                const anchor = 'table <tianwang_blocked> persist\nblock drop quick from <tianwang_blocked> to any\nblock drop quick to <tianwang_blocked>\n';
+                const anchorResult = await this.executeFile('pfctl', ['-a', 'tianwang', '-f', '-'], 10000, anchor);
+                if (!anchorResult.success) {
+                    throw new Error(`无法初始化天网 pf 锚点: ${anchorResult.error || anchorResult.stderr}`);
+                }
+            }
+
+            await this.restoreExecutions();
             
             // 初始化白名单
             this.config.whitelistIPs.forEach(ip => {
@@ -242,8 +253,8 @@ class FirewallService extends EventEmitter {
             throw new Error(`无效的IP地址: ${ip}`);
         }
 
-        if (this.allowedIPs.has(ip)) {
-            logger.warn(`IP ${ip} 在白名单中，跳过阻止`);
+        if (this.isProtectedIP(ip)) {
+            logger.warn(`IP ${ip} 属于本地保护范围，跳过阻止`);
             return false;
         }
 
@@ -274,6 +285,58 @@ class FirewallService extends EventEmitter {
         }
 
         return false;
+    }
+
+    async blockIPWithReceipt(ip, reason, duration, idempotencyKey) {
+        if (!idempotencyKey || typeof idempotencyKey !== 'string') {
+            throw new Error('防火墙动作缺少幂等键');
+        }
+        if (this.executions.has(idempotencyKey)) {
+            return this.executions.get(idempotencyKey);
+        }
+        if (!this.isValidIP(ip) || this.isProtectedIP(ip)) {
+            throw new Error('阻断目标无效或属于本地保护地址');
+        }
+
+        const ruleId = await this.addBlockRule(ip, reason);
+        const receipt = {
+            execution_id: idempotencyKey,
+            rule_id: ruleId,
+            target: ip,
+            applied_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + duration).toISOString(),
+            rollback_available: true
+        };
+        this.executions.set(idempotencyKey, receipt);
+        this.persistExecutions();
+
+        setTimeout(() => {
+            this.rollbackExecution(idempotencyKey, 'TTL expired').catch(error => {
+                logger.error('防火墙规则到期回滚失败:', error);
+            });
+        }, duration);
+        this.emit('ip-blocked', { ip, reason, ruleId });
+        return receipt;
+    }
+
+    async rollbackExecution(executionId, reason = 'Response plan rollback') {
+        const receipt = this.executions.get(executionId);
+        if (!receipt) {
+            return { execution_id: executionId, status: 'already_absent' };
+        }
+
+        const removed = await this.removeBlockRule(receipt.rule_id, receipt.target);
+        if (!removed) {
+            throw new Error(`无法精确回滚防火墙执行对象: ${executionId}`);
+        }
+        this.executions.delete(executionId);
+        this.persistExecutions();
+        this.emit('ip-unblocked', { ip: receipt.target, reason, ruleId: receipt.rule_id });
+        return {
+            execution_id: executionId,
+            status: 'rolled_back',
+            rolled_back_at: new Date().toISOString()
+        };
     }
 
     // 解除IP阻止
@@ -308,32 +371,66 @@ class FirewallService extends EventEmitter {
 
     // 添加阻止规则（平台特定实现）
     async addBlockRule(ip, reason) {
-        let command;
+        let systemRules;
         const ruleId = `tianwang_block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         switch (this.platform) {
             case 'win32':
-                command = `netsh advfirewall firewall add rule name="${ruleId}" dir=in action=block remoteip=${ip}`;
+                systemRules = [
+                    { executable: 'netsh', args: ['advfirewall', 'firewall', 'add', 'rule', `name=${ruleId}_in`, 'dir=in', 'action=block', `remoteip=${ip}`] },
+                    { executable: 'netsh', args: ['advfirewall', 'firewall', 'add', 'rule', `name=${ruleId}_out`, 'dir=out', 'action=block', `remoteip=${ip}`] }
+                ];
                 break;
             case 'linux':
-                command = `iptables -A INPUT -s ${ip} -j DROP -m comment --comment "${ruleId}: ${reason}"`;
+                systemRules = [
+                    { executable: net.isIP(ip) === 6 ? 'ip6tables' : 'iptables', args: ['-A', 'INPUT', '-s', ip, '-j', 'DROP', '-m', 'comment', '--comment', `${ruleId}_in`] },
+                    { executable: net.isIP(ip) === 6 ? 'ip6tables' : 'iptables', args: ['-A', 'OUTPUT', '-d', ip, '-j', 'DROP', '-m', 'comment', '--comment', `${ruleId}_out`] }
+                ];
                 break;
             case 'darwin':
-                // macOS使用pfctl，需要先添加到表中
-                command = `echo "block drop from ${ip} to any" | pfctl -a tianwang -f -`;
+                systemRules = [
+                    { executable: 'pfctl', args: ['-a', 'tianwang', '-t', 'tianwang_blocked', '-T', 'add', ip] }
+                ];
                 break;
             default:
                 throw new Error(`不支持的平台: ${this.platform}`);
         }
 
-        const result = await this.executeCommand(command);
-        if (result.success) {
+        const appliedRules = [];
+        for (const systemRule of systemRules) {
+            const result = await this.executeFile(systemRule.executable, systemRule.args);
+            if (!result.success) {
+                const compensationFailures = [];
+                for (const applied of appliedRules.reverse()) {
+                    const rollback = await this.executeFile(applied.executable, this.toRemovalArgs(applied.args));
+                    if (!rollback.success) compensationFailures.push(applied);
+                }
+                if (compensationFailures.length > 0) {
+                    this.rules.set(ruleId, {
+                        ip,
+                        reason: `${reason} (partial application requires reconciliation)`,
+                        platform: this.platform,
+                        systemRules: compensationFailures,
+                        timestamp: Date.now(),
+                        duration: this.config.blockDuration
+                    });
+                    this.blockedIPs.add(ip);
+                }
+                const error = new Error(`添加防火墙规则失败: ${result.error || result.stderr}`);
+                error.code = compensationFailures.length > 0 ? 'FIREWALL_PARTIAL_APPLICATION' : 'FIREWALL_RULE_FAILED';
+                error.ruleId = compensationFailures.length > 0 ? ruleId : null;
+                throw error;
+            }
+            appliedRules.push(systemRule);
+        }
+
+        if (appliedRules.length === systemRules.length) {
             // 将规则存储到Map中，用于统计
             this.rules.set(ruleId, {
                 ip,
                 reason,
                 platform: this.platform,
-                command,
+                systemRules,
                 timestamp: Date.now(),
                 duration: this.config.blockDuration
             });
@@ -344,32 +441,25 @@ class FirewallService extends EventEmitter {
             logger.debug(`防火墙规则已添加: ${ruleId}`);
             this.emit('rule-added', { ruleId, ip, reason });
             return ruleId;
-        } else {
-            throw new Error(`添加防火墙规则失败: ${result.error}`);
         }
     }
 
     // 移除阻止规则（平台特定实现）
     async removeBlockRule(ruleId, ip) {
-        let command;
-
-        switch (this.platform) {
-            case 'win32':
-                command = `netsh advfirewall firewall delete rule name="${ruleId}"`;
-                break;
-            case 'linux':
-                // 先查找规则行号，然后删除
-                command = `iptables -D INPUT -s ${ip} -j DROP`;
-                break;
-            case 'darwin':
-                command = `pfctl -a tianwang -F rules`;
-                break;
-            default:
-                throw new Error(`不支持的平台: ${this.platform}`);
+        const rule = this.rules.get(ruleId);
+        if (!rule || rule.ip !== ip) {
+            logger.warn('拒绝移除不属于该执行对象的规则', { ruleId, ip });
+            return false;
         }
 
-        const result = await this.executeCommand(command);
-        if (result.success) {
+        const systemRules = rule.systemRules || [];
+        if (systemRules.length === 0) return false;
+        const remainingRules = [];
+        for (const systemRule of [...systemRules].reverse()) {
+            const result = await this.executeFile(systemRule.executable, this.toRemovalArgs(systemRule.args));
+            if (!result.success) remainingRules.push(systemRule);
+        }
+        if (remainingRules.length === 0) {
             // 从Map中移除规则
             this.rules.delete(ruleId);
             
@@ -379,10 +469,56 @@ class FirewallService extends EventEmitter {
             logger.debug(`防火墙规则已移除: ${ruleId}`);
             this.emit('rule-removed', { ruleId, ip });
             return true;
-        } else {
-            logger.error(`移除防火墙规则失败: ${result.error}`);
-            return false;
         }
+        rule.systemRules = remainingRules;
+        this.rules.set(ruleId, rule);
+        logger.error(`移除防火墙规则失败: ${ruleId}`);
+        return false;
+    }
+
+    toRemovalArgs(args) {
+        if (this.platform === 'win32') {
+            const name = args.find(arg => arg.startsWith('name='));
+            return ['advfirewall', 'firewall', 'delete', 'rule', name];
+        }
+        if (this.platform === 'linux') {
+            return ['-D', ...args.slice(1)];
+        }
+        if (this.platform === 'darwin') {
+            return args.map(arg => arg === 'add' ? 'delete' : arg);
+        }
+        throw new Error(`不支持的平台: ${this.platform}`);
+    }
+
+    async restoreExecutions() {
+        if (!this.executionStore) return;
+        const persisted = this.executionStore.get('responseExecutions', {});
+        for (const [executionId, entry] of Object.entries(persisted)) {
+            if (!entry?.receipt || !entry?.rule?.systemRules) continue;
+            this.executions.set(executionId, entry.receipt);
+            this.rules.set(entry.receipt.rule_id, entry.rule);
+            this.blockedIPs.add(entry.receipt.target);
+            const remainingMs = Date.parse(entry.receipt.expires_at) - Date.now();
+            if (remainingMs <= 0) {
+                await this.rollbackExecution(executionId, 'TTL expired while agent was offline');
+            } else {
+                setTimeout(() => {
+                    this.rollbackExecution(executionId, 'TTL expired').catch(error => {
+                        logger.error('恢复的防火墙规则到期回滚失败:', error);
+                    });
+                }, remainingMs);
+            }
+        }
+    }
+
+    persistExecutions() {
+        if (!this.executionStore) return;
+        const persisted = {};
+        for (const [executionId, receipt] of this.executions.entries()) {
+            const rule = this.rules.get(receipt.rule_id);
+            if (rule) persisted[executionId] = { receipt, rule };
+        }
+        this.executionStore.set('responseExecutions', persisted);
     }
 
     // 允许IP地址（添加到白名单）
@@ -496,11 +632,39 @@ class FirewallService extends EventEmitter {
         });
     }
 
+    async executeFile(executable, args, timeout = 10000, input = null) {
+        return new Promise((resolve) => {
+            const child = execFile(executable, args, { timeout }, (error, stdout, stderr) => {
+                resolve({
+                    success: !error,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    error: error?.message
+                });
+            });
+            if (input !== null) {
+                child.stdin.end(input);
+            }
+        });
+    }
+
     // 验证IP地址格式
     isValidIP(ip) {
-        const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-        return ipv4Regex.test(ip) || ipv6Regex.test(ip);
+        return net.isIP(ip) !== 0;
+    }
+
+    isProtectedIP(ip) {
+        if (this.allowedIPs.has(ip)) return true;
+        const version = net.isIP(ip);
+        if (version === 4) {
+            const first = Number(ip.split('.')[0]);
+            return first === 0 || first === 127 || first >= 224 || ip === '255.255.255.255';
+        }
+        if (version === 6) {
+            const normalized = ip.toLowerCase();
+            return normalized === '::' || normalized === '::1' || normalized.startsWith('ff');
+        }
+        return true;
     }
 
     // 启用自动阻止
@@ -600,4 +764,4 @@ class FirewallService extends EventEmitter {
     }
 }
 
-module.exports = FirewallService; 
+module.exports = FirewallService;

@@ -4,6 +4,8 @@ const url = require('url');
 const logger = require('../utils/logger');
 const models = require('../models');
 const keyManagementService = require('./KeyManagementService');
+const config = require('../config');
+const { randomUUID } = require('crypto');
 
 class WebSocketService {
   constructor() {
@@ -11,6 +13,7 @@ class WebSocketService {
     this.clients = new Map(); // agent_id -> WebSocket
     this.heartbeatInterval = 30000; // 30秒心跳
     this.heartbeatTimers = new Map();
+    this.pendingTasks = new Map();
   }
 
   // 初始化WebSocket服务器
@@ -49,15 +52,12 @@ class WebSocketService {
         hasConnectionKey: !!connectionKey,
         tokenLength: token?.length,
         connectionKeyLength: connectionKey?.length,
-        rawConnectionKeyLength: rawConnectionKey?.length,
-        url: info.req.url
+        rawConnectionKeyLength: rawConnectionKey?.length
       });
 
       // 增加URL解码调试信息
       if (rawConnectionKey && connectionKey) {
         logger.debug('URL解码调试:', {
-          rawConnectionKey: rawConnectionKey.substring(0, 50) + '...',
-          decodedConnectionKey: connectionKey.substring(0, 50) + '...',
           rawLength: rawConnectionKey.length,
           decodedLength: connectionKey.length,
           hasPlusInRaw: rawConnectionKey.includes('+'),
@@ -73,7 +73,7 @@ class WebSocketService {
       }
 
       // 验证JWT token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tianwang-secret');
+      const decoded = jwt.verify(token, config.jwt.secret);
       
       logger.debug('JWT token解码成功:', {
         agent_id: decoded.agent_id,
@@ -112,12 +112,9 @@ class WebSocketService {
       info.req.agent = agent;
       info.req.agent_id = decoded.agent_id;
 
-      // 验证连接密钥（如果提供）- 改为更宽松的验证
       if (connectionKey && decoded.connectionKey) {
         logger.debug('开始验证连接密钥:', {
           agent_id: decoded.agent_id,
-          providedConnectionKey: connectionKey.substring(0, 32) + '...',
-          expectedConnectionKey: decoded.connectionKey.substring(0, 32) + '...',
           providedLength: connectionKey.length,
           expectedLength: decoded.connectionKey.length
         });
@@ -134,29 +131,29 @@ class WebSocketService {
           });
           
           if (!keyValidation.isValid) {
-            logger.warn('WebSocket连接密钥验证失败，但允许连接:', { 
+            logger.warn('WebSocket连接密钥验证失败:', {
               agent_id: decoded.agent_id,
               reason: keyValidation.error || '未知错误',
-              providedSignature: connectionKey.substring(0, 16) + '...',
-              expectedKey: decoded.connectionKey.substring(0, 16) + '...'
+              providedLength: connectionKey.length,
+              expectedLength: decoded.connectionKey.length
             });
-            // 密钥验证失败，但不拒绝连接，只记录警告
+            return false;
           } else {
             logger.debug('WebSocket连接密钥验证成功:', { 
               agent_id: decoded.agent_id 
             });
           }
         } catch (keyError) {
-          logger.warn('WebSocket连接密钥验证失败，但允许连接:', keyError.message);
-          // 密钥验证过程中发生错误，但不拒绝连接，只记录警告
+          logger.warn('WebSocket连接密钥验证失败:', keyError.message);
+          return false;
         }
       } else {
-        // 如果没有连接密钥，记录调试信息但不拒绝连接
-        logger.debug('WebSocket连接未提供连接密钥，但允许连接:', { 
+        logger.warn('WebSocket连接缺少连接密钥:', {
           hasConnectionKey: !!connectionKey, 
           hasDecodedKey: !!decoded.connectionKey,
           agent_id: decoded.agent_id 
         });
+        return false;
       }
 
       return true;
@@ -235,8 +232,7 @@ class WebSocketService {
       ws.on('message', (message) => {
         logger.debug('收到WebSocket消息:', { 
           agent_id, 
-          messageLength: message.length,
-          messagePreview: message.toString().substring(0, 100) + '...'
+          messageLength: message.length
         });
         this.handleMessage(agent_id, message);
       });
@@ -324,19 +320,80 @@ class WebSocketService {
         logger.debug('处理状态更新消息:', { agent_id, status: data.status });
         await this.handleStatusUpdate(agent_id, data);
         break;
+
+      case 'task-progress':
+        this.handleTaskProgress(agent_id, data);
+        break;
+
+      case 'task-result':
+        this.handleTaskResult(agent_id, data);
+        break;
                     
       default:
-        logger.warn('未知消息类型:', { agent_id, type: data.type, availableTypes: ['heartbeat', 'data', 'pong', 'status'] });
+        logger.warn('未知消息类型:', { agent_id, type: data.type, availableTypes: ['heartbeat', 'data', 'pong', 'status', 'task-progress', 'task-result'] });
       }
 
     } catch (error) {
       logger.error('处理WebSocket消息失败:', { 
         agent_id, 
         error: error.message,
-        messagePreview: message?.toString().substring(0, 100) + '...',
+        messageLength: message?.length,
         stack: error.stack
       });
     }
+  }
+
+  handleTaskProgress(agent_id, data) {
+    const pending = this.pendingTasks.get(data.task_id);
+    if (!pending || pending.agent_id !== agent_id) return;
+    pending.onProgress?.(data.progress || {});
+  }
+
+  handleTaskResult(agent_id, data) {
+    const pending = this.pendingTasks.get(data.task_id);
+    if (!pending || pending.agent_id !== agent_id) {
+      logger.warn('收到未知或节点不匹配的任务回执', { agent_id, task_id: data.task_id });
+      return;
+    }
+
+    clearTimeout(pending.timer);
+    this.pendingTasks.delete(data.task_id);
+    if (data.status === 'succeeded') {
+      pending.resolve(data);
+    } else {
+      const error = new Error(data.error?.message || '节点任务执行失败');
+      error.code = data.error?.code || 'NODE_TASK_FAILED';
+      error.result = data;
+      pending.reject(error);
+    }
+  }
+
+  dispatchTask(agent_id, task, options = {}) {
+    const task_id = task.task_id || randomUUID();
+    const timeoutMs = options.timeoutMs || config.mcp.taskTimeoutMs;
+    if (this.pendingTasks.has(task_id)) {
+      return Promise.reject(Object.assign(new Error('任务 ID 已在执行'), { code: 'TASK_ALREADY_PENDING' }));
+    }
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingTasks.delete(task_id);
+        reject(Object.assign(new Error('等待节点任务回执超时'), { code: 'NODE_TASK_TIMEOUT' }));
+      }, timeoutMs);
+
+      this.pendingTasks.set(task_id, { agent_id, resolve, reject, timer, onProgress: options.onProgress });
+      const sent = this.sendToAgent(agent_id, {
+        type: 'task',
+        data: { ...task, task_id },
+        timestamp: Date.now()
+      });
+
+      if (!sent) {
+        clearTimeout(timer);
+        this.pendingTasks.delete(task_id);
+        reject(Object.assign(new Error('目标节点不在线'), { code: 'NODE_OFFLINE' }));
+      }
+    });
   }
 
   // 处理心跳
@@ -430,6 +487,14 @@ class WebSocketService {
 
       // 移除连接
       this.clients.delete(agent_id);
+
+      for (const [taskId, pending] of this.pendingTasks.entries()) {
+        if (pending.agent_id === agent_id) {
+          clearTimeout(pending.timer);
+          this.pendingTasks.delete(taskId);
+          pending.reject(Object.assign(new Error('节点在任务执行期间断开连接'), { code: 'NODE_DISCONNECTED' }));
+        }
+      }
 
       // 清除心跳定时器
       this.clearHeartbeat(agent_id);
@@ -537,7 +602,7 @@ class WebSocketService {
   // 广播消息给所有在线代理
   broadcast(message) {
     let successCount = 0;
-    for (const [agent_id, ws] of this.clients.entries()) {
+    for (const agent_id of this.clients.keys()) {
       if (this.sendToAgent(agent_id, message)) {
         successCount++;
       }
@@ -584,6 +649,11 @@ class WebSocketService {
         ws.close(1001, '服务器关闭');
       }
       this.clients.clear();
+      for (const pending of this.pendingTasks.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(Object.assign(new Error('服务正在关闭'), { code: 'SERVER_SHUTDOWN' }));
+      }
+      this.pendingTasks.clear();
 
       // 关闭WebSocket服务器
       this.wss.close();
@@ -592,4 +662,4 @@ class WebSocketService {
   }
 }
 
-module.exports = new WebSocketService(); 
+module.exports = new WebSocketService();

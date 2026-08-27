@@ -1,35 +1,37 @@
 const models = require('../models');
-const SecurityEvent = require('../models/SecurityEvent');
 const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const keyManagementService = require('../services/KeyManagementService');
 const deviceFingerprintService = require('../services/DeviceFingerprintService');
 const registrationCodeService = require('../services/RegistrationCodeService');
+const securityEventService = require('../services/SecurityEventService');
+const config = require('../config');
 
 class AgentController {
   // 注册代理
   async registerAgent(req, res) {
     try {
       const {
-        agent_id: agent_id,
+        agent_id: agent_idRaw,
         hostname,
         platform,
         arch,
         version,
         capabilities,
-        system_info: system_info,
+        system_info: systemInfoRaw,
         registrationCode,
-        device_fingerprint: device_fingerprint
+        device_fingerprint: deviceFingerprintRaw
       } = req.body;
+      const agent_id = agent_idRaw || req.body.agentId;
+      const system_info = systemInfoRaw || req.body.systemInfo;
+      const device_fingerprint = deviceFingerprintRaw || req.body.deviceFingerprint;
 
       console.log('代理注册请求:', {
         agent_id: agent_id,
         hostname,
         platform,
         hasRegistrationCode: !!registrationCode,
-        hasFingerprint: !!device_fingerprint,
-        fingerprint: device_fingerprint?.substring(0, 16) + '...'
+        hasFingerprint: !!device_fingerprint
       });
 
       // 验证必需字段
@@ -43,7 +45,7 @@ class AgentController {
 
       // 验证注册码（如果提供）
       if (registrationCode) {
-        console.log('验证注册码:', registrationCode.substring(0, 8) + '...');
+        console.log('验证注册码');
         const deviceInfo = {
           agent_id: agent_id,
           hostname,
@@ -121,7 +123,7 @@ class AgentController {
           ...system_info
         });
         fingerprint = fingerprintResult.fingerprint;
-        console.log('生成的设备指纹:', fingerprint.substring(0, 16) + '...');
+        console.log('设备指纹生成完成');
       }
 
       // 创建新代理
@@ -167,9 +169,9 @@ class AgentController {
           agent_id: agent_id, 
           hostname,
           type: 'agent',
-          connectionKey: connectionKey.key
+          connectionKey: `${connectionKey.key}:${connectionKey.timestamp}:${connectionKey.signature}`
         },
-        process.env.JWT_SECRET || 'tianwang-secret',
+        config.jwt.secret,
         { expiresIn: '7d' }
       );
 
@@ -210,25 +212,18 @@ class AgentController {
     try {
       console.log('记录安全事件:', { eventType, severity, agent_id: agent.agent_id, details });
       
-      // 检查SecurityEvent模型是否可用
-      if (!models.SecurityEvent) {
-        console.warn('SecurityEvent模型不可用，跳过安全事件记录');
-        return;
-      }
-
-      await models.SecurityEvent.create({
-        event_type: eventType,
-        severity: severity,
+      await securityEventService.record({
+        type: eventType,
+        alert_type: 'authentication-anomaly',
+        severity,
         title: `代理安全事件: ${eventType}`,
         description: `代理 ${agent.agent_id} (${agent.hostname}) 发生安全事件: ${eventType}`,
-        raw_data: {
-          agent_id: agent.agent_id,
-          hostname: agent.hostname,
-          platform: agent.platform,
-          ...details
-        },
-        device_id: agent.id,
-        status: 'open'
+        details: { hostname: agent.hostname, platform: agent.platform, ...details },
+        device_id: agent.device_id,
+        agent_id: agent.agent_id,
+        organization_id: agent.organization_id,
+        source: 'agent-auth',
+        tags: ['agent', 'authentication']
       });
 
       console.log('安全事件记录成功:', { eventType, agent_id: agent.agent_id });
@@ -241,7 +236,9 @@ class AgentController {
   // 代理认证
   async authenticateAgent(req, res) {
     try {
-      const { agent_id: agent_id, hostname, device_fingerprint: device_fingerprint } = req.body;
+      const agent_id = req.body.agent_id || req.body.agentId;
+      const hostname = req.body.hostname;
+      const device_fingerprint = req.body.device_fingerprint || req.body.deviceFingerprint;
 
       console.log('代理认证请求:', { agent_id: agent_id, hostname, hasFingerprint: !!device_fingerprint });
 
@@ -272,12 +269,17 @@ class AgentController {
         hasStoredFingerprint: !!agent.device_fingerprint 
       });
 
-      // 验证设备指纹（如果提供）
-      if (device_fingerprint && agent.device_fingerprint) {
-        console.log('开始设备指纹验证:', {
-          providedFingerprint: device_fingerprint.substring(0, 16) + '...',
-          storedFingerprint: agent.device_fingerprint.substring(0, 16) + '...'
+      if (agent.device_fingerprint && !device_fingerprint) {
+        return res.status(401).json({
+          success: false,
+          message: '设备指纹不能为空',
+          error: 'DEVICE_FINGERPRINT_REQUIRED'
         });
+      }
+
+      // 验证设备指纹
+      if (device_fingerprint && agent.device_fingerprint) {
+        console.log('开始设备指纹验证');
 
         // 构建完整的设备信息用于指纹验证
         const deviceInfoForVerification = {
@@ -322,13 +324,7 @@ class AgentController {
         console.log('设备指纹生成成功:', {
           hostname: fingerprintValidation.components.hostname,
           platform: fingerprintValidation.components.platform,
-          fingerprint: fingerprintValidation.fingerprint.substring(0, 16) + '...',
           dataLength: JSON.stringify(fingerprintValidation.components).length
-        });
-
-        console.log('当前生成的指纹:', {
-          currentFingerprint: fingerprintValidation.fingerprint.substring(0, 16) + '...',
-          expectedFingerprint: agent.device_fingerprint.substring(0, 16) + '...'
         });
 
         // 验证指纹
@@ -341,25 +337,13 @@ class AgentController {
 
         console.log('设备指纹验证结果:', {
           isValid: fingerprintValidationResult.isValid,
-          expected: fingerprintValidationResult.expected.substring(0, 16) + '...',
-          actual: fingerprintValidationResult.actual.substring(0, 16) + '...',
           match: fingerprintValidationResult.isValid ? '匹配' : '不匹配'
-        });
-
-        console.log('设备指纹验证结果:', {
-          isValid: fingerprintValidationResult.isValid,
-          expected: fingerprintValidationResult.expected.substring(0, 16) + '...',
-          actual: fingerprintValidationResult.actual.substring(0, 16) + '...',
-          currentGenerated: fingerprintValidationResult.currentGenerated.substring(0, 16) + '...'
         });
 
         if (!fingerprintValidationResult.isValid) {
           console.log('设备指纹验证失败:', {
             agent_id, 
-            hostname,
-            expected: agent.device_fingerprint.substring(0, 16) + '...',
-            actual: device_fingerprint.substring(0, 16) + '...',
-            currentGenerated: fingerprintValidation.fingerprint?.substring(0, 16) + '...'
+            hostname
           });
           
           // 记录安全事件
@@ -377,12 +361,7 @@ class AgentController {
           return res.status(401).json({
             success: false,
             message: '设备指纹验证失败',
-            error: 'DEVICE_FINGERPRINT_MISMATCH',
-            details: {
-              expected: agent.device_fingerprint.substring(0, 16) + '...',
-              actual: device_fingerprint.substring(0, 16) + '...',
-              currentGenerated: fingerprintValidation.fingerprint?.substring(0, 16) + '...'
-            }
+            error: 'DEVICE_FINGERPRINT_MISMATCH'
           });
         } else {
           console.log('设备指纹验证成功:', { agent_id, hostname });
@@ -408,9 +387,7 @@ class AgentController {
         keyLength: connectionKey.key.length,
         timestamp: connectionKey.timestamp,
         signatureLength: connectionKey.signature.length,
-        expiresAt: connectionKey.expiresAt,
-        keyPreview: connectionKey.key.substring(0, 16) + '...',
-        signaturePreview: connectionKey.signature.substring(0, 16) + '...'
+        expiresAt: connectionKey.expiresAt
       });
 
       // 构建完整的连接密钥字符串
@@ -418,12 +395,7 @@ class AgentController {
 
       console.log('完整连接密钥字符串:', {
         fullConnectionKeyLength: fullConnectionKey.length,
-        fullConnectionKeyPreview: fullConnectionKey.substring(0, 32) + '...',
-        parts: {
-          key: connectionKey.key.substring(0, 16) + '...',
-          timestamp: connectionKey.timestamp,
-          signature: connectionKey.signature.substring(0, 16) + '...'
-        }
+        timestamp: connectionKey.timestamp
       });
 
       // 生成新的JWT token
@@ -434,7 +406,7 @@ class AgentController {
           type: 'agent',
           connectionKey: fullConnectionKey
         },
-        process.env.JWT_SECRET || 'tianwang-secret',
+        config.jwt.secret,
         { expiresIn: '7d' }
       );
 
@@ -685,23 +657,19 @@ class AgentController {
   // 创建安全事件
   async createSecurityEvent(eventData) {
     try {
-      // 检查SecurityEvent模型是否可用
-      if (!models.SecurityEvent) {
-        console.warn('SecurityEvent模型不可用，跳过安全事件创建');
-        return null;
-      }
-
-      const event = await models.SecurityEvent.create({
-        event_type: eventData.type,
+      const agent = await models.Agent.findOne({ where: { agent_id: eventData.agent_id } });
+      const event = await securityEventService.record({
+        type: eventData.type,
+        alert_type: eventData.type === 'network_threat' ? 'suspicious-connection' : 'high-cpu-usage',
         severity: eventData.severity,
         title: eventData.title || `安全事件: ${eventData.type}`,
         description: eventData.description || `代理 ${eventData.agent_id} 发生安全事件: ${eventData.type}`,
-        raw_data: {
-          agent_id: eventData.agent_id,
-          ...eventData.metadata
-        },
-        device_id: eventData.deviceId,
-        status: 'open'
+        details: eventData.metadata || {},
+        device_id: eventData.deviceId || agent?.device_id,
+        agent_id: eventData.agent_id,
+        organization_id: agent?.organization_id,
+        source: 'internal-monitor',
+        tags: ['internal-monitor', eventData.type]
       });
 
       // 同时存储到InfluxDB
@@ -1122,4 +1090,4 @@ class AgentController {
   }
 }
 
-module.exports = new AgentController(); 
+module.exports = new AgentController();

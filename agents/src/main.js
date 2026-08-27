@@ -10,6 +10,8 @@ const NetworkMonitor = require('./services/NetworkMonitor');
 const SecurityService = require('./services/SecurityService');
 const FirewallService = require('./services/FirewallService');
 const EventService = require('./services/EventService');
+const PacketCaptureService = require('./services/PacketCaptureService');
+const TaskExecutionService = require('./services/TaskExecutionService');
 
 // 配置存储
 const store = new Store();
@@ -23,6 +25,7 @@ let networkMonitor = null;
 let securityService = null;
 let firewallService = null;
 let eventService = null;
+let taskExecutionService = null;
 let settingsWindow = null; // 新增：设置窗口
 
 // 应用程序是否已准备就绪
@@ -341,7 +344,7 @@ async function initializeServices() {
             const savedRegistrationCode = store.get('registrationCode');
             if (savedRegistrationCode) {
                 agentService.setRegistrationCode(savedRegistrationCode);
-                logger.info('从存储中恢复注册码:', savedRegistrationCode.substring(0, 8) + '...');
+                logger.info('已从存储中恢复注册码');
             }
             
             await agentService.initialize();
@@ -430,11 +433,19 @@ async function initializeServices() {
         });
 
         // 初始化防火墙服务
-        firewallService = new FirewallService();
+        firewallService = new FirewallService({ executionStore: store });
         await firewallService.initialize({
             autoBlock: false, // 默认关闭自动阻止
             blockDuration: 3600000, // 1小时
             whitelistIPs: ['127.0.0.1', '::1', '192.168.1.1', '10.0.0.1']
+        });
+
+        taskExecutionService = new TaskExecutionService({
+            packetCapture: new PacketCaptureService(),
+            networkMonitor,
+            systemMonitor,
+            firewall: firewallService,
+            publicKeyProvider: () => agentService?.publicKey
         });
 
         // 初始化事件服务
@@ -473,6 +484,38 @@ async function initializeServices() {
 
         // 尝试连接到服务器（可选，不阻塞启动）
         if (agentService) {
+            agentService.on('task', async (task) => {
+                const startedAt = new Date().toISOString();
+                try {
+                    agentService.sendMessage({
+                        type: 'task-progress',
+                        task_id: task.task_id,
+                        progress: { phase: 'started', started_at: startedAt }
+                    });
+                    const result = await taskExecutionService.execute(task, progress => {
+                        agentService.sendMessage({ type: 'task-progress', task_id: task.task_id, progress });
+                    });
+                    agentService.sendMessage({
+                        type: 'task-result',
+                        task_id: task.task_id,
+                        status: 'succeeded',
+                        started_at: startedAt,
+                        finished_at: new Date().toISOString(),
+                        result
+                    });
+                } catch (error) {
+                    logger.error('节点任务执行失败:', { task_id: task.task_id, code: error.code, message: error.message });
+                    agentService.sendMessage({
+                        type: 'task-result',
+                        task_id: task.task_id,
+                        status: 'failed',
+                        started_at: startedAt,
+                        finished_at: new Date().toISOString(),
+                        error: { code: error.code || 'NODE_TASK_FAILED', message: error.message }
+                    });
+                }
+            });
+
             try {
                 await agentService.connect();
             } catch (connectError) {
@@ -797,7 +840,7 @@ ipcMain.handle('set-registration-code', async (event, code) => {
         if (agentService) {
             agentService.setRegistrationCode(code);
             store.set('registrationCode', code);
-            logger.info('注册码已设置:', code ? code.substring(0, 8) + '...' : 'null');
+            logger.info('注册码已设置:', { configured: !!code });
             return { success: true };
         }
         return { success: false, error: '代理服务未初始化' };
@@ -1100,4 +1143,4 @@ process.on('unhandledRejection', (reason, promise) => {
     }
     
     logger.error('未处理的Promise拒绝:', reason);
-}); 
+});

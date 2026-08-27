@@ -110,7 +110,6 @@ module.exports = (sequelize) => {
       existingUsage.agent_id = agent_id; // 更新agent_id（可能发生变化）
       console.log('设备已使用过此注册码，更新使用时间:', { 
         agent_id, 
-        device_fingerprint: device_fingerprint?.substring(0, 16) + '...',
         usedCount: this.used_count 
       });
     } else {
@@ -123,7 +122,6 @@ module.exports = (sequelize) => {
       });
       console.log('新设备使用注册码，增加使用次数:', { 
         agent_id, 
-        device_fingerprint: device_fingerprint?.substring(0, 16) + '...',
         usedCount: this.used_count 
       });
     }
