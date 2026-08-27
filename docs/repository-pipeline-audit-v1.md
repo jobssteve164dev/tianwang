@@ -90,6 +90,7 @@
 ## 6. 已知非阻断债务
 
 - ESLint 当前为 0 error，但服务端仍有 154 条 warning，前端仍有类型 `any`、Hook 依赖等历史 warning。它们没有阻断本轮逻辑与构建，但不能描述为“零告警代码库”。
+- 包含开发工具链的完整 `npm audit` 仍报告根工作区 55 项、Agent 23 项告警，集中在 CRA、Electron、旧 ESLint/Jest 及其间接依赖；`--omit=dev` 的两个生产审计均为 0。后续升级开发工具链必须保留当前 220 项契约，不应使用 `npm audit fix --force` 制造不可控的大版本迁移。
 - 前端 gzip 后主包约 933 KiB，生产构建提示体积偏大。建议后续按页面拆分 AI 模型、规则编辑和报表模块；这属于性能优化，不影响当前主路径正确性。
 - `agents/openwrt` 是未完成的历史 C 原型，不在支持矩阵。当前可发布节点实现以 `agents/src` 为准。
 - MCP 首版使用短期 Bearer token，尚未实现完整 OAuth 动态客户端注册；调查调用保留 `investigation_id` 查询，但尚未接入 MCP Tasks 扩展和运行中取消。
