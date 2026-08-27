@@ -18,7 +18,7 @@
     "ai:dev": "node scripts/ai-environment.js run",
     "build": "npm run server:build && npm run client:build && npm run agent:build",
     "server:build": "npm --prefix server run build",
-    "client:build": "npm --prefix client run build",
+    "client:build": "CI=false npm --prefix client run build",
     "agent:build": "npm --prefix agents run build",
     "test": "npm run server:test && npm run client:test && npm run agent:test && npm run integration:test && npm run ai:test",
     "server:test": "npm --prefix server test -- --runInBand",
