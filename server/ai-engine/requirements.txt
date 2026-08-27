@@ -7,7 +7,7 @@ pydantic-settings==2.15.0
 
 # 核心机器学习框架
 scikit-learn==1.9.0
-numpy==2.5.2
+numpy==2.4.6
 pandas==3.0.5
 scipy==1.18.1
 
