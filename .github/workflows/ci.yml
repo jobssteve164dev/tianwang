@@ -58,7 +58,7 @@ jobs:
 
       - name: Validate deployment configuration
         run: |
-          docker compose config --quiet
+          node --test tests/deployment/compose.cjs
           docker compose -f docker-compose.build.yml config --quiet
 
       - name: Apply database schema
@@ -75,3 +75,52 @@ jobs:
 
       - name: Verify repository
         run: npm run verify
+
+  production-containers:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: tianwang-ci
+      DB_PASSWORD: fixture-postgres-password
+      REDIS_PASSWORD: fixture-redis-password
+      INFLUXDB_PASSWORD: fixture-influx-password
+      INFLUXDB_TOKEN: fixture-influx-admin-token
+      JWT_SECRET: fixture-jwt-signing-secret
+      ENCRYPTION_KEY: fixture-encryption-secret
+      AI_INTERNAL_TOKEN: fixture-ai-internal-token
+      BOOTSTRAP_ADMIN_USERNAME: fixtureadmin
+      BOOTSTRAP_ADMIN_EMAIL: fixture@example.test
+      BOOTSTRAP_ADMIN_PASSWORD: FixtureAdminPassword1!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build production images
+        run: docker compose build
+      - name: Inspect and replay exported runtime images
+        run: |
+          mkdir -p container-evidence
+          docker image inspect tianwang-server:latest tianwang-client:latest tianwang-ai-engine:latest tianwang-nginx:latest --format '{{.Id}} {{.Os}}/{{.Architecture}} {{.Size}}' > container-evidence/images.txt
+          docker save tianwang-server:latest tianwang-client:latest tianwang-ai-engine:latest tianwang-nginx:latest | gzip > container-evidence/runtime-images.tar.gz
+          gzip -dc container-evidence/runtime-images.tar.gz | docker load
+          stat -c %s container-evidence/runtime-images.tar.gz > container-evidence/archive-bytes.txt
+      - name: Start complete production topology
+        run: docker compose up -d --no-build --wait
+      - name: Verify packaged dashboard and authentication
+        run: node --test tests/deployment/runtime.cjs
+      - name: Capture runtime evidence
+        if: always()
+        run: |
+          mkdir -p container-evidence
+          docker compose ps --all --format json > container-evidence/services.json
+          docker compose logs --no-color > container-evidence/services.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-container-evidence
+          path: container-evidence
+          retention-days: 7
+      - name: Stop this verification stack
+        if: always()
+        run: docker compose stop
