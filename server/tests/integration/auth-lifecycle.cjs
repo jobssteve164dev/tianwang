@@ -74,9 +74,11 @@ test('logout revokes the authenticated session even if refresh wins the race', a
 test('logging out one device preserves live events on another device', async () => {
   const { io: connect } = require('socket.io-client');
   const { server, io } = require('../../src/index');
+  const agentSockets = require('../../src/services/WebSocketService');
   const { once } = require('node:events');
   const first = await login(), second = await login();
   app.set('io', io);
+  agentSockets.initialize(server);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}`;
   const sockets = [first, second].map(session => connect(url, { auth: { token: session.accessToken }, transports: ['websocket'], reconnection: false }));
@@ -146,6 +148,7 @@ test('logging out one device preserves live events on another device', async () 
     } finally { releaseCheck(); models.UserSession.findOne = originalSessionFind; }
   } finally {
     sockets.forEach(socket => socket.disconnect());
+    agentSockets.close();
     await new Promise(resolve => io.close(resolve));
     app.set('io', undefined);
   }

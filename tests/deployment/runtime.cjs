@@ -23,6 +23,21 @@ test('packaged gateway serves the dashboard and real authenticated data', async 
   const headers = { Authorization: 'Bearer ' + session.accessToken };
   assert.equal((await json('/api/auth/me', { headers })).user.role, 'super_admin');
   for (const path of ['/api/dashboard/security-metrics','/api/dashboard/threat-trends','/api/dashboard/device-stats']) await json(path, { headers });
+  const socketCheck = `
+    const WebSocket = require('ws');
+    const token = require('fs').readFileSync(0, 'utf8');
+    const socket = new WebSocket('ws://nginx/socket.io/?EIO=4&transport=websocket');
+    const deadline = setTimeout(() => { console.error('Socket.IO authentication did not complete'); socket.terminate(); process.exitCode = 1; }, 10000);
+    socket.on('message', data => {
+      const frame = data.toString();
+      if (frame.startsWith('0')) socket.send('40' + JSON.stringify({ token }));
+      if (frame.startsWith('40')) { clearTimeout(deadline); socket.close(); }
+      if (frame.startsWith('44')) { console.error('Socket.IO authentication rejected'); process.exitCode = 1; clearTimeout(deadline); socket.close(); }
+      if (frame === '2') socket.send('3');
+    });
+    socket.on('error', error => { console.error(error.message); clearTimeout(deadline); process.exitCode = 1; });
+  `;
+  execFileSync('docker', ['compose', 'exec', '-T', 'server', 'node', '-e', socketCheck], { input: session.accessToken });
   await json('/api/auth/logout', { method: 'POST', headers });
   assert.equal((await fetch(base + '/api/auth/me', { headers })).status, 401);
 });

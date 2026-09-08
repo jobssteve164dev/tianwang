@@ -10,6 +10,8 @@ const { randomUUID } = require('crypto');
 class WebSocketService {
   constructor() {
     this.wss = null;
+    this.httpServer = null;
+    this.upgradeHandler = null;
     this.clients = new Map(); // agent_id -> WebSocket
     this.heartbeatInterval = 30000; // 30秒心跳
     this.heartbeatTimers = new Map();
@@ -19,7 +21,7 @@ class WebSocketService {
   // 初始化WebSocket服务器
   initialize(server) {
     this.wss = new WebSocket.Server({
-      server,
+      noServer: true,
       path: '/ws',
       verifyClient: async (info, callback) => {
         try {
@@ -33,6 +35,14 @@ class WebSocketService {
     });
 
     this.wss.on('connection', this.handleConnection.bind(this));
+    const wss = this.wss;
+    this.httpServer = server;
+    this.upgradeHandler = (request, socket, head) => {
+      // Socket.IO shares this HTTP server and handles its own upgrade path.
+      if (!wss.shouldHandle(request)) return;
+      wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));
+    };
+    server.on('upgrade', this.upgradeHandler);
         
     logger.info('WebSocket服务器已启动');
     return this.wss;
@@ -656,7 +666,11 @@ class WebSocketService {
       this.pendingTasks.clear();
 
       // 关闭WebSocket服务器
+      this.httpServer.removeListener('upgrade', this.upgradeHandler);
       this.wss.close();
+      this.wss = null;
+      this.httpServer = null;
+      this.upgradeHandler = null;
       logger.info('WebSocket服务器已关闭');
     }
   }
