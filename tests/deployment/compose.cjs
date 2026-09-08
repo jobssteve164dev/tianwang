@@ -29,3 +29,13 @@ test('the effective runtime uses injected credentials and production settings', 
   assert.equal(s['ai-engine'].environment.AI_INTERNAL_TOKEN, env.AI_INTERNAL_TOKEN);
   assert.equal(s.server.environment.LOG_LEVEL, 'info');
 });
+test('backend producers and AI consumers use the same production topics', () => {
+  const path = require('node:path');
+  const backend = JSON.parse(execFileSync('node', ['-e', `process.stdout.write(JSON.stringify(require(${JSON.stringify(path.resolve('server/src/config'))}).kafka.topics))`], {
+    env: { ...env, ...config.services.server.environment }, encoding: 'utf8'
+  }));
+  const ai = JSON.parse(execFileSync('python3', ['-c', `import sys,json; sys.path.insert(0,${JSON.stringify(path.resolve('server/ai-engine'))}); from src.config import config; print(json.dumps(config.kafka_topics))`], {
+    cwd: require('node:os').tmpdir(), env: { ...env, ...config.services['ai-engine'].environment }, encoding: 'utf8'
+  }));
+  assert.deepEqual(ai, backend);
+});

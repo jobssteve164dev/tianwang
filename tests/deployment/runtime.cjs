@@ -41,3 +41,8 @@ test('agent WebSocket connections reach backend authentication', async () => {
   });
   assert.equal(status, 403, 'Unauthenticated agents must reach the backend, not the dashboard HTML');
 });
+test('packaged AI and backend share their Kafka topics', () => {
+  const backend = JSON.parse(execFileSync('docker', ['compose', 'exec', '-T', 'server', 'node', '-e', "process.stdout.write(JSON.stringify(require('./src/config').kafka.topics))"], { encoding: 'utf8' }));
+  const ai = JSON.parse(execFileSync('docker', ['compose', 'exec', '-T', 'ai-engine', 'python', '-c', 'import json; from src.config import config; print(json.dumps(config.kafka_topics))'], { encoding: 'utf8' }));
+  assert.deepEqual(ai, backend);
+});

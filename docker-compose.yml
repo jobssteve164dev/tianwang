@@ -189,6 +189,7 @@ services:
       AI_LOG_LEVEL: INFO
       PYTHONPATH: /app
       AI_KAFKA_BROKERS: kafka:9092
+      AI_KAFKA_TOPICS: '{"logs":"security-logs","alerts":"security-alerts","actions":"protection-actions"}'
       AI_INFLUXDB_URL: http://influxdb:8086
       AI_INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN}
       AI_REDIS_HOST: redis
