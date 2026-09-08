@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
+const http = require('node:http');
 const base = 'http://127.0.0.1:18080';
 const json = async (path, options) => {
   const response = await fetch(base + path, options);
@@ -29,4 +30,14 @@ test('runtime images exclude local secrets and development dependencies', () => 
   const check = "const fs=require('fs');if(fs.existsSync('/app/.env')||fs.existsSync('/app/.git')||fs.existsSync('/app/node_modules/jest'))process.exit(1)";
   execFileSync('docker', ['compose','exec','-T','server','node','-e',check]);
   execFileSync('docker', ['compose','exec','-T','ai-engine','python','-c',"import importlib.util; assert importlib.util.find_spec('pytest') is None"]);
+});
+test('agent WebSocket connections reach backend authentication', async () => {
+  const status = await new Promise((resolve, reject) => {
+    const request = http.get(base + '/ws', { headers: {
+      Connection: 'Upgrade', Upgrade: 'websocket',
+      'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ=='
+    } }, response => { response.resume(); resolve(response.statusCode); });
+    request.on('error', reject);
+  });
+  assert.equal(status, 403, 'Unauthenticated agents must reach the backend, not the dashboard HTML');
 });
