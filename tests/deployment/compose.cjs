@@ -34,7 +34,8 @@ test('backend producers and AI consumers use the same production topics', () => 
   const backend = JSON.parse(execFileSync('node', ['-e', `process.stdout.write(JSON.stringify(require(${JSON.stringify(path.resolve('server/src/config'))}).kafka.topics))`], {
     env: { ...env, ...config.services.server.environment }, encoding: 'utf8'
   }));
-  const ai = JSON.parse(execFileSync('python3', ['-c', `import sys,json; sys.path.insert(0,${JSON.stringify(path.resolve('server/ai-engine'))}); from src.config import config; print(json.dumps(config.kafka_topics))`], {
+  const python = process.env.PYTHON || path.resolve('.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  const ai = JSON.parse(execFileSync(python, ['-c', `import sys,json; sys.path.insert(0,${JSON.stringify(path.resolve('server/ai-engine'))}); from src.config import config; print(json.dumps(config.kafka_topics))`], {
     cwd: require('node:os').tmpdir(), env: { ...env, ...config.services['ai-engine'].environment }, encoding: 'utf8'
   }));
   assert.deepEqual(ai, backend);
