@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const models = require('../models');
 const config = require('../config');
 const logger = require('../utils/logger');
+const { generateTokens, findAccessSession } = require('../services/UserSessionService');
 
 /**
  * 验证JWT Token
@@ -104,13 +105,15 @@ const authenticate = async (req, res, next) => {
       }
       
       // 用户认证逻辑
-      // 检查模型是否可用
-      if (!models.User) {
-        return res.status(503).json({
-          error: 'Database not available',
-          code: 'DB_UNAVAILABLE'
-        });
+      if (!models.User || !models.UserSession) {
+        return res.status(503).json({ error: 'Database not available', code: 'DB_UNAVAILABLE' });
       }
+      const session = decoded.tokenUse === 'access' && decoded.userId
+        ? await findAccessSession(token, decoded.userId) : null;
+      if (!session) {
+        return res.status(401).json({ error: 'Session expired; sign in again', code: 'SESSION_EXPIRED' });
+      }
+      req.sessionId = session.id;
 
       // 查找用户
       const user = await models.User.findByPk(decoded.userId, {
@@ -142,6 +145,7 @@ const authenticate = async (req, res, next) => {
       req.user = user;
       req.userId = user.id;
       req.organizationId = user.organization_id;
+      req.accessToken = token;
       
       next();
       
@@ -232,21 +236,6 @@ const requireOrganization = (req, res, next) => {
   }
   
   next();
-};
-
-/**
- * 生成JWT Token
- */
-const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId, tokenUse: 'access' }, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn
-  });
-  
-  const refreshToken = jwt.sign({ userId, tokenUse: 'refresh' }, config.jwt.secret, {
-    expiresIn: config.jwt.refreshExpiresIn
-  });
-  
-  return { accessToken, refreshToken };
 };
 
 /**

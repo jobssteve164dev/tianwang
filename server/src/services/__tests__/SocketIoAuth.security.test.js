@@ -18,6 +18,7 @@ describe('Socket.IO authentication', () => {
     const userId = 'd8ca4979-0e71-409f-8944-acba9b1a9b5c';
     const organizationId = '7766f65c-1cf5-40f1-bd24-8a527862b460';
     const modelRegistry = {
+      UserSession: { findOne: jest.fn().mockResolvedValue({ is_active: true }) },
       User: {
         findByPk: jest.fn().mockResolvedValue({
           id: userId,
@@ -28,7 +29,7 @@ describe('Socket.IO authentication', () => {
         })
       }
     };
-    const token = jwt.sign({ userId }, config.jwt.secret);
+    const token = jwt.sign({ userId, tokenUse: 'access' }, config.jwt.secret);
     const socket = { handshake: { auth: { token } } };
     const next = jest.fn();
 
@@ -36,5 +37,9 @@ describe('Socket.IO authentication', () => {
 
     expect(next).toHaveBeenCalledWith();
     expect(socket.user).toEqual({ id: userId, organization_id: organizationId, role: 'admin' });
+    modelRegistry.UserSession.findOne.mockResolvedValue(null);
+    const revokedNext = jest.fn();
+    await authenticateSocket({ handshake: { auth: { token } } }, revokedNext, modelRegistry);
+    expect(revokedNext.mock.calls[0][0]).toBeInstanceOf(Error);
   });
 });

@@ -43,6 +43,7 @@ const keyManagementService = require('./services/KeyManagementService');
 const dataStorageService = require('./services/DataStorageService');
 const mcpRoutes = require('./routes/mcp');
 const models = require('./models');
+const { findAccessSession } = require('./services/UserSessionService');
 const aiModelController = require('./controllers/aiModelController');
 const threatConfigService = require('./services/ThreatIntelligenceConfigService');
 
@@ -122,7 +123,10 @@ async function authenticateSocket(socket, next, modelRegistry = models) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('AUTH_REQUIRED'));
     const decoded = jwt.verify(token, config.jwt.secret);
-    if (decoded.type === 'agent' || decoded.tokenUse === 'refresh' || !decoded.userId) return next(new Error('USER_TOKEN_REQUIRED'));
+    if (decoded.type === 'agent' || decoded.tokenUse !== 'access' || !decoded.userId) return next(new Error('USER_TOKEN_REQUIRED'));
+    const session = await findAccessSession(token, decoded.userId, modelRegistry);
+    if (!session) return next(new Error('AUTH_DENIED'));
+    socket.sessionId = session.id;
     const user = await modelRegistry.User.findByPk(decoded.userId);
     if (!user || user.status !== 'active' || user.isLocked()) return next(new Error('AUTH_DENIED'));
     socket.user = { id: user.id, organization_id: user.organization_id, role: user.role };
@@ -134,20 +138,37 @@ async function authenticateSocket(socket, next, modelRegistry = models) {
 }
 
 io.use(authenticateSocket);
+app.set('io', io);
 
 // Socket.IO事件处理
 io.on('connection', (socket) => {
-  logger.info('Socket.IO client connected', { socketId: socket.id, userId: socket.user.id });
-  socket.emit('authenticated', { status: 'success' });
+  socket.join(`user:${socket.user.id}`);
+  socket.join(`session:${socket.sessionId}`);
+  // Register subscriptions immediately, but hold them until the joined session is rechecked.
+  const sessionReady = (async () => {
+    try {
+      if (!await findAccessSession(socket.handshake.auth.token, socket.user.id) || !socket.connected) {
+        socket.disconnect(true);
+        return false;
+      }
+      logger.info('Socket.IO client connected', { socketId: socket.id, userId: socket.user.id });
+      socket.emit('authenticated', { status: 'success' });
+      return true;
+    } catch (error) {
+      logger.warn('Socket.IO session validation failed', { reason: error.name });
+      socket.disconnect(true);
+      return false;
+    }
+  })();
 
-  // 实时威胁数据订阅
-  socket.on('subscribe-threats', () => {
+  socket.on('subscribe-threats', async () => {
+    if (!await sessionReady || !socket.connected) return;
     socket.join(`threats:${socket.user.organization_id}`);
     logger.info('Socket.IO threat subscription enabled', { socketId: socket.id, organizationId: socket.user.organization_id });
   });
 
-  // 实时系统状态订阅
-  socket.on('subscribe-system-status', () => {
+  socket.on('subscribe-system-status', async () => {
+    if (!await sessionReady || !socket.connected) return;
     socket.join(`system-status:${socket.user.organization_id}`);
     logger.info('Socket.IO system subscription enabled', { socketId: socket.id, organizationId: socket.user.organization_id });
   });

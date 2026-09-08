@@ -1,0 +1,28 @@
+.login-page {
+  background: radial-gradient(ellipse at 15% 15%, #e8eaff 0, transparent 55%),
+    radial-gradient(ellipse at 90% 90%, #ede9f6 0, transparent 50%), #f5f6fb;
+}
+
+.login-panel {
+  padding: 40px;
+  background: #fff;
+  border: 1px solid #e1e4ef;
+  border-radius: 20px;
+  box-shadow: 0 20px 70px #27336612;
+}
+
+.login-panel .ant-form-item-label > label { color: #333c56; font-weight: 500; }
+.login-panel .ant-input-affix-wrapper { border-color: #adb4c8; }
+.login-panel .ant-input-affix-wrapper-focused { outline: 2px solid #667eea; outline-offset: 3px; }
+.login-panel .ant-btn:focus-visible { outline: 3px solid #434eb0; outline-offset: 4px; }
+.login-panel .ant-input { font-size: 16px; }
+.login-panel .ant-alert { text-align: left; }
+
+@media (max-width: 480px) {
+  .login-panel { padding: 32px 24px; }
+}
+
+@media (max-height: 560px) {
+  .login-page { align-items: flex-start !important; }
+  .login-panel { padding-top: 24px; padding-bottom: 24px; }
+}

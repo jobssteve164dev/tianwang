@@ -3,6 +3,7 @@ const { Umzug, SequelizeStorage } = require('umzug');
 const path = require('path');
 const logger = require('../utils/logger');
 const models = require('../models');
+const { bootstrapAdmin } = require('./bootstrap-admin');
 
 const runMigrations = async () => {
   let sequelize;
@@ -44,6 +45,7 @@ const runMigrations = async () => {
       throw new Error('Database models failed to initialize after migrations');
     }
     await sequelize.sync();
+    await bootstrapAdmin(sequelize, initialized.models);
     logger.info('✅ [DB Migration] Model schema synchronization completed.');
 
   } catch (error) {

@@ -3,6 +3,7 @@ import { Form, Input, Button, Alert } from 'antd';
 import { UserOutlined, LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginAsync, clearError } from '../../store/slices/authSlice';
+import './LoginPage.css';
 
 interface LoginForm {
   username: string;
@@ -16,10 +17,9 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (values: LoginForm) => {
     try {
-      await (dispatch as any)(loginAsync(values)).unwrap();
-    } catch (error) {
-      // 错误已经在Redux中处理
-      console.error('登录失败:', error);
+      await dispatch(loginAsync(values)).unwrap();
+    } catch {
+      form.focusField('password');
     }
   };
 
@@ -28,18 +28,16 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{
+    <main className="login-page" style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       padding: '20px'
     }}>
-      <div className="modern-card" style={{
+      <section className="login-panel" aria-labelledby="login-title" style={{
         width: '100%',
-        maxWidth: '400px',
-        padding: '40px',
+        maxWidth: '440px',
         textAlign: 'center'
       }}>
         <div style={{ marginBottom: '32px' }}>
@@ -51,20 +49,17 @@ const LoginPage: React.FC = () => {
               display: 'block'
             }}
           />
-          <h2 style={{
+          <h1 id="login-title" style={{
             fontSize: '28px',
             fontWeight: 600,
             margin: 0,
             marginBottom: '8px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
+            color: '#1e2547'
           }}>
             天网安全监控
-          </h2>
+          </h1>
           <p style={{ color: '#666', margin: 0, fontSize: '14px' }}>
-            请使用您的账户登录系统
+            登录，掌握设备与安全态势
           </p>
         </div>
 
@@ -83,7 +78,9 @@ const LoginPage: React.FC = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          autoComplete="off"
+          autoComplete="on"
+          onValuesChange={() => error && dispatch(clearError())}
+          scrollToFirstError
           size="large"
         >
           <Form.Item
@@ -98,6 +95,9 @@ const LoginPage: React.FC = () => {
             <Input
               prefix={<UserOutlined style={{ color: '#667eea' }} />}
               placeholder="请输入用户名"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               className="modern-input"
               style={{ height: '44px', borderRadius: '8px' }}
             />
@@ -115,6 +115,7 @@ const LoginPage: React.FC = () => {
             <Input.Password
               prefix={<LockOutlined style={{ color: '#667eea' }} />}
               placeholder="请输入密码"
+              autoComplete="current-password"
               className="modern-input"
               style={{ height: '44px', borderRadius: '8px' }}
             />
@@ -140,8 +141,8 @@ const LoginPage: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

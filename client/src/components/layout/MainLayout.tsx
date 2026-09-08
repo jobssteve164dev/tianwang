@@ -13,9 +13,10 @@ import {
   SettingOutlined,
   RobotOutlined,
 } from '@ant-design/icons';
-import { Avatar, Dropdown, Space } from 'antd';
+import { Avatar, Dropdown, Space, App } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { logout } from '../../store/slices/authSlice';
+import { logoutAsync } from '../../store/slices/authSlice';
+import { wsManager } from '../../services/api';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -28,6 +29,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { user } = useAppSelector((state) => state.auth);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const { message } = App.useApp();
 
   // 监听窗口大小变化
   useEffect(() => {
@@ -97,13 +100,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
+      disabled: loggingOut,
     },
   ];
 
-  const handleMenuClick = ({ key }: { key: string }) => {
-    if (key === 'logout') {
-      dispatch(logout());
-      navigate('/login');
+  const handleMenuClick = async ({ key }: { key: string }) => {
+    if (key === 'logout' && !loggingOut) {
+      setLoggingOut(true);
+      try {
+        await dispatch(logoutAsync()).unwrap();
+        wsManager.disconnect();
+        navigate('/login');
+      } catch (error) {
+        message.error(String(error));
+      } finally {
+        setLoggingOut(false);
+      }
     }
   };
 
@@ -214,4 +226,4 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   );
 };
 
-export default MainLayout; 
+export default MainLayout;

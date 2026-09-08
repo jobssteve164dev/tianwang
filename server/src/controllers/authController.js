@@ -3,7 +3,8 @@
  */
 
 const models = require('../models');
-const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
+const { verifyRefreshToken } = require('../middleware/auth');
+const { issueSession, rotateSession, revokeSession, revokeUserSessions } = require('../services/UserSessionService');
 const logger = require('../utils/logger');
 
 /**
@@ -71,7 +72,8 @@ const login = async (req, res) => {
     await user.save();
 
     // 生成JWT tokens
-    const tokens = generateTokens(user.id);
+    const tokens = await issueSession(user.id, req, user.password_hash);
+    if (!tokens) return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
 
     logger.audit('LOGIN_SUCCESS', user.id, 'login', {
       ip: req.ip,
@@ -160,7 +162,9 @@ const refreshToken = async (req, res) => {
     if (!user || user.status !== 'active' || user.isLocked()) {
       return res.status(401).json({ error: 'Account cannot refresh tokens', code: 'REFRESH_DENIED' });
     }
-    return res.json(generateTokens(user.id));
+    const tokens = await rotateSession(token, user.id);
+    if (!tokens) return res.status(401).json({ error: 'Session expired; sign in again', code: 'SESSION_EXPIRED' });
+    return res.json(tokens);
   } catch (error) {
     logger.error('Refresh token error:', error);
     return res.status(500).json({ error: 'Token refresh failed', code: 'REFRESH_ERROR' });
@@ -171,7 +175,14 @@ const refreshToken = async (req, res) => {
  * 用户登出
  */
 const logout = async (req, res) => {
-  res.json({ message: 'Logout successful' });
+  try {
+    await revokeSession(req.sessionId, req.userId);
+    req.app.get('io')?.in(`session:${req.sessionId}`).disconnectSockets(true);
+    res.json({ message: 'Logout successful' });
+  } catch (error) {
+    logger.error('Logout error:', error);
+    res.status(500).json({ error: 'Logout failed; retry', code: 'LOGOUT_ERROR' });
+  }
 };
 
 /**
@@ -216,8 +227,16 @@ const changePassword = async (req, res) => {
     if (!valid) {
       return res.status(400).json({ error: 'Current password is incorrect', code: 'INVALID_CURRENT_PASSWORD' });
     }
-    user.password_hash = req.body.new_password;
-    await user.save();
+    const changed = await models.sequelize.transaction(async transaction => {
+      const current = await models.User.findByPk(req.userId, { transaction, lock: true });
+      if (!current || current.password_hash !== user.password_hash) return false;
+      current.password_hash = req.body.new_password;
+      await current.save({ transaction });
+      await revokeUserSessions(current.id, transaction);
+      return true;
+    });
+    if (!changed) return res.status(400).json({ error: 'Current password is incorrect', code: 'INVALID_CURRENT_PASSWORD' });
+    req.app.get('io')?.in(`user:${req.userId}`).disconnectSockets(true);
     logger.audit('PASSWORD_CHANGED', user.id, 'change-password', { ip: req.ip });
     return res.json({ message: 'Password changed successfully' });
   } catch (error) {

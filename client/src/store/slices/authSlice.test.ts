@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { fetchUserProfile, loginAsync, logout } from './authSlice';
+import reducer, { fetchUserProfile, loginAsync, logout, logoutAsync } from './authSlice';
 
 const makeStore = () => configureStore({ reducer: { auth: reducer } });
 
@@ -61,6 +61,33 @@ describe('auth state uses only server-issued identities', () => {
       token: 'access-token', isAuthenticated: true, loading: false, error: null
     }, logout());
     expect(state).toMatchObject({ user: null, token: null, isAuthenticated: false });
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  test('shows an actionable Chinese message for incorrect credentials', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false, status: 401,
+      json: async () => ({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' })
+    });
+    const store = makeStore();
+    await store.dispatch(loginAsync({ username: 'admin', password: 'Wrong123' }));
+    expect(store.getState().auth.error).toBe('用户名或密码不正确，请重新输入');
+    expect(store.getState().auth.isAuthenticated).toBe(false);
+  });
+
+  test('revokes the server session before completing logout and retains it on a failed request', async () => {
+    expect(typeof logoutAsync).toBe('function');
+    const store = makeStore();
+    store.dispatch({ type: 'auth/setToken', payload: 'active-token' });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500 });
+    await store.dispatch(logoutAsync());
+    expect(store.getState().auth.token).toBe('active-token');
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, status: 200 });
+    await store.dispatch(logoutAsync());
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/auth/logout', expect.objectContaining({
+      method: 'POST', headers: { Authorization: 'Bearer active-token' }
+    }));
+    expect(store.getState().auth.token).toBeNull();
     expect(localStorage.getItem('token')).toBeNull();
   });
 });

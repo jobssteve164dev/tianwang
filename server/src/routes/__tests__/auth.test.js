@@ -3,7 +3,20 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 
 const mockUserModel = { findOne: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
-jest.mock('../../models', () => ({ User: mockUserModel }));
+const mockSessions = [];
+const mockSessionModel = {
+  create: jest.fn(async values => { mockSessions.push({ id: String(mockSessions.length + 1), ...values, is_active: true }); }),
+  findOne: jest.fn(async ({ where }) => mockSessions.find(row =>
+    Object.entries(where).every(([key, value]) => key === 'expires_at' || row[key] === value))),
+  update: jest.fn(async (values, { where }) => {
+    const rows = mockSessions.filter(row => Object.entries(where).every(([key, value]) => key === 'expires_at' || row[key] === value));
+    rows.forEach(row => Object.assign(row, values));
+    return [rows.length];
+  })
+};
+jest.mock('../../models', () => ({ User: mockUserModel, UserSession: mockSessionModel,
+  sequelize: { transaction: async callback => callback({}) }
+}));
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), audit: jest.fn()
 }));
@@ -33,7 +46,7 @@ function user(overrides = {}) {
 }
 
 describe('auth route end-to-end token contract', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => { jest.clearAllMocks(); mockSessions.length = 0; mockUserModel.findByPk.mockResolvedValue(user()); });
 
   test('login issues distinct typed access and refresh tokens', async () => {
     const stored = user();
@@ -68,6 +81,7 @@ describe('auth route end-to-end token contract', () => {
     const stored = user();
     mockUserModel.findByPk.mockResolvedValue(stored);
     const accessToken = jwt.sign({ userId: stored.id, tokenUse: 'access' }, config.jwt.secret, { expiresIn: 60 });
+    await mockSessionModel.create({ user_id: stored.id, session_token: require('crypto').createHash('sha256').update(accessToken).digest('hex') });
     const refreshToken = jwt.sign({ userId: stored.id, tokenUse: 'refresh' }, config.jwt.secret, { expiresIn: 60 });
     await request(app).get('/api/auth/me').expect(401);
     await request(app).get('/api/auth/me').set('Authorization', `Bearer ${refreshToken}`).expect(401);
@@ -79,6 +93,7 @@ describe('auth route end-to-end token contract', () => {
     const stored = user();
     mockUserModel.findByPk.mockResolvedValue(stored);
     const accessToken = jwt.sign({ userId: stored.id, tokenUse: 'access' }, config.jwt.secret, { expiresIn: 60 });
+    await mockSessionModel.create({ user_id: stored.id, session_token: require('crypto').createHash('sha256').update(accessToken).digest('hex') });
     await request(app).post('/api/auth/change-password')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ current_password: 'Correct1', new_password: 'NewSecret2' })

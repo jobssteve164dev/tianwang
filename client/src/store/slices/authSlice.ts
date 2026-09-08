@@ -39,7 +39,14 @@ export const loginAsync = createAsyncThunk(
 
       if (!response.ok) {
         const error = await response.json();
-        return rejectWithValue(error.message || '登录失败');
+        const messages: Record<string, string> = {
+          INVALID_CREDENTIALS: '用户名或密码不正确，请重新输入',
+          ACCOUNT_LOCKED: '登录尝试过多，请稍后再试',
+          ACCOUNT_INACTIVE: '账户已停用，请联系管理员',
+          DB_UNAVAILABLE: '登录服务暂时不可用，请稍后重试',
+        };
+        return rejectWithValue(messages[error.code] || (response.status === 429
+          ? '登录尝试过多，请稍后再试' : '暂时无法登录，请稍后重试'));
       }
 
       const data = await response.json();
@@ -47,6 +54,26 @@ export const loginAsync = createAsyncThunk(
       return { user: data.user, token: data.accessToken };
     } catch (error) {
       return rejectWithValue('网络错误，请稍后重试');
+    }
+  }
+);
+
+export const logoutAsync = createAsyncThunk(
+  'auth/logoutSession',
+  async (_, { dispatch, getState, rejectWithValue }) => {
+    const token = (getState() as { auth: AuthState }).auth.token;
+    try {
+      if (token) {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok && response.status !== 401) {
+          return rejectWithValue('退出登录失败，请重试');
+        }
+      }
+      dispatch(logout());
+    } catch {
+      return rejectWithValue('网络连接失败，请重试退出登录');
     }
   }
 );
