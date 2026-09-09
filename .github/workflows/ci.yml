@@ -101,12 +101,13 @@ jobs:
       - name: Inspect and replay exported runtime images
         run: |
           mkdir -p container-evidence
-          docker image inspect tianwang-server:latest tianwang-client:latest tianwang-ai-engine:latest tianwang-nginx:latest --format '{{.Id}} {{.Os}}/{{.Architecture}} {{.Size}}' > container-evidence/images.txt
-          docker save tianwang-server:latest tianwang-client:latest tianwang-ai-engine:latest tianwang-nginx:latest | gzip > container-evidence/runtime-images.tar.gz
+          mapfile -t images < <(docker compose config --images | sort -u)
+          docker image inspect "${images[@]}" --format '{{.Id}} {{.Os}}/{{.Architecture}} {{.Size}}' > container-evidence/images.txt
+          docker save "${images[@]}" | gzip > container-evidence/runtime-images.tar.gz
           gzip -dc container-evidence/runtime-images.tar.gz | docker load
           stat -c %s container-evidence/runtime-images.tar.gz > container-evidence/archive-bytes.txt
       - name: Start complete production topology
-        run: docker compose up -d --no-build --wait
+        run: docker compose up -d --no-build --pull never --wait
       - name: Verify packaged dashboard and authentication
         run: node --test tests/deployment/runtime.cjs
       - name: Capture runtime evidence

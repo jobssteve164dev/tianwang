@@ -20,7 +20,10 @@ services:
   # PostgreSQL 数据库 - 用户、配置等关系型数据
   postgres:
     platform: linux/amd64
-    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
+    image: tianwang-postgres:15-alpine
+    build:
+      context: ./docker/production/runtime-images
+      dockerfile: postgres.Dockerfile
     environment:
       POSTGRES_DB: tianwang
       POSTGRES_USER: tianwang
@@ -38,7 +41,10 @@ services:
   # InfluxDB 时序数据库 - 日志、指标等时序数据
   influxdb:
     platform: linux/amd64
-    image: influxdb:2.7-alpine@sha256:991673dc2d237bd79b15d6627410d72de111387e7dac673dbb92cf3333ffcc8c
+    image: tianwang-influxdb:2.7-alpine
+    build:
+      context: ./docker/production/runtime-images
+      dockerfile: influxdb.Dockerfile
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: tianwang
@@ -60,7 +66,10 @@ services:
   # Redis 缓存数据库 - 会话、缓存
   redis:
     platform: linux/amd64
-    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    image: tianwang-redis:7-alpine
+    build:
+      context: ./docker/production/runtime-images
+      dockerfile: redis.Dockerfile
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
     command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD"']
@@ -80,7 +89,10 @@ services:
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
-    image: confluentinc/cp-zookeeper:7.4.0@sha256:90631f224b4397ecfb4e824e43d93e0e42656841c6d55ef635c49df3975260ae
+    image: tianwang-zookeeper:7.4.0
+    build:
+      context: ./docker/production/runtime-images
+      dockerfile: zookeeper.Dockerfile
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -89,7 +101,10 @@ services:
 
   kafka:
     platform: linux/amd64
-    image: confluentinc/cp-kafka:7.4.0@sha256:187dac6627e7906c350f5f8c982f80ce735ff1a0e571a20de6000a309a12ce63
+    image: tianwang-kafka:7.4.0
+    build:
+      context: ./docker/production/runtime-images
+      dockerfile: kafka.Dockerfile
     depends_on:
       - zookeeper
     environment:

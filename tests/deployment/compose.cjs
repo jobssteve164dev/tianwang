@@ -6,6 +6,11 @@ for (const key of ['DB_PASSWORD','REDIS_PASSWORD','JWT_SECRET','ENCRYPTION_KEY',
 env.BOOTSTRAP_ADMIN_USERNAME = 'fixtureadmin';
 env.BOOTSTRAP_ADMIN_EMAIL = 'fixture@example.test';
 const config = JSON.parse(execFileSync('docker', ['compose','--env-file','/dev/null','-f','docker-compose.yml','config','--format','json'], { env, encoding: 'utf8' }));
+test('the whole-project release packages every image needed for offline startup', () => {
+  const packaged = Object.entries(config.services).filter(([,service]) => service.build).map(([name]) => name).sort();
+  assert.deepEqual(packaged, Object.keys(config.services).sort());
+  for (const service of Object.values(config.services)) assert.equal(service.platform, 'linux/amd64');
+});
 test('production deployment preserves every service without host source mounts', () => {
   assert.deepEqual(Object.keys(config.services).sort(), ['postgres','influxdb','redis','zookeeper','kafka','server','client','ai-engine','nginx'].sort());
   for (const service of Object.values(config.services)) {
