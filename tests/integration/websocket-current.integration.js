@@ -6,6 +6,7 @@ let mockAgentRecord;
 const mockProcessAgentData = jest.fn();
 
 jest.mock('../../server/src/models', () => ({
+  sequelize: { transaction: jest.fn(fn => fn({ LOCK: { UPDATE: 'UPDATE' } })) },
   Agent: {
     findOne: jest.fn(() => Promise.resolve(mockAgentRecord))
   }
@@ -96,7 +97,8 @@ describe('WebSocket current integration contract', () => {
       platform: 'linux',
       status: 'offline',
       last_seen: null,
-      save: jest.fn().mockResolvedValue(undefined)
+      save: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn(function(values) { Object.assign(this, values); return Promise.resolve(this); })
     };
   });
 
@@ -124,7 +126,7 @@ describe('WebSocket current integration contract', () => {
     expect(client.readyState).toBe(WebSocket.OPEN);
     expect(webSocketService.getConnectedClients()).toContain('node-integration');
     expect(mockAgentRecord.status).toBe('online');
-    expect(mockAgentRecord.save).toHaveBeenCalled();
+    expect(mockAgentRecord.update).toHaveBeenCalled();
   });
 
   test('拒绝无效令牌和错误连接密钥', async () => {
@@ -162,7 +164,8 @@ describe('WebSocket current integration contract', () => {
       mockAgentRecord,
       'network',
       { connections: 3 },
-      expect.any(Number)
+      expect.any(Number),
+      undefined
     );
   });
 
@@ -191,6 +194,6 @@ describe('WebSocket current integration contract', () => {
     await new Promise(resolve => client.once('close', resolve));
     await waitUntil(() => mockAgentRecord.status === 'offline', '节点离线状态未同步');
     expect(webSocketService.getConnectedClients()).not.toContain('node-integration');
-    expect(models.Agent.findOne).toHaveBeenCalledWith({ where: { agent_id: 'node-integration' } });
+    expect(models.Agent.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { agent_id: 'node-integration' } }));
   });
 });

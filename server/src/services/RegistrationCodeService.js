@@ -54,7 +54,6 @@ class RegistrationCodeService {
       const savedCode = await this.saveToDatabase(registrationCode);
 
       logger.info('注册码生成成功:', { 
-        code, 
         expiry: new Date(registrationCode.expiry),
         permissions 
       });
@@ -93,18 +92,7 @@ class RegistrationCodeService {
   // 保存注册码到数据库
   async saveToDatabase(registrationCode) {
     try {
-      if (!models.RegistrationCode) {
-        logger.warn('数据库未初始化，注册码将保存到内存缓存');
-        // 如果数据库不可用，暂时保存到内存缓存
-        this.memoryCache = this.memoryCache || new Map();
-        this.memoryCache.set(registrationCode.code, {
-          ...registrationCode,
-          id: Date.now(),
-          created_at: new Date(),
-          updated_at: new Date()
-        });
-        return this.memoryCache.get(registrationCode.code);
-      }
+      if (!models.RegistrationCode) throw new Error('注册码数据库不可用');
 
       const savedCode = await models.RegistrationCode.create({
         code: registrationCode.code,
@@ -138,24 +126,9 @@ class RegistrationCodeService {
       let registrationCode = null;
 
       // 首先尝试从数据库获取注册码
-      if (models.RegistrationCode) {
-        try {
-          registrationCode = await models.RegistrationCode.findOne({
-            where: { code }
-          });
-        } catch (dbError) {
-          logger.warn('数据库查询失败，尝试从内存缓存获取:', dbError.message);
-        }
-      }
+      if (!models.RegistrationCode) throw new Error('注册码数据库不可用');
+      registrationCode = await models.RegistrationCode.findOne({ where: { code } });
 
-      // 如果数据库不可用或查询失败，尝试从内存缓存获取
-      if (!registrationCode && this.memoryCache) {
-        registrationCode = this.memoryCache.get(code);
-        if (registrationCode) {
-          logger.info('从内存缓存获取注册码');
-        }
-      }
-      
       if (!registrationCode) {
         logger.warn('注册码不存在');
         return {
@@ -360,7 +333,6 @@ class RegistrationCodeService {
       await registrationCode.incrementUsage(deviceInfo.agent_id, deviceInfo.fingerprint);
 
       logger.info('注册码使用成功:', { 
-        code, 
         agent_id: deviceInfo.agent_id,
         remainingUses: registrationCode.getRemainingUses()
       });
@@ -459,7 +431,6 @@ class RegistrationCodeService {
       await registrationCode.extendExpiry(additionalExpiry);
 
       logger.info('注册码有效期已延长:', { 
-        code, 
         newExpiry: new Date(registrationCode.expiry) 
       });
 

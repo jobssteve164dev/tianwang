@@ -1734,7 +1734,7 @@ const htmlContent = `<!DOCTYPE html>
                     record.tags?.length ? '标签：' + record.tags.join('、') : '',
                     record.feedback ? '处理结果：' + record.feedback : ''
                 ].filter(Boolean);
-                window.alert(lines.join('\n\n'));
+                window.alert(lines.join('\\n\\n'));
             } catch (error) {
                 addLog('获取事件详情失败: ' + error.message, 'error');
             }

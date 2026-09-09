@@ -6,7 +6,10 @@ class SecurityEventService {
     this.models = modelProvider;
   }
 
-  async record(eventData) {
+  async record(eventData, options = {}) {
+    if (!options.transaction) {
+      return this.models.sequelize.transaction(transaction => this.record(eventData, { transaction }));
+    }
     const SecurityEvent = this.models.SecurityEvent;
     const Alert = this.models.Alert;
     if (!SecurityEvent || !Alert) {
@@ -26,7 +29,7 @@ class SecurityEventService {
       target_ip: eventData.target_ip || null,
       status: 'open',
       tags: eventData.tags || []
-    });
+    }, options);
 
     try {
       await Alert.create({
@@ -43,7 +46,7 @@ class SecurityEventService {
         threatDetails: { security_event_id: event.id, ...(eventData.details || {}) },
         evidence: eventData.evidence || {},
         tags: eventData.tags || []
-      });
+      }, options);
     } catch (error) {
       logger.error('安全事件的告警投影创建失败', { event_id: event.id, error: error.message });
       throw error;

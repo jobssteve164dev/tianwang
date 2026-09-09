@@ -6,8 +6,11 @@ const mockAgentModel = jest.fn();
 mockAgentModel.findOne = jest.fn();
 mockAgentModel.findAll = jest.fn();
 mockAgentModel.count = jest.fn();
+mockAgentModel.create = jest.fn();
+const mockCode = { is_active: true, expiry: Date.now() + 86400000, used_count: 0, max_uses: 2, used_by: [], update: jest.fn() };
+const mockDatabase = { query: jest.fn(), transaction: jest.fn(fn => fn({ LOCK: { UPDATE: 'UPDATE' } })) };
 
-jest.mock('../../src/models', () => ({ Agent: mockAgentModel }));
+jest.mock('../../src/models', () => ({ Agent: mockAgentModel, sequelize: mockDatabase, RegistrationCode: { findOne: jest.fn(() => mockCode) }, User: { findOne: jest.fn(() => ({ organization_id: null })) } }));
 jest.mock('../../src/utils/logger', () => ({
   info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn()
 }));
@@ -21,7 +24,7 @@ jest.mock('../../src/services/DeviceFingerprintService', () => ({
   generateFingerprint: jest.fn(() => ({ fingerprint: 'fingerprint', components: {} }))
 }));
 jest.mock('../../src/services/RegistrationCodeService', () => ({
-  validateRegistrationCode: jest.fn(), incrementCodeUsage: jest.fn(), useRegistrationCode: jest.fn(),
+  verifyCodeSignature: jest.fn(() => true), validateRegistrationCode: jest.fn(), incrementCodeUsage: jest.fn(), useRegistrationCode: jest.fn(),
   disableRegistrationCode: jest.fn(), extendRegistrationCode: jest.fn()
 }));
 jest.mock('../../src/services/SecurityEventService', () => ({ record: jest.fn() }));
@@ -32,6 +35,7 @@ const logger = require('../../src/utils/logger');
 
 const app = express();
 app.use(express.json());
+app.use((req, res, next) => { req.user = { isAgent: true }; req.agentId = 'agent-123'; req.organizationId = null; next(); });
 app.post('/register', agentController.registerAgent);
 app.post('/auth', agentController.authenticateAgent);
 app.get('/', agentController.getAgents);
@@ -39,14 +43,14 @@ app.get('/:agent_id', agentController.getAgent);
 app.patch('/:agent_id/status', agentController.updateAgentStatus);
 app.delete('/:agent_id', agentController.deleteAgent);
 app.post('/:agent_id/heartbeat', agentController.heartbeat);
-app.post('/:agent_id/data', agentController.receiveData);
+app.post('/:agent_id/data', agentController.receiveData.bind(agentController));
 app.delete('/registration-codes/:code', agentController.disableRegistrationCode);
 app.patch('/registration-codes/:code/extend', agentController.extendRegistrationCode);
 
 function storedAgent(overrides = {}) {
   return {
     agent_id: 'agent-123', hostname: 'test-host', platform: 'linux', status: 'offline',
-    registered_at: new Date('2026-01-01T00:00:00Z'), last_seen: null, device_fingerprint: null,
+    registered_at: new Date('2026-01-01T00:00:00Z'), last_seen: null, device_fingerprint: 'fingerprint',
     save: jest.fn().mockResolvedValue(undefined), destroy: jest.fn().mockResolvedValue(undefined),
     ...overrides
   };
@@ -56,12 +60,14 @@ describe('AgentController current Sequelize contract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAgentModel.mockImplementation(data => storedAgent(data));
+    mockAgentModel.create.mockImplementation(data => storedAgent(data));
+    mockDatabase.query.mockResolvedValue([]);
   });
 
   test('registers a new agent and returns credentials', async () => {
     mockAgentModel.findOne.mockResolvedValue(null);
     const response = await request(app).post('/register').send({
-      agent_id: 'agent-123', hostname: 'test-host', platform: 'linux', capabilities: ['network-capture']
+      agent_id: 'agent-123', hostname: 'test-host', platform: 'linux', registrationCode: 'fixture-code', capabilities: ['network-capture']
     }).expect(201);
     expect(response.body.success).toBe(true);
     expect(response.body.agent.agent_id).toBe('agent-123');
@@ -71,34 +77,34 @@ describe('AgentController current Sequelize contract', () => {
 
   test('requires the stable node identity fields', async () => {
     const response = await request(app).post('/register').send({ hostname: 'test-host' }).expect(400);
-    expect(response.body.message).toContain('agent_id, hostname, platform');
+    expect(response.body.message).toContain('设备信息和注册码');
   });
 
-  test('returns conflict for an existing agent after refreshing its metadata', async () => {
+  test('returns conflict without changing an existing agent', async () => {
     const existing = storedAgent();
     mockAgentModel.findOne.mockResolvedValue(existing);
     const response = await request(app).post('/register').send({
-      agent_id: 'agent-123', hostname: 'renamed-host', platform: 'linux'
+      agent_id: 'agent-123', hostname: 'renamed-host', platform: 'linux', registrationCode: 'fixture-code'
     }).expect(409);
-    expect(existing.save).toHaveBeenCalled();
-    expect(existing.hostname).toBe('renamed-host');
-    expect(response.body.agent_id).toBe('agent-123');
+    expect(existing.save).not.toHaveBeenCalled();
+    expect(existing.hostname).toBe('test-host');
+    expect(response.body.success).toBe(false);
   });
 
   test('surfaces registration persistence errors', async () => {
     mockAgentModel.findOne.mockResolvedValue(null);
-    mockAgentModel.mockImplementation(data => storedAgent({ ...data, save: jest.fn().mockRejectedValue(new Error('db down')) }));
+    mockAgentModel.create.mockRejectedValue(new Error('db down'));
     const response = await request(app).post('/register').send({
-      agent_id: 'agent-123', hostname: 'test-host', platform: 'linux'
+      agent_id: 'agent-123', hostname: 'test-host', platform: 'linux', registrationCode: 'fixture-code'
     }).expect(500);
     expect(response.body.success).toBe(false);
-    expect(logger.error).toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
   });
 
   test('authenticates an existing agent and returns a WebSocket credential pair', async () => {
     const agent = storedAgent();
     mockAgentModel.findOne.mockResolvedValue(agent);
-    const response = await request(app).post('/auth').send({ agent_id: 'agent-123', hostname: 'test-host' }).expect(200);
+    const response = await request(app).post('/auth').send({ agent_id: 'agent-123', hostname: 'test-host', device_fingerprint: 'fingerprint' }).expect(200);
     expect(agent.status).toBe('online');
     expect(agent.save).toHaveBeenCalled();
     expect(response.body).toMatchObject({ success: true, publicKey: 'public-key' });
@@ -116,7 +122,7 @@ describe('AgentController current Sequelize contract', () => {
     mockAgentModel.count.mockResolvedValue(1);
     const response = await request(app).get('/?status=online&platform=linux&page=2&limit=10').expect(200);
     expect(mockAgentModel.findAll).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: 'online', platform: 'linux' }, limit: 10, offset: 10
+      where: { status: 'online', platform: 'linux', organization_id: null }, limit: 10, offset: 10
     }));
     expect(response.body.data.pagination).toEqual({ page: 2, limit: 10, total: 1, pages: 1 });
   });

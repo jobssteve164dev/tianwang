@@ -3,7 +3,7 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 
 const mockAgentModel = { findOne: jest.fn() };
-jest.mock('../../src/models', () => ({ Agent: mockAgentModel }));
+jest.mock('../../src/models', () => ({ Agent: mockAgentModel, sequelize: { transaction: jest.fn(fn => fn({ LOCK: { UPDATE: 'UPDATE' } })) } }));
 jest.mock('../../src/services/KeyManagementService', () => ({
   verifyConnectionKeyMatch: jest.fn((provided, expected) => ({
     isValid: provided === expected,
@@ -21,7 +21,7 @@ const config = require('../../src/config');
 function agent(overrides = {}) {
   return {
     agent_id: 'node-1', hostname: 'node', platform: 'linux', status: 'offline',
-    save: jest.fn().mockResolvedValue(undefined), ...overrides
+    save: jest.fn().mockResolvedValue(undefined), update: jest.fn(function(values) { Object.assign(this, values); return Promise.resolve(this); }), ...overrides
   };
 }
 
@@ -88,11 +88,12 @@ describe('WebSocketService current node contract', () => {
   test('tracks a connected node, marks it online and sends a welcome message', async () => {
     const stored = agent();
     const ws = socket();
+    mockAgentModel.findOne.mockResolvedValue(stored);
     await service.handleConnection(ws, { agent_id: 'node-1', agent: stored });
 
     expect(service.getConnectedClients()).toEqual(['node-1']);
     expect(stored.status).toBe('online');
-    expect(stored.save).toHaveBeenCalled();
+    expect(stored.update).toHaveBeenCalled();
     expect(JSON.parse(ws.send.mock.calls[0][0])).toMatchObject({ type: 'welcome', agent_id: 'node-1' });
   });
 
@@ -149,6 +150,6 @@ describe('WebSocketService current node contract', () => {
     await service.handleDisconnection('node-1', 1000, Buffer.from('done'));
     expect(service.clients.has('node-1')).toBe(false);
     expect(stored.status).toBe('offline');
-    expect(stored.save).toHaveBeenCalled();
+    expect(stored.update).toHaveBeenCalled();
   });
 });

@@ -195,17 +195,57 @@ class WebSocketService {
       }
 
       // 存储连接
+      const previous = this.clients.get(agent_id);
+      if (previous && previous !== ws) {
+        for (const [taskId, pending] of this.pendingTasks.entries()) {
+          if (pending.agent_id === agent_id) {
+            clearTimeout(pending.timer);
+            this.pendingTasks.delete(taskId);
+            pending.reject(Object.assign(new Error('设备重新连接，请重新执行任务'), { code: 'NODE_RECONNECTED' }));
+          }
+        }
+        this.clearHeartbeat(agent_id);
+      }
       this.clients.set(agent_id, ws);
+      if (previous && previous !== ws) previous.close(1000, '设备已重新连接');
       logger.debug('WebSocket连接已存储:', { 
         agent_id, 
         totalClients: this.clients.size 
       });
 
+      // 设置消息处理 - 使用闭包确保agent_id正确传递
+      ws.on('message', (message) => {
+        if (this.clients.get(agent_id) !== ws) return;
+        logger.debug('收到WebSocket消息:', {
+          agent_id,
+          messageLength: message.length
+        });
+        this.handleMessage(agent_id, message);
+      });
+
+      // 设置连接关闭处理 - 使用闭包确保agent_id正确传递
+      ws.on('close', (code, reason) => {
+        logger.debug('WebSocket连接即将关闭:', {
+          agent_id,
+          code,
+          reason: reason.toString()
+        });
+        this.handleDisconnection(agent_id, code, reason, ws);
+      });
+
+      // 设置错误处理
+      ws.on('error', (error) => {
+        logger.error('WebSocket连接错误:', {
+          agent_id,
+          error: error.message,
+          errorCode: error.code,
+          errorType: error.type
+        });
+      });
+
       // 更新代理状态
       if (agent) {
-        agent.status = 'online';
-        agent.last_seen = new Date();
-        await agent.save();
+        await this.persistConnectionStatus(agent_id);
         logger.debug('代理状态已更新为在线:', { 
           agent_id, 
           hostname: agent.hostname,
@@ -238,34 +278,6 @@ class WebSocketService {
       this.setupHeartbeat(agent_id, ws);
       logger.debug('心跳机制已设置:', { agent_id, interval: this.heartbeatInterval });
 
-      // 设置消息处理 - 使用闭包确保agent_id正确传递
-      ws.on('message', (message) => {
-        logger.debug('收到WebSocket消息:', { 
-          agent_id, 
-          messageLength: message.length
-        });
-        this.handleMessage(agent_id, message);
-      });
-
-      // 设置连接关闭处理 - 使用闭包确保agent_id正确传递
-      ws.on('close', (code, reason) => {
-        logger.debug('WebSocket连接即将关闭:', { 
-          agent_id, 
-          code, 
-          reason: reason.toString() 
-        });
-        this.handleDisconnection(agent_id, code, reason);
-      });
-
-      // 设置错误处理
-      ws.on('error', (error) => {
-        logger.error('WebSocket连接错误:', { 
-          agent_id, 
-          error: error.message,
-          errorCode: error.code,
-          errorType: error.type
-        });
-      });
 
     } catch (error) {
       logger.error('处理WebSocket连接失败:', { 
@@ -452,12 +464,14 @@ class WebSocketService {
       const agent = await models.Agent.findOne({ where: { agent_id } });
             
       if (agent) {
-        await agentController.processAgentData(
+        const receipt = await agentController.processAgentData(
           agent,
           data.dataType,
           data.data,
-          data.timestamp
+          data.timestamp,
+          data.messageId ?? data.message_id
         );
+        this.sendToAgent(agent_id, { type: 'data_ack', messageId: data.messageId ?? data.message_id, ...receipt });
         
         logger.debug('代理数据已处理:', { agent_id, dataType: data.dataType });
       } else {
@@ -466,6 +480,7 @@ class WebSocketService {
 
     } catch (error) {
       logger.error('处理数据消息失败:', { agent_id, error: error.message });
+      this.sendToAgent(agent_id, { type: 'data_error', messageId: data.messageId ?? data.message_id, code: error.code || 'TELEMETRY_WRITE_FAILED' });
     }
   }
 
@@ -487,8 +502,9 @@ class WebSocketService {
   }
 
   // 处理连接断开
-  async handleDisconnection(agent_id, code, reason) {
+  async handleDisconnection(agent_id, code, reason, ws) {
     try {
+      if (ws && this.clients.get(agent_id) !== ws) return;
       // 检查agent_id是否有效
       if (!agent_id) {
         logger.warn('处理连接断开时agent_id无效');
@@ -510,12 +526,7 @@ class WebSocketService {
       this.clearHeartbeat(agent_id);
 
       // 更新代理状态
-      const agent = await models.Agent.findOne({ where: { agent_id } });
-      if (agent) {
-        agent.status = 'offline';
-        agent.last_seen = new Date();
-        await agent.save();
-      }
+      await this.persistConnectionStatus(agent_id);
 
       logger.info('代理WebSocket连接已断开:', { 
         agent_id, 
@@ -530,6 +541,8 @@ class WebSocketService {
 
   // 设置心跳
   setupHeartbeat(agent_id, ws) {
+    if (this.clients.get(agent_id) !== ws) return;
+    this.clearHeartbeat(agent_id);
     const timer = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         // 发送ping消息
@@ -544,6 +557,13 @@ class WebSocketService {
     }, this.heartbeatInterval);
 
     this.heartbeatTimers.set(agent_id, timer);
+  }
+
+  async persistConnectionStatus(agent_id) {
+    await models.sequelize.transaction(async transaction => {
+      const agent = await models.Agent.findOne({ where: { agent_id }, transaction, lock: transaction.LOCK.UPDATE });
+      if (agent) await agent.update({ status: this.clients.has(agent_id) ? 'online' : 'offline', last_seen: new Date() }, { transaction });
+    });
   }
 
   // 重置心跳

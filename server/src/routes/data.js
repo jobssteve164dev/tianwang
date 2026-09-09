@@ -1,6 +1,6 @@
 /**
  * 数据查询API路由
- * Data Query API Routes - 提供对InfluxDB中存储数据的访问接口
+ * Data Query API Routes - 提供 PostgreSQL 中的指标与安全事件查询
  */
 
 const express = require('express');
@@ -8,12 +8,13 @@ const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const dataStorageService = require('../services/DataStorageService');
 const logger = require('../utils/logger');
+const { requireAgentAccess } = require('../middleware/agentAccess');
 
 /**
  * GET /api/data/system/:agent_id
  * 获取代理的系统性能数据
  */
-router.get('/system/:agent_id', authenticate, async (req, res) => {
+router.get('/system/:agent_id', authenticate, requireAgentAccess, async (req, res) => {
   try {
     const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
@@ -48,7 +49,7 @@ router.get('/system/:agent_id', authenticate, async (req, res) => {
  * GET /api/data/network/:agent_id
  * 获取代理的网络流量数据
  */
-router.get('/network/:agent_id', authenticate, async (req, res) => {
+router.get('/network/:agent_id', authenticate, requireAgentAccess, async (req, res) => {
   try {
     const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
@@ -83,7 +84,7 @@ router.get('/network/:agent_id', authenticate, async (req, res) => {
  * GET /api/data/security/:agent_id
  * 获取代理的安全事件数据
  */
-router.get('/security/:agent_id', authenticate, async (req, res) => {
+router.get('/security/:agent_id', authenticate, requireAgentAccess, async (req, res) => {
   try {
     const { agent_id } = req.params;
     const { start, end, limit = 1000 } = req.query;
@@ -118,7 +119,7 @@ router.get('/security/:agent_id', authenticate, async (req, res) => {
  * GET /api/data/stats/:agent_id
  * 获取代理的系统性能统计
  */
-router.get('/stats/:agent_id', authenticate, async (req, res) => {
+router.get('/stats/:agent_id', authenticate, requireAgentAccess, async (req, res) => {
   try {
     const { agent_id } = req.params;
     const { timeRange = '1h' } = req.query;
@@ -148,7 +149,7 @@ router.get('/stats/:agent_id', authenticate, async (req, res) => {
  * GET /api/data/agents/:agent_id/summary
  * 获取代理的数据摘要
  */
-router.get('/agents/:agent_id/summary', authenticate, async (req, res) => {
+router.get('/agents/:agent_id/summary', authenticate, requireAgentAccess, async (req, res) => {
   try {
     const { agent_id } = req.params;
     const { timeRange = '24h' } = req.query;
@@ -164,10 +165,10 @@ router.get('/agents/:agent_id/summary', authenticate, async (req, res) => {
       agent_id,
       timeRange,
       system: {
-        avgCpuLoad: 0,
-        avgMemoryUsage: 0,
-        maxCpuLoad: 0,
-        maxMemoryUsage: 0
+        avgCpuLoad: systemStats.avg_cpu_load,
+        avgMemoryUsage: systemStats.avg_memory_usage,
+        maxCpuLoad: systemStats.max_cpu_load,
+        maxMemoryUsage: systemStats.max_memory_usage
       },
       security: {
         totalEvents: securityEvents.length,
@@ -178,22 +179,6 @@ router.get('/agents/:agent_id/summary', authenticate, async (req, res) => {
       },
       lastUpdated: new Date().toISOString()
     };
-
-    // 计算系统指标
-    if (systemStats.length > 0) {
-      const cpuLoads = systemStats.filter(s => s._field === 'cpu_load').map(s => s._value);
-      const memoryUsages = systemStats.filter(s => s._field === 'memory_usage_percent').map(s => s._value);
-
-      if (cpuLoads.length > 0) {
-        summary.system.avgCpuLoad = cpuLoads.reduce((a, b) => a + b, 0) / cpuLoads.length;
-        summary.system.maxCpuLoad = Math.max(...cpuLoads);
-      }
-
-      if (memoryUsages.length > 0) {
-        summary.system.avgMemoryUsage = memoryUsages.reduce((a, b) => a + b, 0) / memoryUsages.length;
-        summary.system.maxMemoryUsage = Math.max(...memoryUsages);
-      }
-    }
 
     res.json({
       success: true,
@@ -218,7 +203,8 @@ router.get('/health', authenticate, async (req, res) => {
   try {
     const isInitialized = dataStorageService.isInitialized;
     
-    const healthy = isInitialized && !!dataStorageService.queryApi;
+    await require('../config/database').getSequelize().authenticate();
+    const healthy = isInitialized;
     res.status(healthy ? 200 : 503).json({
       success: healthy,
       data: {

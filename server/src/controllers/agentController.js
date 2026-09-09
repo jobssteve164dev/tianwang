@@ -2,163 +2,21 @@ const models = require('../models');
 const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const keyManagementService = require('../services/KeyManagementService');
-const deviceFingerprintService = require('../services/DeviceFingerprintService');
 const registrationCodeService = require('../services/RegistrationCodeService');
+const deviceFingerprintService = require('../services/DeviceFingerprintService');
 const securityEventService = require('../services/SecurityEventService');
 const config = require('../config');
-const fetch = require('node-fetch');
 
 class AgentController {
   // 注册代理
   async registerAgent(req, res) {
     try {
-      const {
-        agent_id: agent_idRaw,
-        hostname,
-        platform,
-        arch,
-        version,
-        capabilities,
-        system_info: systemInfoRaw,
-        registrationCode,
-        device_fingerprint: deviceFingerprintRaw
-      } = req.body;
-      const agent_id = agent_idRaw || req.body.agentId;
-      const system_info = systemInfoRaw || req.body.systemInfo;
-      const device_fingerprint = deviceFingerprintRaw || req.body.deviceFingerprint;
-
-      console.log('代理注册请求:', {
-        agent_id: agent_id,
-        hostname,
-        platform,
-        hasRegistrationCode: !!registrationCode,
-        hasFingerprint: !!device_fingerprint
-      });
-
-      // 验证必需字段
-      if (!agent_id || !hostname || !platform) {
-        console.warn('代理注册缺少必需字段:', { agent_id: agent_id, hostname, platform });
-        return res.status(400).json({
-          success: false,
-          message: '缺少必需字段: agent_id, hostname, platform'
-        });
-      }
-
-      // 验证注册码（如果提供）
-      if (registrationCode) {
-        console.log('验证注册码');
-        const deviceInfo = {
-          agent_id: agent_id,
-          hostname,
-          platform,
-          fingerprint: device_fingerprint
-        };
-
-        const codeValidation = await registrationCodeService.validateRegistrationCode(registrationCode, deviceInfo);
-        console.log('注册码验证结果:', { isValid: codeValidation.isValid, error: codeValidation.error || '无错误' });
-        
-        if (!codeValidation.isValid) {
-          console.warn('注册码验证失败:', codeValidation.error || '未知错误');
-          return res.status(400).json({
-            success: false,
-            message: codeValidation.error || '注册码验证失败',
-            code: codeValidation.code
-          });
-        }
-
-        // 增加注册码使用次数
-        await registrationCodeService.incrementCodeUsage(registrationCode, agent_id, device_fingerprint);
-        console.log('注册码使用次数已增加');
-      }
-
-      // 检查代理是否已存在
-      console.log('检查代理是否已存在:', { agent_id: agent_id });
-      
-      // 检查模型是否可用
-      if (!models.Agent) {
-        console.error('Agent模型不可用');
-        return res.status(503).json({
-          error: 'Database not available',
-          code: 'DB_UNAVAILABLE'
-        });
-      }
-
-      let agent = await models.Agent?.findOne({ where: { agent_id } });
-            
-      if (agent) {
-        console.log('代理已存在，更新信息:', { agent_id: agent_id, hostname });
-        
-        // 更新现有代理信息
-        agent.hostname = hostname;
-        agent.platform = platform;
-        agent.arch = arch;
-        agent.version = version;
-        agent.capabilities = capabilities;
-        agent.system_info = system_info;
-        agent.device_fingerprint = device_fingerprint;
-        agent.last_seen = new Date();
-        agent.status = 'online';
-                
-        await agent.save();
-                
-        console.log('代理信息已更新:', { agent_id: agent_id, hostname });
-        logger.info('代理信息已更新:', { agent_id: agent_id, hostname });
-                
-        return res.status(409).json({
-          success: false,
-          message: '代理已存在，请使用认证接口获取token',
-          agent_id: agent_id
-        });
-      }
-
-      console.log('代理不存在，创建新代理');
-
-      // 生成设备指纹（如果未提供）
-      let fingerprint = device_fingerprint;
-      if (!fingerprint && system_info) {
-        console.log('生成设备指纹...');
-        const fingerprintResult = deviceFingerprintService.generateFingerprint({
-          hostname,
-          platform,
-          arch,
-          ...system_info
-        });
-        fingerprint = fingerprintResult.fingerprint;
-        console.log('设备指纹生成完成');
-      }
-
-      // 创建新代理
-      agent = new models.Agent({
-        agent_id,
-        name: hostname, // 使用hostname作为name
-        hostname,
-        platform,
-        arch,
-        version: version || '1.0.0',
-        capabilities: capabilities || [],
-        system_info: system_info || {},
-        device_fingerprint: fingerprint,
-        status: 'online',
-        registered_at: new Date(),
-        last_seen: new Date(),
-        organization_id: req.user?.organization_id // 如果用户已认证
-      });
-
-      await agent.save();
-      console.log('新代理已保存到数据库:', { agent_id: agent_id, hostname });
-
-      // 使用注册码（如果提供）
-      if (registrationCode) {
-        console.log('使用注册码...');
-        const deviceInfo = {
-          agent_id: agent_id,
-          hostname,
-          platform,
-          fingerprint
-        };
-        await registrationCodeService.useRegistrationCode(registrationCode, deviceInfo);
-        console.log('注册码使用完成');
-      }
+      const { enroll } = await import('../core/enrollment.js');
+      const agent = await enroll(req.body);
+      const agent_id = agent.agent_id;
+      const hostname = agent.hostname;
+      const platform = agent.platform;
+      const fingerprint = agent.device_fingerprint;
 
       // 生成连接密钥
       const connectionKey = keyManagementService.generateConnectionKey();
@@ -198,13 +56,9 @@ class AgentController {
       });
 
     } catch (error) {
-      console.error('代理注册失败:', error);
-      logger.error('代理注册失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '代理注册失败',
-        error: error.message
-      });
+      logger.warn('代理注册失败', { reason: error.statusCode || error.name });
+      res.status(error.statusCode || 500).json({ success: false,
+        message: error.statusCode ? error.message : '代理注册失败' });
     }
   }
 
@@ -270,108 +124,8 @@ class AgentController {
         hasStoredFingerprint: !!agent.device_fingerprint 
       });
 
-      if (agent.device_fingerprint && !device_fingerprint) {
-        return res.status(401).json({
-          success: false,
-          message: '设备指纹不能为空',
-          error: 'DEVICE_FINGERPRINT_REQUIRED'
-        });
-      }
-
-      // 验证设备指纹
-      if (device_fingerprint && agent.device_fingerprint) {
-        console.log('开始设备指纹验证');
-
-        // 构建完整的设备信息用于指纹验证
-        const deviceInfoForVerification = {
-          hostname: hostname,
-          platform: agent.platform,
-          arch: agent.arch,
-          // 从存储的系统信息中提取其他必要信息
-          macAddresses: agent.system_info?.macAddresses || [],
-          cpuInfo: agent.system_info?.cpu || {},
-          memoryInfo: agent.system_info?.memory || {},
-          diskInfo: agent.system_info?.diskInfo || [],
-          networkInterfaces: agent.system_info?.networkInterfaces || [],
-          systemUuid: agent.system_info?.systemUuid || '',
-          biosInfo: agent.system_info?.biosInfo || {}
-        };
-
-        console.log('设备信息用于验证:', {
-          hostname: deviceInfoForVerification.hostname,
-          platform: deviceInfoForVerification.platform,
-          arch: deviceInfoForVerification.arch,
-          macCount: deviceInfoForVerification.macAddresses.length,
-          diskCount: deviceInfoForVerification.diskInfo.length
-        });
-
-        // 生成当前设备指纹
-        console.log('开始生成设备指纹:', { 
-          hostname: deviceInfoForVerification.hostname, 
-          platform: deviceInfoForVerification.platform, 
-          arch: deviceInfoForVerification.arch 
-        });
-        
-        const fingerprintValidation = deviceFingerprintService.generateFingerprint(deviceInfoForVerification);
-        
-        console.log('指纹数据构建完成:', {
-          hostname: fingerprintValidation.components.hostname,
-          platform: fingerprintValidation.components.platform,
-          macCount: fingerprintValidation.components.macAddresses.length,
-          diskCount: fingerprintValidation.components.diskInfo.length,
-          networkCount: fingerprintValidation.components.networkInterfaces.length
-        });
-        
-        console.log('设备指纹生成成功:', {
-          hostname: fingerprintValidation.components.hostname,
-          platform: fingerprintValidation.components.platform,
-          dataLength: JSON.stringify(fingerprintValidation.components).length
-        });
-
-        // 验证指纹
-        const fingerprintValidationResult = {
-          isValid: fingerprintValidation.fingerprint === agent.device_fingerprint,
-          expected: agent.device_fingerprint,
-          actual: device_fingerprint,
-          currentGenerated: fingerprintValidation.fingerprint
-        };
-
-        console.log('设备指纹验证结果:', {
-          isValid: fingerprintValidationResult.isValid,
-          match: fingerprintValidationResult.isValid ? '匹配' : '不匹配'
-        });
-
-        if (!fingerprintValidationResult.isValid) {
-          console.log('设备指纹验证失败:', {
-            agent_id, 
-            hostname
-          });
-          
-          // 记录安全事件
-          try {
-            await this.recordSecurityEvent(agent, 'fingerprint_mismatch', 'high', {
-              expected: agent.device_fingerprint,
-              actual: device_fingerprint,
-              currentGenerated: fingerprintValidation.fingerprint
-            });
-          } catch (securityEventError) {
-            console.error('记录安全事件失败:', securityEventError);
-          }
-          
-          // 设备指纹验证失败，拒绝认证
-          return res.status(401).json({
-            success: false,
-            message: '设备指纹验证失败',
-            error: 'DEVICE_FINGERPRINT_MISMATCH'
-          });
-        } else {
-          console.log('设备指纹验证成功:', { agent_id, hostname });
-        }
-      } else {
-        console.log('跳过设备指纹验证:', { 
-          hasProvidedFingerprint: !!device_fingerprint, 
-          hasStoredFingerprint: !!agent.device_fingerprint 
-        });
+      if (!agent.device_fingerprint || device_fingerprint !== agent.device_fingerprint) {
+        return res.status(401).json({ success: false, message: '设备认证失败', code: 'DEVICE_FINGERPRINT_MISMATCH' });
       }
 
       // 更新最后活跃时间
@@ -452,6 +206,9 @@ class AgentController {
   async receiveData(req, res) {
     try {
       const { agent_id } = req.params;
+      if (!req.user?.isAgent || req.agentId !== agent_id) {
+        return res.status(403).json({ success: false, message: '只能上报当前设备的数据' });
+      }
       const { type, data, timestamp } = req.body;
 
       if (!type || !data) {
@@ -470,271 +227,32 @@ class AgentController {
         });
       }
 
-      // 更新代理最后活跃时间
-      agent.last_seen = new Date();
-      agent.dataReceivedAt = new Date();
-      await agent.save();
-
       // 处理不同类型的数据
-      await this.processAgentData(agent, type, data, timestamp);
+      const receipt = await this.processAgentData(agent, type, data, timestamp, req.body.messageId ?? req.body.message_id);
 
       logger.debug('接收代理数据:', { agent_id, type, dataSize: JSON.stringify(data).length });
 
       res.json({
         success: true,
         message: '数据接收成功',
+        ...receipt,
         timestamp: Date.now()
       });
 
     } catch (error) {
       logger.error('接收代理数据失败:', error);
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         success: false,
         message: '数据接收失败',
-        error: error.message
+        code: error.code || 'TELEMETRY_WRITE_FAILED'
       });
     }
   }
 
   // 处理代理数据
-  async processAgentData(agent, type, data, timestamp) {
-    try {
-      const processedData = {
-        agent_id: agent.agent_id,
-        hostname: agent.hostname,
-        platform: agent.platform,
-        type,
-        data,
-        timestamp: timestamp || Date.now(),
-        receivedAt: new Date()
-      };
-
-      switch (type) {
-      case 'system':
-        await this.processSystemData(processedData);
-        break;
-                    
-      case 'network':
-        await this.processNetworkData(processedData);
-        break;
-                    
-      case 'logs':
-        await this.processLogData(processedData);
-        break;
-                    
-      case 'security':
-        await this.processSecurityData(processedData);
-        break;
-                    
-      default:
-        logger.warn('未知数据类型:', type);
-      }
-
-      // 检测安全威胁
-      await this.detectThreats(processedData);
-
-    } catch (error) {
-      logger.error('处理代理数据失败:', error);
-    }
-  }
-
-  // 处理系统数据
-  async processSystemData(data) {
-    try {
-      // 存储系统性能数据到时序数据库
-      const dataStorageService = require('../services/DataStorageService');
-      await dataStorageService.storeSystemData(data.agent_id, data.data);
-            
-      // 检查系统异常
-      if (data.data.system) {
-        const system = data.data.system;
-                
-        // 检查CPU使用率
-        if (system.cpu && system.cpu.load > 90) {
-          await this.createSecurityEvent({
-            agent_id: data.agent_id,
-            type: 'system_alert',
-            severity: 'medium',
-            title: 'CPU使用率过高',
-            description: `CPU使用率达到 ${system.cpu.load}%`,
-            metadata: { cpu_load: system.cpu.load }
-          });
-        }
-                
-        // 检查内存使用率
-        if (system.memory && parseFloat(system.memory.usage) > 90) {
-          await this.createSecurityEvent({
-            agent_id: data.agent_id,
-            type: 'system_alert',
-            severity: 'medium',
-            title: '内存使用率过高',
-            description: `内存使用率达到 ${system.memory.usage}%`,
-            metadata: { memory_usage: system.memory.usage }
-          });
-        }
-      }
-            
-      logger.debug('系统数据处理完成:', { agent_id: data.agent_id });
-    } catch (error) {
-      logger.error('处理系统数据失败:', error);
-    }
-  }
-
-  // 处理网络数据
-  async processNetworkData(data) {
-    try {
-      // 存储网络流量数据
-      const dataStorageService = require('../services/DataStorageService');
-      await dataStorageService.storeNetworkData(data.agent_id, data.data);
-            
-      // 检查网络异常
-      if (data.data.suspicious && data.data.suspicious.length > 0) {
-        for (const suspicious of data.data.suspicious) {
-          await this.createSecurityEvent({
-            agent_id: data.agent_id,
-            type: 'network_threat',
-            severity: this.mapSeverity(suspicious.severity),
-            title: suspicious.type,
-            description: suspicious.message,
-            metadata: suspicious
-          });
-        }
-      }
-            
-      logger.debug('网络数据处理完成:', { agent_id: data.agent_id });
-    } catch (error) {
-      logger.error('处理网络数据失败:', error);
-    }
-  }
-
-  // 处理日志数据
-  async processLogData(data) {
-    try {
-      // 存储日志数据
-      const dataStorageService = require('../services/DataStorageService');
-      await dataStorageService.storeLogData(data.agent_id, data.data);
-            
-      logger.debug('日志数据处理完成:', { agent_id: data.agent_id });
-    } catch (error) {
-      logger.error('处理日志数据失败:', error);
-    }
-  }
-
-  // 处理安全数据
-  async processSecurityData(data) {
-    try {
-      // 处理安全威胁数据
-      if (data.data.threats && data.data.threats.length > 0) {
-        for (const threat of data.data.threats) {
-          await this.createSecurityEvent({
-            agent_id: data.agent_id,
-            type: threat.type,
-            severity: this.mapSeverity(threat.severity),
-            title: threat.type,
-            description: threat.description,
-            metadata: threat
-          });
-        }
-      }
-            
-      logger.debug('安全数据处理完成:', { agent_id: data.agent_id });
-    } catch (error) {
-      logger.error('处理安全数据失败:', error);
-    }
-  }
-
-  // 威胁检测
-  async detectThreats(data) {
-    try {
-      const analysisTypes = data.type === 'network'
-        ? ['anomaly', 'network']
-        : data.type === 'system'
-          ? ['anomaly']
-          : ['anomaly', 'malware', 'network', 'behavior'];
-      const response = await fetch(`${config.ai.engineUrl}/api/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: data.data, analysis_types: analysisTypes }),
-        timeout: config.ai.timeout
-      });
-      if (!response.ok) {
-        logger.warn('AI威胁检测未完成', { agent_id: data.agent_id, status: response.status });
-        return;
-      }
-      const analysis = await response.json();
-      const results = analysis.results || {};
-      const detections = [
-        ['anomaly_detection', 'is_anomaly', 'ai_anomaly'],
-        ['malware_detection', 'is_malware', 'ai_malware'],
-        ['network_intrusion', 'is_intrusion', 'ai_network_intrusion']
-      ];
-      for (const [resultKey, flag, eventType] of detections) {
-        const detection = results[resultKey];
-        if (detection?.[flag]) {
-          await this.createSecurityEvent({
-            agent_id: data.agent_id,
-            type: eventType,
-            severity: detection.confidence >= 0.9 ? 'critical' : detection.confidence >= 0.7 ? 'high' : 'medium',
-            title: `AI检测到${eventType.replace('ai_', '')}`,
-            description: `AI模型检测到异常，置信度 ${Math.round((detection.confidence || 0) * 100)}%`,
-            metadata: { source_type: data.type, analysis: detection }
-          });
-        }
-      }
-      logger.debug('AI威胁检测完成', { agent_id: data.agent_id, analysisTypes });
-    } catch (error) {
-      logger.warn('AI威胁检测不可用', { agent_id: data.agent_id, error: error.message });
-    }
-  }
-
-  // 创建安全事件
-  async createSecurityEvent(eventData) {
-    try {
-      const agent = await models.Agent.findOne({ where: { agent_id: eventData.agent_id } });
-      const event = await securityEventService.record({
-        type: eventData.type,
-        alert_type: eventData.type === 'network_threat' ? 'suspicious-connection' : 'high-cpu-usage',
-        severity: eventData.severity,
-        title: eventData.title || `安全事件: ${eventData.type}`,
-        description: eventData.description || `代理 ${eventData.agent_id} 发生安全事件: ${eventData.type}`,
-        details: eventData.metadata || {},
-        device_id: eventData.deviceId || agent?.device_id,
-        agent_id: eventData.agent_id,
-        organization_id: agent?.organization_id,
-        source: 'internal-monitor',
-        tags: ['internal-monitor', eventData.type]
-      });
-
-      // 同时存储到InfluxDB
-      const dataStorageService = require('../services/DataStorageService');
-      await dataStorageService.storeSecurityEvent(eventData.agent_id, {
-        ...eventData,
-        timestamp: new Date(),
-        status: 'open'
-      });
-
-      logger.info('安全事件已创建:', { 
-        agent_id: eventData.agent_id, 
-        type: eventData.type,
-        severity: eventData.severity 
-      });
-            
-      return event;
-    } catch (error) {
-      logger.error('创建安全事件失败:', error);
-      return null;
-    }
-  }
-
-  // 映射严重程度
-  mapSeverity(severity) {
-    const severityMap = {
-      'low': 'low',
-      'medium': 'medium',
-      'high': 'high',
-      'critical': 'critical'
-    };
-    return severityMap[severity] || 'medium';
+  async processAgentData(agent, type, data, timestamp, messageId) {
+    const { ingest } = await import('../core/telemetry.js');
+    return ingest(agent, type, data, timestamp, messageId);
   }
 
   // 获取代理列表
@@ -747,16 +265,14 @@ class AgentController {
       if (platform) filter.platform = platform;
             
       // 添加组织过滤
-      if (req.user?.organization_id) {
-        filter.organization_id = req.user.organization_id;
-      }
+      filter.organization_id = req.organizationId;
 
       const agents = await models.Agent?.findAll({
         where: filter,
         order: [['last_seen', 'DESC']],
         limit: limit * 1,
         offset: (page - 1) * limit,
-        attributes: { exclude: ['system_info'] } // 排除敏感系统信息
+        attributes: { exclude: ['system_info', 'device_fingerprint'] }
       });
 
       const total = await models.Agent?.count({ where: filter });
@@ -812,8 +328,7 @@ class AgentController {
 
       logger.info('注册码生成成功:', { 
         count, 
-        createdBy: options.createdBy,
-        codes: codes.map(c => c.code)
+        createdBy: options.createdBy
       });
 
       res.json({

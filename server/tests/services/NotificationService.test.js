@@ -76,6 +76,12 @@ describe('NotificationService', () => {
   });
 
   describe('初始化', () => {
+    test('an unavailable SMTP server cannot block core application startup', async () => {
+      const nodemailer = require('nodemailer');
+      nodemailer.createTransport.mockReturnValueOnce({ verify: () => new Promise(() => {}), close: jest.fn() });
+      const completed = await Promise.race([notificationService.initialize().then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 50))]);
+      expect(completed).toBe(true);
+    });
     test('应该成功初始化通知服务', async () => {
       await notificationService.initialize();
       

@@ -62,6 +62,13 @@ describe('ReportService', () => {
   });
 
   describe('初始化', () => {
+    test('startup preserves existing report files', async () => {
+      fs.access.mockResolvedValue();
+      fs.readdir.mockResolvedValue(['old-report.html']);
+      fs.stat.mockResolvedValue({ mtime: new Date(0) });
+      await reportService.initialize();
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
     test('应该成功初始化报告服务', async () => {
       // Mock fs.access抛出错误（目录不存在）
       fs.access.mockRejectedValue(new Error('Directory not found'));

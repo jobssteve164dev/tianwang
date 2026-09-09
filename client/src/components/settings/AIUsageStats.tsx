@@ -26,16 +26,15 @@ const { Text } = Typography;
 
 interface UsageStats {
   total_requests: number;
-  total_cost: number;
-  daily_cost: number;
-  monthly_cost: number;
+  input_tokens: number;
+  output_tokens: number;
   providers: {
     [key: string]: {
       status: string;
       request_count: number;
       failure_count: number;
-      daily_cost: number;
-      monthly_cost: number;
+      input_tokens: number | null;
+      output_tokens: number | null;
     };
   };
 }
@@ -172,32 +171,8 @@ const AIUsageStats: React.FC<AIUsageStatsProps> = ({ refreshTrigger }) => {
         );
       },
     },
-    {
-      title: '今日成本',
-      dataIndex: 'daily_cost',
-      key: 'daily_cost',
-      render: (cost: number) => (
-        <Statistic
-          value={cost}
-          precision={4}
-          prefix="$"
-          valueStyle={{ color: cost > 0 ? '#cf1322' : '#3f8600' }}
-        />
-      ),
-    },
-    {
-      title: '本月成本',
-      dataIndex: 'monthly_cost',
-      key: 'monthly_cost',
-      render: (cost: number) => (
-        <Statistic
-          value={cost}
-          precision={4}
-          prefix="$"
-          valueStyle={{ color: cost > 0 ? '#cf1322' : '#3f8600' }}
-        />
-      ),
-    },
+    { title: '输入 Token', dataIndex: 'input_tokens', key: 'input_tokens', render: (count: number | null) => count === null ? '—' : count.toLocaleString() },
+    { title: '输出 Token', dataIndex: 'output_tokens', key: 'output_tokens', render: (count: number | null) => count === null ? '—' : count.toLocaleString() },
   ];
 
   // 表格数据
@@ -236,22 +211,16 @@ const AIUsageStats: React.FC<AIUsageStatsProps> = ({ refreshTrigger }) => {
         <Col xs={24} sm={12} lg={6}>
           <Card size="small">
             <Statistic
-              title="今日成本"
-              value={stats?.daily_cost || 0}
-              precision={4}
-              prefix="$"
-              valueStyle={{ color: (stats?.daily_cost || 0) > 0 ? '#cf1322' : '#3f8600' }}
+              title="输入 Token"
+              value={stats?.input_tokens ?? 0}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card size="small">
             <Statistic
-              title="本月成本"
-              value={stats?.monthly_cost || 0}
-              precision={4}
-              prefix="$"
-              valueStyle={{ color: (stats?.monthly_cost || 0) > 0 ? '#cf1322' : '#3f8600' }}
+              title="输出 Token"
+              value={stats?.output_tokens ?? 0}
             />
           </Card>
         </Col>
@@ -296,21 +265,6 @@ const AIUsageStats: React.FC<AIUsageStatsProps> = ({ refreshTrigger }) => {
         />
       </Card>
 
-      {/* 使用说明 */}
-      {/* <Alert
-        message="使用说明"
-        description="统计数据实时更新，成本基于实际API调用计算。建议定期检查成本控制设置，避免超出预算。"
-        type="info"
-        showIcon
-        style={{ marginTop: 16 }}
-      /> */}
-
-      {/* 成本控制建议 */}
-      {stats && stats.daily_cost > 0.1 && (
-        <div style={{ marginTop: 16 }}>
-          {/* 成本提醒功能暂时注释 */}
-        </div>
-      )}
     </div>
   );
 };

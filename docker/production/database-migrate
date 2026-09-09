@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+cd /app/server
+exec node src/database/migrate.js

@@ -196,3 +196,69 @@ describe('AgentService current secure node contract', () => {
         jest.useRealTimers();
     });
 });
+
+describe('durable telemetry delivery', () => {
+    beforeEach(() => { mockStoreValues.clear(); jest.clearAllMocks(); });
+    test('locally detected threats use the same durable acknowledged telemetry queue', async () => {
+        const service = new AgentService();
+        const threat = { type: 'suspicious-connection', severity: 'high', description: '检测到异常连接', sourceIP: '198.51.100.1' };
+        expect(await service.sendThreatAlert(threat)).toBe(true);
+        const pending = mockStoreValues.get('pendingTelemetry');
+        expect(pending).toHaveLength(1);
+        expect(pending[0]).toMatchObject({ type: 'data', dataType: 'security', data: { threats: [expect.objectContaining(threat)] } });
+        expect(pending[0].messageId).toEqual(expect.any(String));
+    });
+    test('resends an unacknowledged sample on the next heartbeat without reconnecting', () => {
+        jest.useFakeTimers();
+        const service = new AgentService();
+        service.isConnected = true;
+        service.ws = { readyState: require('ws').OPEN, send: jest.fn() };
+        try {
+            service.sendData('system', { system: { cpu: { load: 10 } } });
+            const original = JSON.parse(service.ws.send.mock.calls[0][0]);
+            service.startHeartbeat();
+            jest.advanceTimersByTime(service.config.heartbeatInterval);
+            const samples = service.ws.send.mock.calls.map(([bytes]) => JSON.parse(bytes)).filter(message => message.type === 'data');
+            expect(samples).toHaveLength(2);
+            expect(samples[1]).toEqual(original);
+        } finally { service.stopHeartbeat(); jest.useRealTimers(); }
+    });
+    test('a delayed close from the old connection cannot disconnect its replacement', async () => {
+        const service = new AgentService();
+        service.authToken = 'token';
+        service.connectionKey = { key: 'key', timestamp: 1, signature: 'signature' };
+        const firstOpen = service.connect();
+        const oldSocket = mockSockets[mockSockets.length - 1];
+        oldSocket.emit('open');
+        await firstOpen;
+        const oldClose = oldSocket.listeners('close')[0];
+        service.isConnected = false;
+        const nextOpen = service.connect();
+        const nextSocket = mockSockets[mockSockets.length - 1];
+        nextSocket.emit('open');
+        await nextOpen;
+        try {
+            oldClose(1000, Buffer.from('old'));
+            expect(service.isConnected).toBe(true);
+            expect(service.ws).toBe(nextSocket);
+        } finally { service.disconnect(); }
+    });
+    test('keeps stable pending messages across restart until a committed receipt arrives', () => {
+        const first = new AgentService();
+        first.sendData('system', { system: { cpu: { load: 95 } } });
+        const pending = mockStoreValues.get('pendingTelemetry');
+        expect(pending).toHaveLength(1);
+        expect(pending[0].messageId).toEqual(expect.any(String));
+        expect(pending[0].timestamp).toEqual(expect.any(Number));
+        const restarted = new AgentService();
+        restarted.isConnected = true;
+        restarted.ws = { readyState: require('ws').OPEN, send: jest.fn() };
+        restarted.flushDataBuffer();
+        const sent = JSON.parse(restarted.ws.send.mock.calls[0][0]);
+        expect(sent.messageId).toBe(pending[0].messageId);
+        expect(sent.timestamp).toBe(pending[0].timestamp);
+        expect(mockStoreValues.get('pendingTelemetry')).toHaveLength(1);
+        restarted.handleMessage({ type: 'data_ack', messageId: sent.messageId, receiptId: 'committed' });
+        expect(mockStoreValues.get('pendingTelemetry')).toEqual([]);
+    });
+});

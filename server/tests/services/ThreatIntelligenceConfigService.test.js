@@ -18,14 +18,14 @@ jest.mock('../../src/utils/encryption', () => ({
 
 const service = require('../../src/services/ThreatIntelligenceConfigService');
 
-describe('ThreatIntelligenceConfigService runtime synchronization', () => {
+describe('ThreatIntelligenceConfigService PostgreSQL configuration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     fetch.mockResolvedValue({ ok: true });
     mockSystemConfig.upsert.mockResolvedValue([{}, true]);
   });
 
-  test('saving configuration updates the running AI rule engine before persistence', async () => {
+  test('saving configuration persists encrypted keys without an external runtime', async () => {
     mockSystemConfig.findOne.mockResolvedValue(null);
 
     await service.save({
@@ -33,49 +33,26 @@ describe('ThreatIntelligenceConfigService runtime synchronization', () => {
       otx: { enabled: false }
     });
 
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8888/api/threat-intelligence/config',
-      expect.objectContaining({
-        method: 'PUT',
-        body: JSON.stringify({
-          misp: { enabled: true, url: 'https://misp.example', api_key: 'misp-key' },
-          otx: { enabled: false, api_key: '' }
-        })
-      })
-    );
+    expect(fetch).not.toHaveBeenCalled();
     expect(mockSystemConfig.upsert).toHaveBeenCalledWith(expect.objectContaining({
       key: 'threat_intelligence_config',
       value: expect.objectContaining({ misp: expect.objectContaining({ apiKey: 'encrypted:misp-key' }) })
     }));
   });
 
-  test('AI engine rejection prevents configuration persistence', async () => {
+  test('external runtime failure does not prevent saving', async () => {
     mockSystemConfig.findOne.mockResolvedValue(null);
     fetch.mockResolvedValue({ ok: false, status: 503, text: jest.fn().mockResolvedValue('not ready') });
 
-    await expect(service.save({ otx: { enabled: true, apiKey: 'otx-key' } }))
-      .rejects.toThrow('AI引擎拒绝威胁情报配置');
-    expect(mockSystemConfig.upsert).not.toHaveBeenCalled();
+    await service.save({ otx: { enabled: true, apiKey: 'otx-key' } });
+    expect(mockSystemConfig.upsert).toHaveBeenCalled();
   });
 
-  test('persisted configuration is replayed to the AI engine on startup', async () => {
-    mockSystemConfig.findOne.mockResolvedValue({
-      value: {
-        misp: { enabled: false, url: '', apiKey: null },
-        otx: { enabled: true, apiKey: 'encrypted:otx-key' }
-      }
-    });
-
-    await expect(service.restoreRuntimeConfig()).resolves.toBe(true);
-
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8888/api/threat-intelligence/config',
-      expect.objectContaining({
-        body: JSON.stringify({
-          misp: { enabled: false, url: '', api_key: '' },
-          otx: { enabled: true, api_key: 'otx-key' }
-        })
-      })
-    );
+  test('stored keys are read from PostgreSQL and are masked for the user', async () => {
+    mockSystemConfig.findOne.mockResolvedValue({ value: { otx: { enabled: true, apiKey: 'encrypted:otx-key' } } });
+    const stored = await service.load();
+    expect(service.runtimeConfig(stored).otx.api_key).toBe('otx-key');
+    expect(service.publicConfig(stored).otx.apiKey).toBe('***');
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

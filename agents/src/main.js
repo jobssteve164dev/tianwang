@@ -367,7 +367,7 @@ async function initializeServices() {
                 agentService.sendThreatAlert(threat)
                     .then(success => {
                         if (success) {
-                            logger.info('威胁告警已发送到服务器');
+                            logger.info('威胁告警已加入上报队列');
                         } else {
                             logger.warn('威胁告警发送失败');
                         }

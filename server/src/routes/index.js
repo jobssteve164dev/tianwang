@@ -20,7 +20,6 @@ const { router: notificationRoutes, setServices: setNotificationServices } = req
 const { router: reportRoutes, setServices: setReportServices } = require('./reports');
 const threatIntelligenceRoutes = require('./threatIntelligence');
 const dataRoutes = require('./data');
-const cacheRoutes = require('./cache');
 const mcpTokenRoutes = require('./mcpTokens');
 
 // API版本信息
@@ -42,8 +41,7 @@ router.get('/', (req, res) => {
       notifications: '/api/notifications',
       reports: '/api/reports',
       threatIntelligence: '/api/threat-intelligence',
-      data: '/api/data',
-      cache: '/api/cache'
+      data: '/api/data'
     },
     documentation: '/api-docs',
     health: '/health'
@@ -64,7 +62,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
 router.use('/threat-intelligence', threatIntelligenceRoutes);
 router.use('/data', dataRoutes);
-router.use('/cache', cacheRoutes);
 router.use('/mcp', mcpTokenRoutes);
 
 // 设置服务实例的方法（将在主应用中调用）

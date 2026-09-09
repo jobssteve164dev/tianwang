@@ -58,7 +58,8 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     // 构建查询条件
-    const query = { agent_id: { [Op.in]: await accessibleAgentIds(req) } };
+    const allowedAgents = await accessibleAgentIds(req);
+    const query = { agent_id: { [Op.in]: allowedAgents } };
     
     if (status && status !== 'all') {
       query.status = status;
@@ -77,6 +78,7 @@ router.get('/', async (req, res) => {
     }
     
     if (agent_id) {
+      if (!allowedAgents.includes(agent_id)) return res.status(403).json({ error: '无权访问此设备' });
       query.agent_id = agent_id;
     }
     
@@ -356,99 +358,6 @@ router.post('/:id/resolve', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to resolve alert'
-    });
-  }
-});
-
-/**
- * 接收代理端威胁告警
- * POST /api/alerts/threat
- */
-router.post('/threat', async (req, res) => {
-  try {
-    // 检查Alert模型是否可用
-    const Alert = models.Alert;
-    if (!Alert) {
-      logger.error('Alert model is null - database may not be initialized');
-      return res.status(500).json({
-        success: false,
-        error: 'Database not initialized'
-      });
-    }
-
-    const {
-      title,
-      description,
-      type,
-      severity,
-      source,
-      sourceIP,
-      sourcePort,
-      targetIP,
-      targetPort,
-      deviceId,
-      agent_id: requestedAgentId,
-      threatDetails,
-      evidence
-    } = req.body;
-
-    // 验证必需字段
-    const agent_id = requestedAgentId || req.agentId;
-    if (!title || !description || !type || !severity || !source || !deviceId || !agent_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields'
-      });
-    }
-
-    if (req.user?.isAgent && agent_id !== req.agentId) {
-      return res.status(403).json({ success: false, error: 'Agent cannot create alerts for another node' });
-    }
-
-    // 创建新的告警
-    const alert = await Alert.create({
-      title,
-      description,
-      type,
-      severity,
-      source,
-      sourceIP,
-      sourcePort,
-      targetIP,
-      targetPort,
-      deviceId,
-      agent_id,
-      threatDetails,
-      evidence,
-      tags: [type, severity, 'agent-detected']
-    });
-
-    logger.info(`New threat alert created: ${alert.id} - ${title} from ${deviceId}`);
-
-    // 通过WebSocket广播新告警
-    if (req.app.locals.io) {
-      req.app.locals.io.emit('new-alert', {
-        id: alert.id,
-        title: alert.title,
-        severity: alert.severity,
-        deviceId: alert.deviceId,
-        timestamp: alert.timestamp
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        id: alert.id,
-        message: 'Alert created successfully'
-      }
-    });
-  } catch (error) {
-    logger.error('Error creating threat alert:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create alert',
-      details: error.message
     });
   }
 });

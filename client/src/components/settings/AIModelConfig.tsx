@@ -5,12 +5,10 @@ import {
   Input,
   Button,
   Switch,
-  Select,
   Space,
   Divider,
   Spin,
   Typography,
-  Tag,
   Tooltip,
   Collapse,
   App,
@@ -25,14 +23,13 @@ import { aiModelApi } from '../../services/api';
 
 const { Text } = Typography;
 const { Password } = Input;
-const { Option } = Select;
 
 interface AIModelConfigData {
   [key: string]: {
     enabled: boolean;
     api_key: string;
     default_model: string;
-    models: string[];
+    has_api_key?: boolean;
   };
 }
 
@@ -49,52 +46,11 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
   const [form] = Form.useForm();
 
   // 提供商信息
-  const providers: Record<string, {
-    name: string;
-    description: string;
-    icon: string;
-    color: string;
-    pricing: string;
-    models: string[];
-  }> = {
-    openai: {
-      name: 'OpenAI',
-      description: 'GPT系列模型，包括GPT-4、GPT-3.5等',
-      icon: '🤖',
-      color: 'blue',
-      pricing: '按token计费，GPT-4较贵，GPT-3.5较便宜',
-      models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo']
-    },
-    claude: {
-      name: 'Claude',
-      description: 'Anthropic的Claude系列模型',
-      icon: '🧠',
-      color: 'green',
-      pricing: '按token计费，Claude-3-haiku性价比高',
-      models: ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
-    },
-    openrouter: {
-      name: 'OpenRouter',
-      description: '聚合多个AI提供商的服务',
-      icon: '🌐',
-      color: 'purple',
-      pricing: '统一计费，支持多种模型',
-      models: [
-        'openai/gpt-4',
-        'anthropic/claude-3-haiku',
-        'google/gemini-pro',
-        'meta-llama/llama-2-70b-chat',
-        'mistralai/mixtral-8x7b-instruct'
-      ]
-    },
-    deepseek: {
-      name: 'DeepSeek',
-      description: '专注于代码和技术的AI模型',
-      icon: '💻',
-      color: 'orange',
-      pricing: '价格相对便宜，适合技术场景',
-      models: ['deepseek-chat', 'deepseek-coder']
-    }
+  const providers: Record<string, { name: string; description: string }> = {
+    openai: { name: 'OpenAI', description: '使用你的 OpenAI 账户进行告警分析' },
+    claude: { name: 'Claude', description: '使用你的 Anthropic 账户进行告警分析' },
+    openrouter: { name: 'OpenRouter', description: '使用你的 OpenRouter 账户选择模型' },
+    deepseek: { name: 'DeepSeek', description: '使用你的 DeepSeek 账户进行告警分析' }
   };
 
   // 加载配置
@@ -124,7 +80,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
       const response = await aiModelApi.updateConfig(values);
       if (response.success) {
         message.success('配置保存成功');
-        setConfig(values);
+        await loadConfig();
         if (onConfigChange) {
           onConfigChange(values);
         }
@@ -146,7 +102,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
       const values = form.getFieldsValue();
       const providerConfig = values[provider];
       
-      if (!providerConfig?.api_key) {
+      if (!providerConfig?.api_key && !config?.[provider]?.has_api_key) {
         message.error('请先输入API密钥');
         return;
       }
@@ -204,9 +160,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
             key,
             label: (
               <Space>
-                <span style={{ fontSize: '18px' }}>{provider.icon}</span>
                 <span>{provider.name}</span>
-                <Tag color={provider.color}>{provider.pricing}</Tag>
               </Space>
             ),
             children: (
@@ -224,12 +178,12 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
                   label="API密钥"
                   rules={[
                     {
-                      required: form.getFieldValue([key, 'enabled']),
+                      required: form.getFieldValue([key, 'enabled']) && !config?.[key]?.has_api_key,
                       message: '请输入API密钥'
                     }
                   ]}
                 >
-                  <Password placeholder="请输入API密钥" />
+                  <Password autoComplete="new-password" placeholder={config?.[key]?.has_api_key ? '已保存，留空保持现有密钥' : '请输入API密钥'} />
                 </Form.Item>
 
                 <Form.Item
@@ -242,13 +196,7 @@ const AIModelConfig: React.FC<AIModelConfigProps> = ({ onConfigChange }) => {
                     }
                   ]}
                 >
-                  <Select placeholder="选择默认模型">
-                    {provider.models?.map((model: string) => (
-                      <Option key={model} value={model}>
-                        {model}
-                      </Option>
-                    ))}
-                  </Select>
+                  <Input placeholder="输入模型名称" />
                 </Form.Item>
 
                 <Space>

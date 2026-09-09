@@ -1,10 +1,10 @@
 /**
  * 缓存服务
- * Cache Service - 多级缓存策略实现
- * 兼容Redis v4.x
+ * Cache Service - PostgreSQL 持久缓存
  */
 
 const logger = require('../utils/logger');
+const { getSequelize } = require('../config/database');
 
 class CacheService {
   constructor() {
@@ -19,249 +19,50 @@ class CacheService {
   }
 
   async connect() {
-    try {
-      logger.debug('🔍 CacheService.connect() 开始执行');
-      
-      // 尝试从database.js获取已存在的Redis客户端
-      try {
-        const { getRedisClient } = require('../config/database');
-        this.client = getRedisClient();
-        logger.debug('🔍 CacheService: 使用database.js中的Redis客户端');
-        
-        // 检查Redis客户端是否已连接
-        if (this.client && this.client.isOpen) {
-          this.isConnected = true;
-          logger.info('✅ CacheService: 使用已连接的Redis客户端');
-          return;
-        }
-      } catch (error) {
-        logger.debug('🔍 CacheService: 无法获取database.js中的Redis客户端，将创建新连接');
-      }
-
-      // 如果无法获取已存在的客户端，则创建新的连接
-      logger.debug('🔍 CacheService: 创建新的Redis连接');
-      const redis = require('redis');
-      
-      logger.debug('🔍 环境变量检查:');
-      logger.debug(`   REDIS_HOST: ${process.env.REDIS_HOST || 'localhost'}`);
-      logger.debug(`   REDIS_PORT: ${process.env.REDIS_PORT || 6379}`);
-      logger.debug(`   REDIS_DB: ${process.env.REDIS_DB || 0}`);
-      logger.debug(`   REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? '已设置' : '未设置'}`);
-
-      const redisConfig = {
-        socket: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT) || 6379
-        },
-        database: parseInt(process.env.REDIS_DB) || 0
-      };
-
-      // 只有在配置了密码时才添加密码
-      if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
-        redisConfig.password = process.env.REDIS_PASSWORD;
-        logger.debug('🔍 添加了Redis密码配置');
-      } else {
-        logger.debug('🔍 未添加Redis密码配置');
-      }
-
-      logger.debug('🔍 Redis配置对象:', JSON.stringify(redisConfig, null, 2));
-      logger.debug('🔍 创建Redis客户端...');
-
-      this.client = redis.createClient(redisConfig);
-
-      // 监听连接事件
-      this.client.on('connect', () => {
-        logger.info('✅ CacheService: Redis连接成功');
-        this.isConnected = true;
-      });
-
-      this.client.on('error', (err) => {
-        logger.error('❌ CacheService: Redis连接错误:', err);
-        logger.error('❌ 错误详情:', {
-          message: err.message,
-          code: err.code,
-          stack: err.stack
-        });
-        this.isConnected = false;
-      });
-
-      this.client.on('end', () => {
-        logger.warn('🔌 CacheService: Redis连接断开');
-        this.isConnected = false;
-      });
-
-      this.client.on('ready', () => {
-        logger.info('🚀 CacheService: Redis准备就绪');
-        this.isConnected = true;
-      });
-
-      logger.debug('🔍 开始连接到Redis...');
-      // 连接到Redis
-      await this.client.connect();
-      // Redis v4 的 connect() 在 ready 事件监听器调度前即可成功返回。
-      // 业务操作不能依赖事件恰好先触发，否则首次连接后会被误判为不可用。
-      this.isConnected = true;
-      logger.debug('🔍 Redis连接完成');
-
-    } catch (error) {
-      logger.error('❌ CacheService: Redis初始化失败:', error);
-      logger.error('❌ 错误详情:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
-      throw error;
-    }
+    await getSequelize().authenticate();
+    this.isConnected = true;
   }
 
-  async disconnect() {
-    if (this.client && this.isConnected) {
-      await this.client.quit();
-      this.isConnected = false;
-    }
-  }
+  async disconnect() { this.isConnected = false; }
 
-  /**
-   * 获取缓存
-   * @param {string} key 缓存键
-   * @param {Function} fetchFunction 数据获取函数（当缓存未命中时调用）
-   * @param {number} ttl 过期时间（秒）
-   * @returns {Promise<any>} 缓存数据
-   */
   async get(key, fetchFunction = null, ttl = 3600) {
-    try {
-      if (!this.isConnected || !this.client) {
-        if (fetchFunction) {
-          return await fetchFunction();
-        }
-        return null;
-      }
-
-      const cached = await this.client.get(key);
-      
-      if (cached) {
-        this.cacheStats.hits++;
-        return JSON.parse(cached);
-      }
-
-      this.cacheStats.misses++;
-      
-      if (fetchFunction) {
-        const data = await fetchFunction();
-        if (data !== null && data !== undefined) {
-          await this.set(key, data, ttl);
-        }
-        return data;
-      }
-
-      return null;
-    } catch (error) {
-      logger.error('缓存获取失败:', error);
-      if (fetchFunction) {
-        return await fetchFunction();
-      }
-      return null;
-    }
+    const [rows] = await getSequelize().query('SELECT value FROM application_cache WHERE key=:key AND expires_at>now()', { replacements: { key } });
+    if (rows.length) { this.cacheStats.hits++; return rows[0].value; }
+    this.cacheStats.misses++;
+    if (!fetchFunction) return null;
+    const value = await fetchFunction();
+    if (value !== undefined && value !== null) await this.set(key, value, ttl);
+    return value;
   }
 
-  /**
-   * 设置缓存
-   * @param {string} key 缓存键
-   * @param {any} value 缓存值
-   * @param {number} ttl 过期时间（秒）
-   */
   async set(key, value, ttl = 3600) {
-    try {
-      if (!this.isConnected || !this.client) return;
-
-      const serialized = JSON.stringify(value);
-      await this.client.setEx(key, ttl, serialized);
-      
-      this.cacheStats.sets++;
-    } catch (error) {
-      logger.error('缓存设置失败:', error);
-    }
+    if (!Number.isFinite(ttl) || ttl <= 0) throw new Error('Cache lifetime must be positive');
+    await getSequelize().query(`INSERT INTO application_cache(key,value,expires_at)
+      VALUES (:key,CAST(:value AS jsonb),now() + :ttl * interval '1 second')
+      ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,expires_at=EXCLUDED.expires_at`, {
+      replacements: { key, value: JSON.stringify(value), ttl }
+    });
+    this.cacheStats.sets++;
   }
 
-  /**
-   * 删除缓存
-   * @param {string} key 缓存键
-   */
   async del(key) {
-    try {
-      if (!this.isConnected || !this.client) return;
-
-      await this.client.del(key);
-      this.cacheStats.deletes++;
-    } catch (error) {
-      logger.error('缓存删除失败:', error);
-    }
+    await getSequelize().query('UPDATE application_cache SET expires_at=now() WHERE key=:key', { replacements: { key } });
+    this.cacheStats.deletes++;
   }
 
-  /**
-   * 批量删除缓存
-   * @param {string} pattern 匹配模式
-   */
   async delPattern(pattern) {
-    try {
-      if (!this.isConnected || !this.client) return;
-
-      const keys = await this.client.keys(pattern);
-      if (keys.length > 0) {
-        await this.client.del(keys);
-        this.cacheStats.deletes += keys.length;
-      }
-    } catch (error) {
-      logger.error('批量缓存删除失败:', error);
-    }
+    const like = pattern.replace(/[\\%_]/g, character => `\\${character}`).replace(/\*/g, '%');
+    await getSequelize().query('UPDATE application_cache SET expires_at=now() WHERE key LIKE :like', { replacements: { like } });
   }
 
-  /**
-   * 检查缓存是否存在
-   * @param {string} key 缓存键
-   * @returns {Promise<boolean>}
-   */
-  async exists(key) {
-    try {
-      if (!this.isConnected || !this.client) return false;
+  async exists(key) { return (await this.ttl(key)) >= 0; }
 
-      const result = await this.client.exists(key);
-      return result === 1;
-    } catch (error) {
-      logger.error('缓存存在检查失败:', error);
-      return false;
-    }
-  }
-
-  /**
-   * 获取缓存剩余时间
-   * @param {string} key 缓存键
-   * @returns {Promise<number>} 剩余秒数，-1表示永不过期，-2表示不存在
-   */
   async ttl(key) {
-    try {
-      if (!this.isConnected || !this.client) return -2;
-
-      return await this.client.ttl(key);
-    } catch (error) {
-      logger.error('缓存TTL获取失败:', error);
-      return -2;
-    }
+    const [rows] = await getSequelize().query('SELECT floor(extract(epoch FROM expires_at-now()))::int AS ttl FROM application_cache WHERE key=:key AND expires_at>now()', { replacements: { key } });
+    return rows[0]?.ttl ?? -2;
   }
 
-  /**
-   * 清空所有缓存
-   */
-  async clear() {
-    try {
-      if (!this.isConnected || !this.client) return;
-
-      await this.client.flushDb();
-      logger.info('缓存已清空');
-    } catch (error) {
-      logger.error('缓存清空失败:', error);
-    }
-  }
+  async clear() { await getSequelize().query('UPDATE application_cache SET expires_at=now()'); }
 
   /**
    * 获取缓存统计信息
@@ -407,15 +208,10 @@ class CacheService {
    * @returns {Promise<boolean>} 是否健康
    */
   async healthCheck() {
-    try {
-      if (!this.isConnected || !this.client) return false;
-      await this.client.ping();
-      return true;
-    } catch (error) {
-      logger.error('Redis健康检查失败:', error);
-      return false;
-    }
+    try { await getSequelize().authenticate(); return true; }
+    catch (error) { logger.warn('缓存数据库不可用', { reason: error.name }); return false; }
   }
+
 }
 
 // 创建单例实例

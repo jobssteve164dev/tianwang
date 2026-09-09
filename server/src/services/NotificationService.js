@@ -84,9 +84,7 @@ class NotificationService extends EventEmitter {
           auth: this.config.email.smtp.auth
         });
                 
-        // 验证邮件配置
-        await this.emailTransporter.verify();
-        logger.info('邮件服务初始化成功');
+        logger.info('邮件发送配置已加载');
       } else {
         logger.warn('邮件配置不完整，邮件通知功能将不可用');
       }

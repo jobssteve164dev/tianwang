@@ -29,31 +29,6 @@ const config = {
         min: parseInt(process.env.DB_POOL_MIN) || 2,
         max: parseInt(process.env.DB_POOL_MAX) || 10
       }
-    },
-    influxdb: {
-      url: process.env.INFLUXDB_URL || 'http://localhost:8086',
-      token: process.env.INFLUXDB_TOKEN || 'tianwang-super-secret-auth-token',
-      org: process.env.INFLUXDB_ORG || 'tianwang',
-      bucket: process.env.INFLUXDB_BUCKET || 'security_logs'
-    },
-    redis: {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT) || 6379,
-      password: process.env.REDIS_PASSWORD || '',
-      db: parseInt(process.env.REDIS_DB) || 0,
-      ttl: parseInt(process.env.REDIS_TTL) || 3600
-    }
-  },
-
-  // Kafka配置
-  kafka: {
-    brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
-    clientId: process.env.KAFKA_CLIENT_ID || 'tianwang-server',
-    groupId: process.env.KAFKA_GROUP_ID || 'tianwang-consumer-group',
-    topics: {
-      logs: process.env.KAFKA_TOPICS_LOGS || 'security-logs',
-      alerts: process.env.KAFKA_TOPICS_ALERTS || 'security-alerts',
-      actions: process.env.KAFKA_TOPICS_ACTIONS || 'protection-actions'
     }
   },
 
@@ -84,27 +59,6 @@ const config = {
     filePath: process.env.LOG_FILE_PATH || './logs/app.log',
     maxSize: process.env.LOG_MAX_SIZE || '10m',
     maxFiles: parseInt(process.env.LOG_MAX_FILES) || 5
-  },
-
-  // AI引擎配置
-  ai: {
-    engineUrl: process.env.AI_ENGINE_URL || 'http://localhost:8888',
-    timeout: parseInt(process.env.AI_ENGINE_TIMEOUT) || 30000,
-    modelPath: process.env.AI_MODEL_PATH || './models',
-    confidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD) || 0.8
-  },
-
-  // 外部API配置
-  externalAPIs: {
-    openai: {
-      apiKey: process.env.OPENAI_API_KEY
-    },
-    claude: {
-      apiKey: process.env.CLAUDE_API_KEY
-    },
-    gemini: {
-      apiKey: process.env.GEMINI_API_KEY
-    }
   },
 
   // 威胁情报配置
@@ -209,9 +163,7 @@ function validateConfig() {
   const required = [
     'JWT_SECRET',
     'DB_PASSWORD',
-    'REDIS_PASSWORD',
-    'ENCRYPTION_KEY',
-    'AI_INTERNAL_TOKEN'
+    'ENCRYPTION_KEY'
   ];
 
   const missing = required.filter(key => !process.env[key]);

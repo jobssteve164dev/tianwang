@@ -80,9 +80,6 @@ class ReportService extends EventEmitter {
       // 加载报告模板
       await this.loadReportTemplates();
             
-      // 清理过期报告
-      await this.cleanupExpiredReports();
-            
       this.isInitialized = true;
       logger.info('报告服务初始化完成');
             

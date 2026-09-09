@@ -4,6 +4,7 @@ module.exports = (sequelize) => {
   const ThreatRule = sequelize.define('ThreatRule', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     name: { type: DataTypes.STRING(100), allowNull: false },
+    organization_id: { type: DataTypes.UUID, allowNull: true },
     rule_type: { type: DataTypes.ENUM('sigma', 'yara', 'suricata', 'custom'), allowNull: false },
     content: { type: DataTypes.TEXT, allowNull: false },
     enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
@@ -13,4 +14,4 @@ module.exports = (sequelize) => {
   }, { tableName: 'threat_rules' });
 
   return ThreatRule;
-}; 
+};

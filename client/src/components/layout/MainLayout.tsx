@@ -11,7 +11,6 @@ import {
   KeyOutlined,
   SecurityScanOutlined,
   SettingOutlined,
-  RobotOutlined,
 } from '@ant-design/icons';
 import { Avatar, Dropdown, Space, App } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -75,11 +74,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <SecurityScanOutlined />,
     },
     {
-      path: '/ai-models',
-      name: '本地AI模型',
-      icon: <RobotOutlined />,
-    },
-    {
       path: '/settings',
       name: '系统设置',
       icon: <SettingOutlined />,
@@ -88,14 +82,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // 用户菜单
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: '个人设置',
-    },
-    {
-      type: 'divider' as const,
-    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,

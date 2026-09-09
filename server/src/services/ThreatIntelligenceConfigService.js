@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 const models = require('../models');
 const encryption = require('../utils/encryption');
-const appConfig = require('../config');
 
 const CONFIG_KEY = 'threat_intelligence_config';
 
@@ -70,13 +69,7 @@ class ThreatIntelligenceConfigService {
     if (next.misp.enabled && (!next.misp.url || !next.misp.apiKey)) throw new Error('MISP配置不完整');
     if (next.otx.enabled && !next.otx.apiKey) throw new Error('OTX配置不完整');
     if (next.misp.url && !/^https?:\/\//i.test(next.misp.url)) throw new Error('MISP服务器地址必须使用HTTP或HTTPS协议');
-    await this.syncToAIEngine(next);
-    try {
-      await models.SystemConfig.upsert({ key: CONFIG_KEY, value: next, category: 'threat_intelligence' });
-    } catch (error) {
-      await this.syncToAIEngine(current).catch(() => {});
-      throw error;
-    }
+    await models.SystemConfig.upsert({ key: CONFIG_KEY, value: next, category: 'threat_intelligence' });
     return next;
   }
 
@@ -92,29 +85,6 @@ class ThreatIntelligenceConfigService {
         api_key: config.otx?.apiKey ? encryption.decrypt(config.otx.apiKey) : ''
       }
     };
-  }
-
-  async syncToAIEngine(config) {
-    const response = await fetch(`${appConfig.ai.engineUrl}/api/threat-intelligence/config`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Token': process.env.AI_INTERNAL_TOKEN || 'tianwang-local-ai-internal'
-      },
-      body: JSON.stringify(this.runtimeConfig(config))
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`AI引擎拒绝威胁情报配置: ${response.status} ${body}`);
-    }
-  }
-
-  async restoreRuntimeConfig() {
-    if (!models.SystemConfig) throw new Error('威胁情报配置数据库不可用');
-    const stored = await models.SystemConfig.findOne({ where: { key: CONFIG_KEY } });
-    if (!stored) return false;
-    await this.syncToAIEngine(stored.value);
-    return true;
   }
 
   async request(url, headers) {

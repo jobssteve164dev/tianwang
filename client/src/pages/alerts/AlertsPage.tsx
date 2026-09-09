@@ -25,7 +25,7 @@ import {
   AlertOutlined
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchAlerts, setFilters, updateAlertStatus, clearError } from '../../store/slices/alertSlice';
+import { fetchAlerts, setFilters, updateAlertStatusAsync, clearError } from '../../store/slices/alertSlice';
 import type { Alert } from '../../store/slices/alertSlice';
 import dayjs from 'dayjs';
 
@@ -33,6 +33,7 @@ const { Title, Paragraph } = Typography;
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+const severityLabels: Record<string, string> = { low: '低', medium: '中', high: '高', critical: '严重' };
 
 const AlertsPage: React.FC = () => {
   const { message } = App.useApp();
@@ -65,13 +66,14 @@ const AlertsPage: React.FC = () => {
     dispatch(setFilters({ ...filters, search: searchText }));
   };
 
-  const handleStatusChange = async (alertId: string, status: string) => {
+  const handleStatusChange = async (alertId: string, status: Alert['status']) => {
     try {
-      // 这里应该调用API更新状态
-      dispatch(updateAlertStatus({ alertId, status }));
+      await dispatch(updateAlertStatusAsync({ alertId, status })).unwrap();
       message.success('告警状态已更新');
+      return true;
     } catch (error) {
       message.error('更新状态失败');
+      return false;
     }
   };
 
@@ -164,7 +166,7 @@ const AlertsPage: React.FC = () => {
       width: 100,
       render: (severity: string) => (
         <Tag color={getSeverityColor(severity)} className="modern-tag">
-          {severity.toUpperCase()}
+          {severityLabels[severity] || '未指定'}
         </Tag>
       ),
     },
@@ -390,9 +392,8 @@ const AlertsPage: React.FC = () => {
             <Button 
               key="acknowledge" 
               type="default"
-              onClick={() => {
-                handleStatusChange(selectedAlert.id, 'acknowledged');
-                setDetailModalVisible(false);
+              onClick={async () => {
+                if (await handleStatusChange(selectedAlert.id, 'acknowledged')) setDetailModalVisible(false);
               }}
               className="modern-button"
             >
@@ -403,9 +404,8 @@ const AlertsPage: React.FC = () => {
             <Button 
               key="resolve" 
               type="primary"
-              onClick={() => {
-                handleStatusChange(selectedAlert.id, 'resolved');
-                setDetailModalVisible(false);
+              onClick={async () => {
+                if (await handleStatusChange(selectedAlert.id, 'resolved')) setDetailModalVisible(false);
               }}
               className="modern-button"
             >
@@ -423,7 +423,7 @@ const AlertsPage: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label="严重级别">
               <Tag color={getSeverityColor(selectedAlert.severity)} className="modern-tag">
-                {selectedAlert.severity.toUpperCase()}
+                {severityLabels[selectedAlert.severity] || '未指定'}
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="状态">
@@ -434,7 +434,7 @@ const AlertsPage: React.FC = () => {
               />
             </Descriptions.Item>
             <Descriptions.Item label="告警类型">
-              {selectedAlert.type}
+              {getAlertTypeInfo(selectedAlert.type).name}
             </Descriptions.Item>
             <Descriptions.Item label="来源">
               {selectedAlert.source}
@@ -450,6 +450,16 @@ const AlertsPage: React.FC = () => {
                 {selectedAlert.description}
               </div>
             </Descriptions.Item>
+            {selectedAlert.threatDetails?.ai?.text && (
+              <Descriptions.Item label="分析建议" span={2}>
+                <div style={{ whiteSpace: 'pre-wrap' }}>{selectedAlert.threatDetails.ai.text}</div>
+              </Descriptions.Item>
+            )}
+            {selectedAlert.threatDetails?.intelligence?.map(item => (
+              <Descriptions.Item key={`${item.source}:${item.value}`} label={item.source.toUpperCase()} span={2}>
+                {item.value}：{item.matches > 0 ? `关联 ${item.matches} 条威胁情报` : '未发现关联威胁情报'}
+              </Descriptions.Item>
+            ))}
           </Descriptions>
         )}
       </Modal>
@@ -457,4 +467,4 @@ const AlertsPage: React.FC = () => {
   );
 };
 
-export default AlertsPage; 
+export default AlertsPage;

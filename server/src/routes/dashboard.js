@@ -8,6 +8,21 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const models = require('../models');
 const { Op } = require('sequelize');
+const { authenticate } = require('../middleware/auth');
+
+router.use(authenticate);
+router.use(async (req, res, next) => {
+  if (req.user.isAgent) return res.status(403).json({ error: '用户登录后可查看仪表盘' });
+  try {
+    const Agent = models.Agent.scope({ where: { organization_id: req.organizationId } });
+    const agents = await Agent.findAll({ attributes: ['agent_id'], raw: true });
+    req.dashboardModels = {
+      Agent,
+      Alert: models.Alert.scope({ where: { agent_id: { [Op.in]: agents.map(agent => agent.agent_id) } } })
+    };
+    next();
+  } catch (error) { next(error); }
+});
 
 /**
  * 获取安全指标数据
@@ -34,19 +49,19 @@ router.get('/security-metrics', async (req, res) => {
       previousAlerts
     ] = await Promise.all([
       // 总威胁数（所有告警）
-      models.Alert.count(),
+      req.dashboardModels.Alert.count(),
       
       // 活跃告警数
-      models.Alert.count({ where: { status: 'active' } }),
+      req.dashboardModels.Alert.count({ where: { status: 'active' } }),
       
       // 总设备数
-      models.Agent.count(),
+      req.dashboardModels.Agent.count(),
       
       // 在线设备数
-      models.Agent.count({ where: { status: 'online' } }),
+      req.dashboardModels.Agent.count({ where: { status: 'online' } }),
       
       // 最近7天的告警数
-      models.Alert.count({
+      req.dashboardModels.Alert.count({
         where: {
           timestamp: {
             [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -55,7 +70,7 @@ router.get('/security-metrics', async (req, res) => {
       }),
       
       // 之前7天的告警数（用于计算趋势）
-      models.Alert.count({
+      req.dashboardModels.Alert.count({
         where: {
           timestamp: {
             [Op.gte]: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
@@ -100,7 +115,7 @@ router.get('/security-metrics', async (req, res) => {
     };
 
     // 按类型统计告警
-    const alertTypeStats = await models.Alert.findAll({
+    const alertTypeStats = await req.dashboardModels.Alert.findAll({
       attributes: [
         'type',
         [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
@@ -145,7 +160,7 @@ router.get('/security-metrics', async (req, res) => {
       const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
       
-      const dailyCount = await models.Alert.count({
+      const dailyCount = await req.dashboardModels.Alert.count({
         where: {
           timestamp: {
             [Op.gte]: startOfDay,
@@ -164,7 +179,7 @@ router.get('/security-metrics', async (req, res) => {
       const startOfWeek = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
       const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
       
-      const weeklyCount = await models.Alert.count({
+      const weeklyCount = await req.dashboardModels.Alert.count({
         where: {
           timestamp: {
             [Op.gte]: startOfWeek,
@@ -286,7 +301,7 @@ router.get('/threat-trends', async (req, res) => {
         const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
         
-        const count = await models.Alert.count({
+        const count = await req.dashboardModels.Alert.count({
           where: {
             type: {
               [Op.in]: specificTypes
@@ -343,7 +358,7 @@ router.get('/threat-distribution', async (req, res) => {
     }
 
     // 按类型统计告警数量
-    const alertTypeStats = await models.Alert.findAll({
+    const alertTypeStats = await req.dashboardModels.Alert.findAll({
       attributes: [
         'type',
         [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
@@ -461,16 +476,16 @@ router.get('/device-stats', async (req, res) => {
       platformStats
     ] = await Promise.all([
       // 总设备数
-      models.Agent.count(),
+      req.dashboardModels.Agent.count(),
       
       // 在线设备数
-      models.Agent.count({ where: { status: 'online' } }),
+      req.dashboardModels.Agent.count({ where: { status: 'online' } }),
       
       // 离线设备数
-      models.Agent.count({ where: { status: 'offline' } }),
+      req.dashboardModels.Agent.count({ where: { status: 'offline' } }),
       
       // 按平台统计设备数量
-      models.Agent.findAll({
+      req.dashboardModels.Agent.findAll({
         attributes: [
           'platform',
           [models.sequelize.fn('COUNT', models.sequelize.col('id')), 'count']
@@ -524,38 +539,6 @@ router.get('/device-stats', async (req, res) => {
 });
 
 /**
- * 获取系统性能指标
- * GET /api/dashboard/performance-metrics
- */
-router.get('/performance-metrics', async (req, res) => {
-  try {
-    const performanceMetrics = {
-      cpuUsage: 45.2,
-      memoryUsage: 67.8,
-      diskUsage: 23.4,
-      networkTraffic: {
-        incoming: 125.6, // MB/s
-        outgoing: 89.3   // MB/s
-      },
-      responseTime: 125, // ms
-      uptime: 86400, // seconds
-      lastUpdated: new Date().toISOString()
-    };
-
-    res.json({
-      success: true,
-      data: performanceMetrics
-    });
-  } catch (error) {
-    logger.error('Error fetching performance metrics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch performance metrics'
-    });
-  }
-});
-
-/**
  * 获取威胁IP统计
  * GET /api/dashboard/threat-ips
  */
@@ -571,7 +554,7 @@ router.get('/threat-ips', async (req, res) => {
     }
 
     // 统计威胁IP
-    const threatIPStats = await models.Alert.findAll({
+    const threatIPStats = await req.dashboardModels.Alert.findAll({
       attributes: [
         'sourceIP',
         'severity',
@@ -642,7 +625,7 @@ router.get('/network-attacks', async (req, res) => {
     ];
 
     // 统计网络攻击类型
-    const attackTypeStats = await models.Alert.findAll({
+    const attackTypeStats = await req.dashboardModels.Alert.findAll({
       attributes: [
         'type',
         'severity',
@@ -712,7 +695,7 @@ router.get('/suspicious-activities', async (req, res) => {
     ];
 
     // 统计可疑活动类型
-    const activityTypeStats = await models.Alert.findAll({
+    const activityTypeStats = await req.dashboardModels.Alert.findAll({
       attributes: [
         'type',
         'severity',
@@ -762,14 +745,20 @@ router.get('/suspicious-activities', async (req, res) => {
  */
 router.get('/alert-stats', async (req, res) => {
   try {
+    const [totalAlerts, criticalAlerts, highAlerts, mediumAlerts, lowAlerts, resolvedAlerts, pendingAlerts] = await Promise.all([
+      req.dashboardModels.Alert.count(),
+      ...['critical', 'high', 'medium', 'low'].map(severity => req.dashboardModels.Alert.count({ where: { severity } })),
+      req.dashboardModels.Alert.count({ where: { status: 'resolved' } }),
+      req.dashboardModels.Alert.count({ where: { status: { [Op.in]: ['active', 'acknowledged'] } } })
+    ]);
     const alertStats = {
-      totalAlerts: 234,
-      criticalAlerts: 12,
-      highAlerts: 45,
-      mediumAlerts: 89,
-      lowAlerts: 88,
-      resolvedAlerts: 156,
-      pendingAlerts: 78,
+      totalAlerts,
+      criticalAlerts,
+      highAlerts,
+      mediumAlerts,
+      lowAlerts,
+      resolvedAlerts,
+      pendingAlerts,
       lastUpdated: new Date().toISOString()
     };
 

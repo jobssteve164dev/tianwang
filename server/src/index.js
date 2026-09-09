@@ -31,8 +31,7 @@ const jwt = require('jsonwebtoken');
 // 导入自定义模块
 const logger = require('./utils/logger');
 const config = require('./config');
-const { connectDatabases, closeDatabases } = require('./config/database');
-const { initializeKafka, closeKafka } = require('./config/kafka');
+const { connectDatabases, closeDatabases, getSequelize } = require('./config/database');
 const { router: routes, setServices: setRouteServices } = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { setupSwagger } = require('./config/swagger');
@@ -44,8 +43,6 @@ const dataStorageService = require('./services/DataStorageService');
 const mcpRoutes = require('./routes/mcp');
 const models = require('./models');
 const { findAccessSession } = require('./services/UserSessionService');
-const aiModelController = require('./controllers/aiModelController');
-const threatConfigService = require('./services/ThreatIntelligenceConfigService');
 
 // 创建Express应用
 const app = express();
@@ -100,13 +97,32 @@ app.use(require('morgan')(config.log.format, {
 }));
 
 // 健康检查端点
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  try {
+    await getSequelize().authenticate();
+  } catch {
+    return res.status(503).json({ service: 'tianwang', status: 'unhealthy' });
+  }
   res.status(200).json({
+    service: 'tianwang',
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: config.app.version,
     environment: config.app.env
   });
+});
+
+app.get('/ready', async (req, res) => {
+  try {
+    const db = getSequelize();
+    const [rows] = await db.query(`SELECT bool_and(to_regclass(name) IS NOT NULL) AS ready
+      FROM unnest(ARRAY['users','user_sessions','agents','alerts','security_events','system_configs',
+        'threat_rules','telemetry_receipts','telemetry_samples','outbox_jobs','application_cache','provider_requests']) AS name`);
+    if (!rows[0].ready) throw new Error('Schema not ready');
+    await db.query('SELECT organization_id FROM threat_rules LIMIT 0');
+    await db.query('SELECT job_id, attempt FROM provider_requests LIMIT 0');
+    res.json({ service: 'tianwang', database: 'ok' });
+  } catch { res.status(503).json({ service: 'tianwang', database: 'unavailable' }); }
 });
 
 // API路由
@@ -184,6 +200,17 @@ app.set('io', io);
 // 初始化服务实例
 let notificationService = null;
 let reportService = null;
+let detectionWorker = null;
+let analysisWorker = null;
+let intelligenceWorker = null;
+let stopPartitionMaintenance = null;
+
+const staticRoot = process.env.CLIENT_BUILD_PATH || path.resolve(__dirname, '../../client/build');
+app.use(express.static(staticRoot, { index: false }));
+app.get('*', (req, res, next) => {
+  if (/^\/(api|mcp|ws|socket\.io)(\/|$)/.test(req.path) || path.extname(req.path)) return next();
+  res.sendFile(path.join(staticRoot, 'index.html'), error => { if (error) next(error); });
+});
 
 // 错误处理中间件（必须在最后）
 app.use(errorHandler);
@@ -216,15 +243,19 @@ async function initialize() {
       throw dbError;
     }
 
-    console.log('📨 Initializing Kafka...');
-    logger.info('📨 Initializing Kafka...');
-    try {
-      await initializeKafka();
-      console.log('✅ Kafka initialized successfully');
-    } catch (kafkaError) {
-      console.error('❌ Kafka initialization failed:', kafkaError.message);
-      logger.error('❌ Kafka initialization failed:', kafkaError);
-    }
+    models.initializeModels();
+    const { Worker } = await import('./core/worker.js');
+    const { detect } = await import('./core/detection.js');
+    detectionWorker = new Worker(getSequelize(), { 'telemetry.detect': detect });
+    detectionWorker.start();
+    const { createAnalyzeHandler } = await import('./core/analysis.js');
+    analysisWorker = new Worker(getSequelize(), { 'alert.analyze': createAnalyzeHandler() });
+    analysisWorker.start();
+    const { createIntelligenceHandler } = await import('./core/intelligence.js');
+    intelligenceWorker = new Worker(getSequelize(), { 'alert.enrich': createIntelligenceHandler() });
+    intelligenceWorker.start();
+    const { startPartitionMaintenance } = await import('./core/partitions.js');
+    stopPartitionMaintenance = startPartitionMaintenance(getSequelize());
 
     // 初始化数据存储服务
     console.log('💾 Initializing data storage service...');
@@ -236,7 +267,7 @@ async function initialize() {
     } catch (dsError) {
       console.error('❌ Data storage service initialization failed:', dsError.message);
       logger.error('❌ Data storage service initialization failed:', dsError);
-      // 继续执行，不阻塞启动
+      throw dsError;
     }
 
     // 初始化WebSocket服务
@@ -302,13 +333,6 @@ async function initialize() {
       throw routeError;
     }
 
-    logger.info('🔄 Restoring persisted runtime configuration...');
-    await Promise.all([
-      aiModelController.restoreRuntimeConfig(),
-      threatConfigService.restoreRuntimeConfig()
-    ]);
-    logger.info('✅ Persisted runtime configuration restored');
-
     // 启动服务器
     const port = config.app.port;
     console.log(`🚀 Starting server on ${config.app.host}:${port}...`);
@@ -349,12 +373,16 @@ async function shutdown(signal) {
   logger.info(`🛑 ${signal} received, shutting down gracefully...`);
 
   WebSocketService.close();
+  io.disconnectSockets(true);
+  await detectionWorker?.stop();
+  await analysisWorker?.stop();
+  await intelligenceWorker?.stop();
+  await stopPartitionMaintenance?.();
   await Promise.allSettled([
     notificationService?.cleanup(),
     reportService?.cleanup(),
     dataStorageService.close(),
     keyManagementService.cleanup(),
-    closeKafka(),
     closeDatabases()
   ]);
 

@@ -99,32 +99,26 @@ describe('AIModelController provider configuration', () => {
     expect(incoming.claude.api_key).toBe('new-key');
   });
 
-  test('configuration is synchronized to the running AI engine before success is returned', async () => {
+  test('configuration persists encrypted without an external runtime', async () => {
     mockSystemConfigModel.findOne.mockResolvedValue(null);
     mockSystemConfigModel.findOrCreate.mockResolvedValue([{}, true]);
     fetch.mockResolvedValue({ ok: true });
     const res = responseRecorder();
 
     await controller.updateConfig({
-      body: { config: { openai: { enabled: true, api_key: 'secret-key' } } }
+      body: { config: { openai: { enabled: true, api_key: 'secret-key', default_model: 'fixture-model' } } }
     }, res);
 
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8888/api/external-apis/config',
-      expect.objectContaining({
-        method: 'PUT',
-        body: JSON.stringify({ providers: { openai: { enabled: true, api_key: 'secret-key' } } })
-      })
-    );
+    expect(fetch).not.toHaveBeenCalled();
     expect(mockSystemConfigModel.findOrCreate).toHaveBeenCalledWith(expect.objectContaining({
       defaults: expect.objectContaining({
-        value: { openai: { enabled: true, api_key: 'encrypted:secret-key' } }
+        value: { openai: { enabled: true, api_key: 'encrypted:secret-key', default_model: 'fixture-model' } }
       })
     }));
     expect(res.body).toEqual({ success: true, message: '配置更新成功' });
   });
 
-  test('AI engine rejection prevents persistent configuration from being written', async () => {
+  test('external runtime failure does not prevent configuration persistence', async () => {
     mockSystemConfigModel.findOne.mockResolvedValue(null);
     fetch.mockResolvedValue({
       ok: false,
@@ -134,27 +128,21 @@ describe('AIModelController provider configuration', () => {
     const res = responseRecorder();
 
     await controller.updateConfig({
-      body: { config: { openai: { enabled: true, api_key: 'secret-key' } } }
+      body: { config: { openai: { enabled: true, api_key: 'secret-key', default_model: 'fixture-model' } } }
     }, res);
 
-    expect(mockSystemConfigModel.findOrCreate).not.toHaveBeenCalled();
-    expect(res.statusCode).toBe(500);
-    expect(res.body).toEqual({ success: false, message: '更新配置失败' });
+    expect(mockSystemConfigModel.findOrCreate).toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 
-  test('persisted provider configuration is replayed after an AI engine restart', async () => {
-    mockSystemConfigModel.findOne.mockResolvedValue({
-      value: { openai: { enabled: true, api_key: 'encrypted:stored-key' } }
-    });
-    fetch.mockResolvedValue({ ok: true });
-
-    await expect(controller.restoreRuntimeConfig()).resolves.toBe(true);
-
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8888/api/external-apis/config',
-      expect.objectContaining({
-        body: JSON.stringify({ providers: { openai: { enabled: true, api_key: 'stored-key' } } })
-      })
-    );
+  test('invalid enabled provider configurations are rejected without persistence', async () => {
+    mockSystemConfigModel.findOne.mockResolvedValue(null);
+    for (const config of [{ unknown: { enabled: true } }, { openai: { enabled: true, api_key: 'key' } }]) {
+      const res = responseRecorder();
+      await controller.updateConfig({ body: { config } }, res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(mockSystemConfigModel.findOrCreate).not.toHaveBeenCalled();
   });
 });

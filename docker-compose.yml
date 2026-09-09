@@ -1,20 +1,13 @@
 x-gitops:
   public_entry:
-    service: nginx
-    container_port: 80
+    service: app
+    container_port: 8000
     healthcheck:
       path: /health
       expected_json:
         service: tianwang
   services:
     postgres: {exposure: internal}
-    influxdb: {exposure: internal}
-    redis: {exposure: internal}
-    zookeeper: {exposure: internal}
-    kafka: {exposure: internal}
-    server: {exposure: internal}
-    client: {exposure: internal}
-    ai-engine: {exposure: internal}
 
 services:
   # PostgreSQL 数据库 - 用户、配置等关系型数据
@@ -38,102 +31,16 @@ services:
     networks:
       - tianwang-network
 
-  # InfluxDB 时序数据库 - 日志、指标等时序数据
-  influxdb:
+  # 前端、API、实时连接与后台任务
+  app:
     platform: linux/amd64
-    image: tianwang-influxdb:2.7-alpine
-    build:
-      context: ./docker/production/runtime-images
-      dockerfile: influxdb.Dockerfile
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: tianwang
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:?Set INFLUXDB_PASSWORD}
-      DOCKER_INFLUXDB_INIT_ORG: tianwang
-      DOCKER_INFLUXDB_INIT_BUCKET: security_logs
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN}
-    volumes:
-      - influxdb_data:/var/lib/influxdb2
-      - influxdb_config:/etc/influxdb2
-    healthcheck:
-      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    networks:
-      - tianwang-network
-
-  # Redis 缓存数据库 - 会话、缓存
-  redis:
-    platform: linux/amd64
-    image: tianwang-redis:7-alpine
-    build:
-      context: ./docker/production/runtime-images
-      dockerfile: redis.Dockerfile
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
-    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD"']
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep PONG"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-    networks:
-      - tianwang-network
-
-  # Apache Kafka 消息队列
-  zookeeper:
-    platform: linux/amd64
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-      - zookeeper_log:/var/lib/zookeeper/log
-    image: tianwang-zookeeper:7.4.0
-    build:
-      context: ./docker/production/runtime-images
-      dockerfile: zookeeper.Dockerfile
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - tianwang-network
-
-  kafka:
-    platform: linux/amd64
-    image: tianwang-kafka:7.4.0
-    build:
-      context: ./docker/production/runtime-images
-      dockerfile: kafka.Dockerfile
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9092'"]
-      interval: 10s
-      timeout: 10s
-      retries: 18
-      start_period: 20s
-    networks:
-      - tianwang-network
-
-  # 后端API服务
-  server:
-    platform: linux/amd64
-    image: tianwang-server:latest
+    image: tianwang-app:latest
     build:
       context: .
-      dockerfile: docker/production/server.Dockerfile
+      dockerfile: docker/production/app.Dockerfile
     environment:
       NODE_ENV: production
+      APP_PORT: 8000
       LOG_LEVEL: info
       CORS_ORIGIN: https://tianwang.szlk.uk
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:?Set BOOTSTRAP_ADMIN_USERNAME}
@@ -144,18 +51,8 @@ services:
       DB_NAME: tianwang
       DB_USER: tianwang
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN}
-      INFLUXDB_ORG: tianwang
-      INFLUXDB_BUCKET: security_logs
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
-      KAFKA_BROKERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
-      AI_ENGINE_URL: http://ai-engine:8888
-      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:?Set AI_INTERNAL_TOKEN}
     volumes:
       - server_data:/app/server/data
       - server_keys:/app/server/keys
@@ -163,87 +60,17 @@ services:
       - server_reports:/app/server/reports
       - server_downloads:/app/server/downloads
       - server_logs:/app/server/logs
-      - custom_sigma_rules:/app/server/ai-engine/rules/sigma/custom
     depends_on:
       postgres:
         condition: service_healthy
-      influxdb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      ai-engine:
-        condition: service_healthy
     networks:
       - tianwang-network
-    restart: unless-stopped
-
-  # 前端Web应用
-  client:
-    platform: linux/amd64
-    image: tianwang-client:latest
-    build:
-      context: .
-      dockerfile: docker/production/client.Dockerfile
-    depends_on:
-      server:
-        condition: service_healthy
-    networks:
-      - tianwang-network
-    restart: unless-stopped
-
-  # AI分析引擎 (Python服务)
-  ai-engine:
-    platform: linux/amd64
-    image: tianwang-ai-engine:latest
-    build:
-      context: ./server/ai-engine
-      dockerfile: ../../docker/production/ai.Dockerfile
-    environment:
-      AI_LOG_LEVEL: INFO
-      PYTHONPATH: /app
-      AI_KAFKA_BROKERS: kafka:9092
-      AI_KAFKA_TOPICS: '{"logs":"security-logs","alerts":"security-alerts","actions":"protection-actions"}'
-      AI_INFLUXDB_URL: http://influxdb:8086
-      AI_INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN}
-      AI_REDIS_HOST: redis
-      AI_REDIS_PORT: 6379
-      AI_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
-      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:?Set AI_INTERNAL_TOKEN}
-    volumes:
-      - ai_models:/app/models
-      - ai_logs:/app/logs
-      - custom_sigma_rules:/app/rules/sigma/custom
-    depends_on:
-      kafka:
-        condition: service_healthy
-      influxdb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tianwang-network
-    restart: unless-stopped
-
-  # Nginx 反向代理
-  nginx:
-    platform: linux/amd64
-    image: tianwang-nginx:latest
-    build:
-      context: ./docker/nginx
-      dockerfile: Dockerfile.production
     ports:
-      - "18080:80"
-    depends_on:
-      server:
-        condition: service_healthy
-      client:
-        condition: service_healthy
-    networks:
-      - tianwang-network
+      - "18080:8000"
     restart: unless-stopped
 
+
+# 旧卷声明保留供数据审计；不挂载到应用，也不执行删除。
 volumes:
   zookeeper_data:
   zookeeper_log:

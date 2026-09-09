@@ -41,7 +41,7 @@ class AgentService extends EventEmitter {
         this.deviceFingerprint = null; // 设备指纹
         this.connectionKey = null; // 连接密钥
         this.publicKey = null; // 服务器公钥
-        this.dataBuffer = [];
+        this.dataBuffer = this.store.get('pendingTelemetry', []);
         this.maxBufferSize = 1000;
     }
 
@@ -597,6 +597,7 @@ class AgentService extends EventEmitter {
             }
             
             this.ws = new WebSocket(wsUrl);
+            const connection = this.ws;
 
             // 连接超时处理
             const connectionTimeout = setTimeout(() => {
@@ -610,6 +611,7 @@ class AgentService extends EventEmitter {
             }, 15000); // 15秒超时
 
             this.ws.on('open', () => {
+                if (this.ws !== connection) return;
                 logger.info('WebSocket连接已建立');
                 clearTimeout(connectionTimeout);
                 this.isConnected = true;
@@ -621,6 +623,7 @@ class AgentService extends EventEmitter {
             });
 
             this.ws.on('message', (data) => {
+                if (this.ws !== connection) return;
                 try {
                     const message = JSON.parse(data.toString());
                     this.handleMessage(message);
@@ -631,6 +634,7 @@ class AgentService extends EventEmitter {
 
             this.ws.on('close', (code, reason) => {
                 clearTimeout(connectionTimeout);
+                if (this.ws !== connection) return;
                 logger.warn('WebSocket连接已关闭', { 
                     code, 
                     reason: reason.toString(),
@@ -657,6 +661,7 @@ class AgentService extends EventEmitter {
 
             this.ws.on('error', (error) => {
                 clearTimeout(connectionTimeout);
+                if (this.ws !== connection) return;
                 logger.error('WebSocket连接错误:', error);
                 
                 // 处理特定的连接错误
@@ -689,6 +694,15 @@ class AgentService extends EventEmitter {
         logger.debug('收到服务器消息:', message);
         
         switch (message.type) {
+            case 'data_ack':
+                if (message.messageId && message.receiptId) {
+                    this.dataBuffer = this.dataBuffer.filter(item => item.messageId !== message.messageId);
+                    this.store.set('pendingTelemetry', this.dataBuffer.filter(item => item.type === 'data'));
+                }
+                break;
+            case 'data_error':
+                logger.warn('数据尚未入库', { messageId: message.messageId, code: message.code });
+                break;
             case 'ping':
                 this.sendMessage({ type: 'pong', timestamp: Date.now() });
                 break;
@@ -763,6 +777,11 @@ class AgentService extends EventEmitter {
 
     // 发送消息到服务器
     sendMessage(message) {
+        if (message.type === 'data') {
+            message.messageId ||= crypto.randomUUID();
+            message.timestamp ??= Date.now();
+            this.bufferData(message);
+        }
         if (!this.isConnected || !this.ws) {
             logger.warn('连接未建立，消息将被缓存');
             
@@ -787,7 +806,7 @@ class AgentService extends EventEmitter {
             const data = JSON.stringify({
                 ...message,
                 agent_id: this.agentId,
-                timestamp: Date.now()
+                timestamp: message.timestamp ?? Date.now()
             });
             this.ws.send(data);
             
@@ -854,58 +873,14 @@ class AgentService extends EventEmitter {
     // 发送威胁告警到服务器
     async sendThreatAlert(threat) {
         try {
-            logger.info('发送威胁告警到服务器:', threat);
-
-            const alertData = {
-                title: threat.description || `检测到${threat.type}威胁`,
-                description: threat.description,
-                type: threat.type,
-                severity: threat.severity,
-                source: threat.source || 'unknown',
-                sourceIP: threat.sourceIP,
-                sourcePort: threat.sourcePort,
-                targetIP: threat.targetIP,
-                targetPort: threat.targetPort,
-                deviceId: os.hostname(),
-                agentId: this.agentId,
-                threatDetails: {
-                    processName: threat.processName,
-                    processId: threat.pid,
-                    command: threat.command,
-                    user: threat.user,
-                    cpu: threat.cpu,
-                    memory: threat.memory,
-                    connections: threat.connections,
-                    temperature: threat.temperature
-                },
-                evidence: {
-                    logs: threat.logs || [],
-                    networkTraffic: threat.networkTraffic,
-                    systemMetrics: threat.systemMetrics,
-                    processList: threat.processList
-                }
-            };
-
-            // 通过HTTP API发送告警
-            const response = await axios.post(`${this.config.apiUrl}/alerts/threat`, alertData, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'TianWang-Agent/1.0',
-                    'Authorization': `Bearer ${this.authToken}`
-                },
-                timeout: 10000
-            });
-
-            if (response.data.success) {
-                logger.info('威胁告警已发送到服务器:', response.data.data.id);
-                this.emit('threat-alert-sent', { threat, alertId: response.data.data.id });
-                return true;
-            } else {
-                logger.error('服务器返回错误:', response.data.error);
-                return false;
-            }
+            this.sendData('security', { threats: [{
+                ...threat,
+                title: threat.title || threat.description || '检测到可疑活动',
+                description: threat.description || '检测到需要检查的安全活动'
+            }] });
+            return true;
         } catch (error) {
-            logger.error('发送威胁告警失败:', error.message);
+            logger.error('威胁告警加入上报队列失败:', error.message);
             this.emit('threat-alert-failed', { threat, error: error.message });
             return false;
         }
@@ -923,8 +898,14 @@ class AgentService extends EventEmitter {
 
     // 缓存数据
     bufferData(data) {
+        if (data.type === 'data') {
+            if (!this.dataBuffer.some(item => item.messageId === data.messageId)) this.dataBuffer.push(data);
+            this.store.set('pendingTelemetry', this.dataBuffer.filter(item => item.type === 'data'));
+            return;
+        }
         if (this.dataBuffer.length >= this.maxBufferSize) {
-            this.dataBuffer.shift(); // 移除最旧的数据
+            const index = this.dataBuffer.findIndex(item => item.type !== 'data');
+            if (index >= 0) this.dataBuffer.splice(index, 1);
         }
         this.dataBuffer.push(data);
     }
@@ -934,7 +915,7 @@ class AgentService extends EventEmitter {
         if (this.dataBuffer.length > 0) {
             logger.info(`发送缓存数据: ${this.dataBuffer.length} 条`);
             const buffered = this.dataBuffer;
-            this.dataBuffer = [];
+            this.dataBuffer = this.dataBuffer.filter(item => item.type === 'data');
             buffered.forEach(data => {
                 this.sendMessage(data);
             });
@@ -946,6 +927,7 @@ class AgentService extends EventEmitter {
         this.stopHeartbeat();
         this.heartbeatTimer = setInterval(() => {
             this.sendHeartbeat();
+            if (this.isConnected) this.flushDataBuffer();
         }, this.config.heartbeatInterval);
         this.heartbeatTimer.unref?.();
     }

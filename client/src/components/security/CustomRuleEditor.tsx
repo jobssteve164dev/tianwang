@@ -24,6 +24,8 @@ import {
   EyeOutlined
 } from '@ant-design/icons';
 import { securityRulesApi } from '../../services/api';
+import { dump } from 'js-yaml';
+import { normalizeRuleForm, previewRule } from './ruleForm';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -50,12 +52,24 @@ interface RuleData {
     category?: string;
   };
   detection: {
-    selection?: Record<string, any>;
+    selection?: Record<string, any> | string;
     condition?: string;
   };
   tags: string[];
   enabled: boolean;
 }
+
+const newRule = (): RuleData => ({
+    title: '',
+    description: '',
+    author: '',
+    level: 'medium',
+    status: 'experimental',
+    logsource: { product: 'windows' },
+    detection: { selection: {}, condition: 'selection' },
+    tags: [],
+    enabled: true
+  });
 
 const CustomRuleEditor: React.FC<CustomRuleEditorProps> = ({
   visible,
@@ -67,25 +81,23 @@ const CustomRuleEditor: React.FC<CustomRuleEditorProps> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [ruleData, setRuleData] = useState<RuleData>({
-    title: '',
-    description: '',
-    author: '',
-    level: 'medium',
-    status: 'experimental',
-    logsource: { product: 'windows' },
-    detection: { selection: {}, condition: 'selection' },
-    tags: [],
-    enabled: true
-  });
+  const [ruleData, setRuleData] = useState<RuleData>(newRule);
   const [yamlPreview, setYamlPreview] = useState('');
   const [testData, setTestData] = useState('');
   const [testResult, setTestResult] = useState<any>(null);
 
   // 加载规则数据（编辑模式）
   useEffect(() => {
-    if (visible && mode === 'edit' && ruleId) {
+    if (!visible) return;
+    form.resetFields();
+    setTestData('');
+    setTestResult(null);
+    if (mode === 'edit' && ruleId) {
       loadRuleData();
+    } else {
+      const defaults = newRule();
+      setRuleData(defaults);
+      form.setFieldsValue(defaults);
     }
   }, [visible, mode, ruleId]);
 
@@ -132,56 +144,20 @@ const CustomRuleEditor: React.FC<CustomRuleEditorProps> = ({
 
   const generateYamlPreview = () => {
     try {
-      const yamlContent = {
-        title: ruleData.title,
-        description: ruleData.description,
-        author: ruleData.author,
-        date: new Date().toISOString().split('T')[0],
-        level: ruleData.level,
-        status: ruleData.status,
-        logsource: ruleData.logsource,
-        detection: ruleData.detection,
-        tags: ruleData.tags,
-        enabled: ruleData.enabled
-      };
-      
-      // 简单的YAML格式化（实际项目中可以使用js-yaml库）
-      const yaml = `title: ${yamlContent.title}
-description: ${yamlContent.description}
-author: ${yamlContent.author}
-date: ${yamlContent.date}
-level: ${yamlContent.level}
-status: ${yamlContent.status}
-logsource:
-  product: ${yamlContent.logsource.product || 'windows'}
-  ${yamlContent.logsource.service ? `service: ${yamlContent.logsource.service}` : ''}
-  ${yamlContent.logsource.category ? `category: ${yamlContent.logsource.category}` : ''}
-detection:
-  selection:
-    ${Object.entries(yamlContent.detection.selection || {}).map(([key, value]) => `${key}: ${value}`).join('\n    ')}
-  condition: ${yamlContent.detection.condition || 'selection'}
-tags:
-${yamlContent.tags.map(tag => `  - ${tag}`).join('\n')}
-enabled: ${yamlContent.enabled}`;
-      
+      const yaml = previewRule({ ...ruleData, date: new Date().toISOString().split('T')[0] });
       setYamlPreview(yaml);
     } catch (error) {
-      setYamlPreview('YAML生成失败');
+      setYamlPreview('请先填写有效的选择条件');
     }
   };
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
       setLoading(true);
 
-      const rulePayload = {
-        ...values,
-        detection: {
-          selection: values.detection?.selection || {},
-          condition: values.detection?.condition || 'selection'
-        }
-      };
+      const rulePayload = normalizeRuleForm(values);
 
       let response;
       if (mode === 'create') {
@@ -199,7 +175,7 @@ enabled: ${yamlContent.enabled}`;
       }
     } catch (error) {
       console.error('提交规则失败:', error);
-      message.error(`${mode === 'create' ? '创建' : '更新'}规则失败`);
+      message.error(error instanceof Error ? error.message : '请检查规则内容后重试');
     } finally {
       setLoading(false);
     }
@@ -283,6 +259,8 @@ enabled: ${yamlContent.enabled}`;
       footer={null}
       destroyOnHidden
     >
+      <Form form={form} layout="vertical" initialValues={ruleData}
+        onValuesChange={() => setRuleData(form.getFieldsValue(true))}>
       <Tabs 
         defaultActiveKey="basic" 
         size="large"
@@ -291,12 +269,7 @@ enabled: ${yamlContent.enabled}`;
             key: 'basic',
             label: '基本信息',
             children: (
-              <Form
-                form={form}
-                layout="vertical"
-                initialValues={ruleData}
-                onValuesChange={(_, allValues) => setRuleData(allValues)}
-              >
+              <>
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item
@@ -366,19 +339,14 @@ enabled: ${yamlContent.enabled}`;
                     </Form.Item>
                   </Col>
                 </Row>
-              </Form>
+              </>
             )
           },
           {
             key: 'logsource',
             label: '日志源配置',
             children: (
-              <Form
-                form={form}
-                layout="vertical"
-                initialValues={ruleData}
-                onValuesChange={(_, allValues) => setRuleData(allValues)}
-              >
+              <>
                 <Row gutter={16}>
                   <Col span={8}>
                     <Form.Item
@@ -426,31 +394,22 @@ enabled: ${yamlContent.enabled}`;
                   showIcon
                   style={{ marginBottom: 16 }}
                 />
-              </Form>
+              </>
             )
           },
           {
             key: 'detection',
             label: '检测逻辑',
             children: (
-              <Form
-                form={form}
-                layout="vertical"
-                initialValues={ruleData}
-                onValuesChange={(_, allValues) => setRuleData(allValues)}
-              >
+              <>
                 <Form.Item
                   name={['detection', 'selection']}
                   label="选择条件"
+                  getValueProps={value => ({ value: typeof value === 'string' ? value : dump(value || {}) })}
                 >
                   <TextArea
                     rows={6}
-                    placeholder={`例如：
-Image: "powershell.exe"
-CommandLine: 
-  - "*bypass*"
-  - "*executionpolicy*"
-ParentImage: "cmd.exe"`}
+                    placeholder={'message|contains: "登录失败"'}
                   />
                 </Form.Item>
 
@@ -464,23 +423,18 @@ ParentImage: "cmd.exe"`}
 
                 <Alert
                   message="检测逻辑说明"
-                  description="selection定义要匹配的字段和值，condition定义匹配逻辑。常用的condition包括：selection（匹配所有selection条件）、1 of selection（匹配任意一个selection条件）、all of selection（匹配所有selection条件）。"
+                  description="按“字段: 值”填写条件；多个字段需同时满足。包含匹配可写为 message|contains: 登录失败。匹配条件使用 selection，排除条件可使用 and not。"
                   type="info"
                   showIcon
                 />
-              </Form>
+              </>
             )
           },
           {
             key: 'tags',
             label: '标签管理',
             children: (
-              <Form
-                form={form}
-                layout="vertical"
-                initialValues={ruleData}
-                onValuesChange={(_, allValues) => setRuleData(allValues)}
-              >
+              <>
                 <Form.Item
                   name="tags"
                   label="规则标签"
@@ -498,7 +452,7 @@ ParentImage: "cmd.exe"`}
                   type="info"
                   showIcon
                 />
-              </Form>
+              </>
             )
           },
           {
@@ -520,7 +474,7 @@ ParentImage: "cmd.exe"`}
             label: '规则测试',
             children: (
               <Card title="规则测试" extra={<PlayCircleOutlined />}>
-                <Form layout="vertical">
+                <div>
                   <Form.Item label="测试数据 (JSON格式)">
                     <TextArea
                       value={testData}
@@ -553,17 +507,16 @@ ParentImage: "cmd.exe"`}
                         type={testResult.matched ? 'success' : 'info'}
                         showIcon
                       />
-                      <Card size="small" style={{ marginTop: 8 }}>
-                        <pre>{JSON.stringify(testResult.test_result, null, 2)}</pre>
-                      </Card>
                     </div>
                   )}
-                </Form>
+                </div>
               </Card>
             )
           }] : [])
         ]}
       />
+
+      </Form>
 
       <Divider />
 

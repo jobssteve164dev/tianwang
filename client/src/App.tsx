@@ -11,7 +11,6 @@ import DevicesPage from './pages/devices/DevicesPage';
 import RegistrationCodesPage from './pages/registration/RegistrationCodesPage';
 import SecurityRulesPage from './pages/security/SecurityRulesPage';
 import SettingsPage from './pages/settings/SettingsPage';
-import LocalAIModelPage from './pages/ai-models/LocalAIModelPage';
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -25,7 +24,7 @@ const App: React.FC = () => {
   }, [dispatch, token, isAuthenticated]);
 
   // 全局加载状态
-  if (loading && token) {
+  if (token && (loading || !isAuthenticated)) {
     return (
       <AntdApp>
         <div className="flex-center full-height">
@@ -49,7 +48,6 @@ const App: React.FC = () => {
             <Route path="registration-codes" element={<RegistrationCodesPage />} />
             <Route path="security-rules" element={<SecurityRulesPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="ai-models" element={<LocalAIModelPage />} />
           </Route>
         )}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />

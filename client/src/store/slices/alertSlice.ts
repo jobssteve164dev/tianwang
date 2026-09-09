@@ -10,6 +10,7 @@ export interface Alert {
   timestamp: string;
   status: 'active' | 'acknowledged' | 'resolved';
   deviceId?: string;
+  threatDetails?: { ai?: { text: string }; intelligence?: Array<{ source: string; value: string; matches: number }> };
 }
 
 export interface AlertState {
@@ -247,4 +248,4 @@ const alertSlice = createSlice({
 });
 
 export const { setFilters, clearError, updateAlertStatus, setPagination } = alertSlice.actions;
-export default alertSlice.reducer; 
+export default alertSlice.reducer;
