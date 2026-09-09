@@ -32,9 +32,6 @@ jobs:
       DB_PASSWORD: tianwang_test_password
       JWT_SECRET: ci-only-jwt-secret
       ENCRYPTION_KEY: ci-only-encryption-key
-      BOOTSTRAP_ADMIN_USERNAME: fixtureadmin
-      BOOTSTRAP_ADMIN_EMAIL: fixture@example.test
-      BOOTSTRAP_ADMIN_PASSWORD: FixtureAdminPassword1!
 
     steps:
       - uses: actions/checkout@v4
@@ -50,11 +47,19 @@ jobs:
           npm --prefix agents ci
 
       - name: Validate deployment configuration
+        env:
+          BOOTSTRAP_ADMIN_USERNAME: fixtureadmin
+          BOOTSTRAP_ADMIN_EMAIL: fixture@example.test
+          BOOTSTRAP_ADMIN_PASSWORD: FixtureAdminPassword1!
         run: |
           node --test tests/deployment/compose.cjs
           docker compose -f docker-compose.build.yml config --quiet
 
       - name: Apply database schema
+        env:
+          BOOTSTRAP_ADMIN_USERNAME: fixtureadmin
+          BOOTSTRAP_ADMIN_EMAIL: fixture@example.test
+          BOOTSTRAP_ADMIN_PASSWORD: FixtureAdminPassword1!
         run: npm run db:migrate
 
       - name: Verify administrator and session lifecycle
