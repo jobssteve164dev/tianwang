@@ -102,8 +102,8 @@ test('packaged Agent ingestion, metrics, detection and worker recovery use Postg
     assert.equal(alerts[0].type,'high-cpu-usage');
     const recovery = `
       const assert=require('node:assert/strict');const {randomUUID}=require('node:crypto');
-      const db=require('./server/src/config/database').initializePostgreSQL();
-      (async()=>{const {Worker}=await import('./server/src/core/worker.js');const id=randomUUID();const kind='packaged-'+id;
+      const db=require('./src/config/database').initializePostgreSQL();
+      (async()=>{const {Worker}=await import('./src/core/worker.js');const id=randomUUID();const kind='packaged-'+id;
         await db.query("INSERT INTO outbox_jobs(id,kind,dedupe_key,payload) VALUES (:id,:kind,:id,'{}')",{replacements:{id,kind}});
         const failed=new Worker(db,{[kind]:async()=>{throw Object.assign(new Error('fixture'),{code:'FIXTURE_UNAVAILABLE'})}},{retrySeconds:0});
         await failed.runOnce();let [rows]=await db.query('SELECT status,attempts FROM outbox_jobs WHERE id=:id',{replacements:{id}});assert.equal(rows[0].status,'pending');
@@ -113,6 +113,6 @@ test('packaged Agent ingestion, metrics, detection and worker recovery use Postg
         [rows]=await db.query('SELECT status,attempts FROM outbox_jobs WHERE id=:id',{replacements:{id}});assert.equal(rows[0].status,'completed');assert.equal(rows[0].attempts,3);
       })().catch(error=>{console.error(error.code||error.name);process.exitCode=1}).finally(()=>db.close());
     `;
-    execFileSync('docker',['compose','exec','-T','-w','/app','app','node','-e',recovery],{stdio:'pipe'});
+    execFileSync('docker',['compose','exec','-T','app','node','-e',recovery],{stdio:'pipe'});
   } finally { await json('/api/auth/logout', { method:'POST',headers }); }
 });
