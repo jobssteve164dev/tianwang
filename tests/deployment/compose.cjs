@@ -37,3 +37,12 @@ test('the application has no dependency or environment for the retired runtime s
   assert.ok(!Object.keys(config.services.app.environment).some(key => /KAFKA|REDIS|INFLUX|AI_ENGINE|AI_INTERNAL/.test(key)));
   assert.equal(config['x-gitops'].public_entry.container_port, 8000);
 });
+test('V2 initializes PostgreSQL in a separate volume without reusing retired data', () => {
+  const data = config.services.postgres.volumes.find(volume => volume.target === '/var/lib/postgresql/data');
+  assert.equal(data.source, 'postgres_v2_data');
+  const source = require('node:fs').readFileSync('docker-compose.yml', 'utf8');
+  assert.match(source, /^  postgres_data:$/m, 'Keep the old volume declaration until its exact physical cleanup is verified');
+  for (const service of Object.values(config.services)) {
+    assert.ok(!(service.volumes || []).some(volume => volume.source === 'postgres_data'));
+  }
+});

@@ -22,7 +22,7 @@ services:
       POSTGRES_USER: tianwang
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_v2_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tianwang -d tianwang"]
       interval: 5s
@@ -83,6 +83,7 @@ volumes:
   ai_models:
   ai_logs:
   postgres_data:
+  postgres_v2_data:
   influxdb_data:
   influxdb_config:
   redis_data:
