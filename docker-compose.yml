@@ -117,7 +117,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9092'"]
       interval: 10s
       timeout: 10s
       retries: 18

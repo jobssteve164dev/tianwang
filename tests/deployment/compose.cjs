@@ -1,6 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
+const { execFile } = require('node:child_process');
+const net = require('node:net');
+const { promisify } = require('node:util');
+const execFileAsync = promisify(execFile);
 const env = { ...process.env };
 for (const key of ['DB_PASSWORD','REDIS_PASSWORD','JWT_SECRET','ENCRYPTION_KEY','AI_INTERNAL_TOKEN','INFLUXDB_PASSWORD','INFLUXDB_TOKEN','BOOTSTRAP_ADMIN_PASSWORD']) env[key] = `fixture-${key}-password-long-enough`;
 env.BOOTSTRAP_ADMIN_USERNAME = 'fixtureadmin';
@@ -44,4 +48,18 @@ test('backend producers and AI consumers use the same production topics', () => 
     cwd: require('node:os').tmpdir(), env: { ...env, ...config.services['ai-engine'].environment }, encoding: 'utf8'
   }));
   assert.deepEqual(ai, backend);
+});
+test('the Kafka health check completes against a listening broker without starting a Java CLI', async () => {
+  const command = config.services.kafka.healthcheck.test[1];
+  assert.equal(command, "bash -c '</dev/tcp/127.0.0.1/9092'");
+  const broker = net.createServer(socket => socket.end());
+  await new Promise((resolve, reject) => broker.listen(0, '127.0.0.1', resolve).once('error', reject));
+  const port = broker.address().port;
+  const probe = command.replace('/9092', `/${port}`);
+  try {
+    await execFileAsync('/bin/bash', ['-c', probe], { timeout: 5000 });
+  } finally {
+    await new Promise(resolve => broker.close(resolve));
+  }
+  await assert.rejects(execFileAsync('/bin/bash', ['-c', probe], { timeout: 5000 }));
 });
