@@ -49,7 +49,12 @@ const runMigrations = async () => {
     logger.info('✅ [DB Migration] Model schema synchronization completed.');
 
   } catch (error) {
-    logger.error('❌ [DB Migration] Migration failed:', error);
+    const cause = error.cause || error;
+    logger.error('❌ [DB Migration] Migration failed', {
+      migration: error.migration?.name || null,
+      reason: cause.name,
+      code: cause.original?.code || cause.code || null
+    });
     throw error;
   } finally {
     if (sequelize) {
