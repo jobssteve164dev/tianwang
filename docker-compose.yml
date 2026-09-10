@@ -6,6 +6,7 @@ x-gitops:
       path: /health
       expected_json:
         service: tianwang
+        status: ok
   services:
     postgres: {exposure: internal}
 
