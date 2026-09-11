@@ -86,4 +86,4 @@ npm install
 
 ## 📚 详细文档
 
-更多详细信息请查看：[docs/development-setup.md](docs/development-setup.md)
+更多详细信息请查看：[development-setup.md](development-setup.md)

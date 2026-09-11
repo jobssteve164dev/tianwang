@@ -23,6 +23,7 @@ test('only the dashboard gateway publishes a host port and has a declared identi
   assert.equal(entries[0][1].ports[0].published, '18080');
   assert.equal(config['x-gitops']?.public_entry?.service, 'app');
   assert.equal(config['x-gitops'].public_entry.healthcheck.expected_json.service, 'tianwang');
+  assert.equal(config['x-gitops'].public_entry.healthcheck.expected_json.status, 'ok');
 });
 test('the effective runtime uses injected credentials and production settings', () => {
   const s = config.services;
