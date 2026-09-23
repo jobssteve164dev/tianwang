@@ -4,6 +4,8 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Version](https://img.shields.io/badge/version-v1.0.0--alpha-orange.svg)]()
 
+[下载 Windows、macOS、Linux 客户端](https://github.com/jobssteve164dev/tianwang/releases)
+
 ## 🛡️ 项目简介
 
 天网是一个以AI为核心能力的分布式网络安全监控与主动防护平台，通过多客户端实时收集设备日志数据，利用机器学习算法和开源安全规则自动识别网络安全威胁，并具备智能防火墙能力进行主动阻断。
@@ -48,7 +50,7 @@
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/your-org/tianwang.git
+   git clone https://github.com/jobssteve164dev/tianwang.git
    cd tianwang
    ```
 
@@ -122,8 +124,8 @@ tianwang/
 
 ## 📧 联系我们
 
-- 项目主页: https://github.com/your-org/tianwang
-- 问题反馈: https://github.com/your-org/tianwang/issues
+- 项目主页: https://github.com/jobssteve164dev/tianwang
+- 问题反馈: https://github.com/jobssteve164dev/tianwang/issues
 - 邮箱: security@tianwang.ai
 
 ---

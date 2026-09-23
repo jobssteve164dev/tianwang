@@ -1,0 +1,102 @@
+name: Desktop client packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - client-v*
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }} installer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-2022
+            platform: win
+            arch: x64
+            extension: exe
+          - label: macOS
+            os: macos-14
+            platform: mac
+            arch: universal
+            extension: dmg
+          - label: Linux
+            os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            extension: AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agents
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: agents/package-lock.json
+
+      - name: Validate tagged version
+        if: startsWith(github.ref, 'refs/tags/client-v')
+        shell: bash
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "client-v${package_version}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify client
+        run: |
+          npm run lint
+          npm test -- --runInBand
+
+      - name: Build installer
+        shell: bash
+        run: |
+          npm run build
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: TianWang-Agent-${{ matrix.platform }}-${{ matrix.arch }}
+          path: agents/dist/*.${{ matrix.extension }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish client release
+    if: startsWith(github.ref, 'refs/tags/client-v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TianWang-Agent-*
+          path: installers
+          merge-multiple: true
+
+      - name: Publish installers and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd installers
+          sha256sum TianWang-Agent-* > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" TianWang-Agent-* SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "TianWang Agent ${GITHUB_REF_NAME#client-v}" \
+            --generate-notes
