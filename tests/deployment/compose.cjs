@@ -38,6 +38,14 @@ test('the application has no dependency or environment for the retired runtime s
   assert.ok(!Object.keys(config.services.app.environment).some(key => /KAFKA|REDIS|INFLUX|AI_ENGINE|AI_INTERNAL/.test(key)));
   assert.equal(config['x-gitops'].public_entry.container_port, 8000);
 });
+test('every production service restarts after the Docker daemon recovers', () => {
+  assert.deepEqual(Object.fromEntries(
+    Object.entries(config.services).map(([name, service]) => [name, service.restart])
+  ), {
+    app: 'unless-stopped',
+    postgres: 'unless-stopped'
+  });
+});
 test('V2 initializes PostgreSQL in a separate volume without reusing retired data', () => {
   const data = config.services.postgres.volumes.find(volume => volume.target === '/var/lib/postgresql/data');
   assert.equal(data.source, 'postgres_v2_data');

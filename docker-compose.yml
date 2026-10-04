@@ -15,6 +15,7 @@ services:
   postgres:
     platform: linux/amd64
     image: tianwang-postgres:15-alpine
+    restart: unless-stopped
     build:
       context: ./docker/production/runtime-images
       dockerfile: postgres.Dockerfile
