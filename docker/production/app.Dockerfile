@@ -3,7 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/package.json
 COPY client/package.json ./client/package.json
-RUN npm ci --workspace client
+COPY --chmod=755 docker/production/npm-ci-with-retry.sh /usr/local/bin/npm-ci-with-retry
+RUN npm-ci-with-retry client
 COPY client ./client
 ENV GENERATE_SOURCEMAP=false
 RUN npm run client:build
@@ -13,7 +14,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/package.json
 COPY client/package.json ./client/package.json
-RUN npm ci --workspace server --omit=dev
+COPY --chmod=755 docker/production/npm-ci-with-retry.sh /usr/local/bin/npm-ci-with-retry
+RUN npm-ci-with-retry server --omit=dev
 
 FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
 WORKDIR /app/server

@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const env = { ...process.env };
 for (const key of ['DB_PASSWORD','REDIS_PASSWORD','JWT_SECRET','ENCRYPTION_KEY','AI_INTERNAL_TOKEN','INFLUXDB_PASSWORD','INFLUXDB_TOKEN','BOOTSTRAP_ADMIN_PASSWORD']) env[key] = `fixture-${key}-password-long-enough`;
 env.BOOTSTRAP_ADMIN_USERNAME = 'fixtureadmin';
@@ -45,6 +48,54 @@ test('every production service restarts after the Docker daemon recovers', () =>
     app: 'unless-stopped',
     postgres: 'unless-stopped'
   });
+});
+test('production dependency installs retry transient registry failures with a fixed bound', t => {
+  const dockerfile = fs.readFileSync('docker/production/app.Dockerfile', 'utf8');
+  assert.match(dockerfile, /npm-ci-with-retry client/);
+  assert.match(dockerfile, /npm-ci-with-retry server --omit=dev/);
+
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'tianwang-npm-retry-'));
+  const countFile = path.join(fixture, 'count');
+  t.after(() => {
+    for (const file of ['npm', 'sleep', 'count']) {
+      const target = path.join(fixture, file);
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    }
+    fs.rmdirSync(fixture);
+  });
+  fs.writeFileSync(path.join(fixture, 'npm'), `#!/bin/sh
+count=0
+[ ! -f "$FAKE_NPM_COUNT" ] || count=$(cat "$FAKE_NPM_COUNT")
+count=$((count + 1))
+printf '%s' "$count" > "$FAKE_NPM_COUNT"
+[ "$count" -ge "$FAKE_NPM_SUCCEED_AT" ]
+`);
+  fs.writeFileSync(path.join(fixture, 'sleep'), '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(path.join(fixture, 'npm'), 0o755);
+  fs.chmodSync(path.join(fixture, 'sleep'), 0o755);
+
+  const run = succeedAt => spawnSync(
+    'docker/production/npm-ci-with-retry.sh',
+    ['server', '--omit=dev'],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${fixture}:${process.env.PATH}`,
+        FAKE_NPM_COUNT: countFile,
+        FAKE_NPM_SUCCEED_AT: String(succeedAt),
+      },
+    },
+  );
+
+  const recovered = run(3);
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.equal(fs.readFileSync(countFile, 'utf8'), '3');
+
+  fs.writeFileSync(countFile, '0');
+  const exhausted = run(4);
+  assert.equal(exhausted.status, 1);
+  assert.equal(fs.readFileSync(countFile, 'utf8'), '3');
 });
 test('V2 initializes PostgreSQL in a separate volume without reusing retired data', () => {
   const data = config.services.postgres.volumes.find(volume => volume.target === '/var/lib/postgresql/data');
