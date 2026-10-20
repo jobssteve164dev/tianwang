@@ -32,7 +32,7 @@ loguru==0.7.3
 
 # 工具库
 python-dotenv==1.2.3
-aiohttp==3.14.3
+aiohttp==3.14.4
 httpx==0.28.1
 pyyaml==6.0.3
 

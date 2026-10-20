@@ -143,3 +143,9 @@ test('the AI rule importer pins a GitPython release with submodule path validati
   const version = requirements.match(/^GitPython==([^\s]+)$/m)?.[1];
   assert.ok(version && semver.gte(version, '3.1.62'), `Vulnerable GitPython pin: ${version}`);
 });
+
+test('the AI HTTP client pins an aiohttp release with resource and cookie fixes', () => {
+  const requirements = fs.readFileSync(path.join(root, 'server/ai-engine/requirements.txt'), 'utf8');
+  const version = requirements.match(/^aiohttp==([^\s]+)$/m)?.[1];
+  assert.ok(version && semver.gte(version, '3.14.4'), `Vulnerable aiohttp pin: ${version}`);
+});

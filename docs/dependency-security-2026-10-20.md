@@ -29,6 +29,8 @@
 
 同一轮扫描还修复了能通过兼容补丁更新消除的 `proxy-addr` 严重漏洞（2.0.8）、Agent 构建依赖 `sharp`（0.35.5）及 `yaml`（2.9.1）。没有使用 `npm audit fix --force`，没有降级或移除现有功能。
 
+首次推送触发的 Python 依赖图更新另检出 aiohttp 告警 607、609（high）和 608（low），均由 3.14.4 修复。因此同轮将保留 AI 引擎的 `aiohttp` 从 3.14.3 定向升级至 3.14.4，补入版本回归。实际 aiohttp 3.14.3 的共享 Secure Cookie 在 HTTP 请求中泄漏已复现；3.14.4 拒绝 HTTP 发送、保留 HTTPS Cookie，真实 ClientSession 本地 JSON POST 也通过。当前正式生产 Compose 不运行独立 Python 服务，本次不改变该边界。
+
 ## 两类需区分的上游记录
 
 `sprintf-js`：CVE 官方记录显示 [CVE-2026-97058](https://www.cve.org/CVERecord?id=CVE-2026-97058) 于 2026-10-12 被 CNA 撤销；GitHub 的 [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c) 尚未同步。依赖来自 YAML/命令行帮助和 Electron 下载器的日志链，不是项目新增的模板入口。没有以改名、伪造版本、屏蔽扫描或 dismiss 告警制造“零漏洞”。这两条扫描提示仍可能保留。
@@ -39,12 +41,12 @@
 
 ## 验证与影响面
 
-- 两套锁文件均经过 `npm ci` 安装；`npm run security:test` 共 29 项通过，覆盖全部已更新依赖的安全版本下限、两套 Shell 引用入口、真实下载器与缓存组件的适用条件及通知服务的真实 MIME 生成。
+- 两套锁文件均经过 `npm ci` 安装；`npm run security:test` 在补入 aiohttp 回归后共 30 项通过，覆盖全部已更新依赖的安全版本下限、两套 Shell 引用入口、真实下载器与缓存组件的适用条件及通知服务的真实 MIME 生成。
 - 修改前已观察到版本下限和 Shell 注入用例失败；邮件 MIME 用例在更新前后均通过。初版缓存用例直接调用未入库策略、初版 YAML 条件误覆盖未受影响旧版本，两者已纠正，不计入有效漏洞复现证据。
 - PostgreSQL 隔离实例的正式迁移、`npm run core:test` 30 项、登录会话测试 7 项通过。
 - 在独立 Python 环境安装 GitPython 3.1.62，实际调用 `Submodule.update(init=True)`：越界路径被拒绝，仓库外目标没有创建。当前生产 Compose 已不运行旧 AI 引擎，仍修复保留源码的依赖清单。
 - `npm run verify` 包含安全检查、服务端/Web/Agent 的 lint、类型检查、测试与构建。Web 构建会消费 selector parser、source map 和序列化依赖；通知、MCP、Socket.IO、迁移与报表分别消费本次服务端依赖。
-- 完整 `npm run verify` 已通过：当时 28 项安全检查、168 项既有测试及三端构建通过；随后增加的 Got 下载器用例已随安全套件单独复验。所有生成的浏览器 JS 均通过语法校验；隔离生产模式应用的真实浏览器登录、仪表盘图表与数据展示通过，无横向溢出。正式健康/就绪入口返回 200、未授权 API 返回 401，认证后的三个仪表盘 API 返回 200；既有 Socket.IO 客户端成功连接更新后的服务端。该验收覆盖本机 Node 22，不能替代 Node 20 容器验收。
+- 完整 `npm run verify` 已通过：当时 28 项安全检查、168 项既有测试及三端构建通过；随后补入 Got 下载器与 aiohttp 用例的安全套件已单独复验，最终容器验收由 CI 承担。所有生成的浏览器 JS 均通过语法校验；隔离生产模式应用的真实浏览器登录、仪表盘图表与数据展示通过，无横向溢出。正式健康/就绪入口返回 200、未授权 API 返回 401，认证后的三个仪表盘 API 返回 200；既有 Socket.IO 客户端成功连接更新后的服务端。该本机验收覆盖 Node 22，不能替代 Node 20 容器验收。
 - 服务端生产依赖扫描：0 high、0 critical，剩余 4 moderate 依赖链条均源自已撤销的 sprintf-js 记录。Agent 生产依赖扫描为 0。
 - Agent 图标生成器使用的 sharp 0.35.5 已在本机 Linux arm64 实际加载，内存 SVG 经 native/libvips 转换为 PNG，并复验 PNG 签名与 32×32 尺寸；未改写产品图标。未运行跨平台安装包发布。
 
