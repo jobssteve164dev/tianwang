@@ -97,6 +97,16 @@ printf '%s' "$count" > "$FAKE_NPM_COUNT"
   assert.equal(exhausted.status, 1);
   assert.equal(fs.readFileSync(countFile, 'utf8'), '3');
 });
+test('the isolated client install owns the dependency patch runner', () => {
+  const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  const clientPackage = JSON.parse(fs.readFileSync('client/package.json', 'utf8'));
+  const dockerfile = fs.readFileSync('docker/production/app.Dockerfile', 'utf8');
+
+  assert.equal(rootPackage.devDependencies['patch-package'], undefined);
+  assert.equal(clientPackage.devDependencies['patch-package'], '8.0.1');
+  assert.match(dockerfile, /COPY patches \.\/patches/);
+  assert.match(dockerfile, /COPY scripts\/apply-dependency-patches\.cjs \.\/scripts\/apply-dependency-patches\.cjs/);
+});
 test('V2 initializes PostgreSQL in a separate volume without reusing retired data', () => {
   const data = config.services.postgres.volumes.find(volume => volume.target === '/var/lib/postgresql/data');
   assert.equal(data.source, 'postgres_v2_data');
