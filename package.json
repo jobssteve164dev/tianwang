@@ -16,6 +16,7 @@
     "server:dev": "npm --prefix server run dev",
     "client:dev": "npm --prefix client start",
     "build": "npm run server:build && npm run client:build && npm run agent:build",
+    "postinstall": "node scripts/apply-dependency-patches.cjs",
     "server:build": "npm --prefix server run build",
     "client:build": "CI=false npm --prefix client run build",
     "agent:build": "npm --prefix agents run build",
@@ -65,12 +66,15 @@
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.2.5",
+    "patch-package": "8.0.1",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0"
   },
   "overrides": {
     "@tootallnate/once": "3.0.1",
+    "argparse": "2.0.1",
     "flatted": "3.4.4",
+    "follow-redirects": "1.16.1",
     "nth-check": "2.1.1",
     "path-to-regexp@>=8.0.0 <8.4.0": "8.4.0",
     "minimatch@>=9.0.0 <9.0.7": "9.0.9",
@@ -78,6 +82,7 @@
     "postcss-selector-parser": "7.1.6",
     "qs": "6.16.0",
     "serialize-javascript": "7.1.2",
+    "selfsigned": "5.5.0",
     "svgo": "4.1.0",
     "tmp": "0.2.7",
     "underscore": "1.13.8",
@@ -87,7 +92,8 @@
     },
     "sequelize": {
       "uuid": "11.1.1"
-    }
+    },
+    "webpack-dev-middleware": "7.4.6"
   },
   "engines": {
     "node": ">=20.0.0",

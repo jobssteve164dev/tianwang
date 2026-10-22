@@ -27,6 +27,11 @@ const minimums = {
   'source-map-js': '1.2.2',
   yaml: { 1: '1.10.3', 2: '2.8.3' },
 };
+const safeRanges = {
+  'follow-redirects': '>=1.16.1',
+  'webpack-dev-middleware': '>=7.4.6 <8.0.0 || >=8.3.0',
+};
+const forbiddenDependencies = ['node-forge', 'sprintf-js'];
 
 for (const manifest of ['package-lock.json', 'agents/package-lock.json']) {
   const lock = JSON.parse(fs.readFileSync(path.join(root, manifest), 'utf8'));
@@ -43,6 +48,21 @@ for (const manifest of ['package-lock.json', 'agents/package-lock.json']) {
       }
     });
   }
+  for (const [name, safeRange] of Object.entries(safeRanges)) {
+    const entries = Object.entries(lock.packages).filter(([entry]) => entry.endsWith(`node_modules/${name}`));
+    if (!entries.length) continue;
+    test(`${manifest}: every installed ${name} excludes the known vulnerable releases`, () => {
+      for (const [entry, pkg] of entries) {
+        assert.ok(semver.satisfies(pkg.version, safeRange), `${entry}: ${pkg.version} is outside ${safeRange}`);
+      }
+    });
+  }
+  for (const name of forbiddenDependencies) {
+    test(`${manifest}: ${name} is absent because no patched release exists`, () => {
+      const entries = Object.keys(lock.packages).filter(entry => entry.endsWith(`node_modules/${name}`));
+      assert.deepEqual(entries, []);
+    });
+  }
 }
 
 for (const manifest of ['package.json', 'agents/package.json']) {
@@ -55,6 +75,14 @@ for (const manifest of ['package.json', 'agents/package.json']) {
     assert.equal(quote(['echo', 'hello world']), "echo 'hello world'");
   });
 }
+
+test('the CRA development server stays on WDS 4 and awaits asynchronous certificate generation', () => {
+  const consumer = createRequire(path.join(root, 'client/package.json'));
+  const serverPackage = consumer('webpack-dev-server/package.json');
+  const serverSource = fs.readFileSync(consumer.resolve('webpack-dev-server/lib/Server.js'), 'utf8');
+  assert.equal(semver.major(serverPackage.version), 4);
+  assert.match(serverSource, /const pems = await selfsigned\.generate\(/);
+});
 
 test('cacheable-request never stores or reuses private responses across users', async () => {
   const http = require('node:http');

@@ -1,0 +1,13 @@
+diff --git a/node_modules/webpack-dev-server/lib/Server.js b/node_modules/webpack-dev-server/lib/Server.js
+index 79e6fc7..b31d395 100644
+--- a/node_modules/webpack-dev-server/lib/Server.js
++++ b/node_modules/webpack-dev-server/lib/Server.js
+@@ -1246,7 +1246,7 @@ class Server {
+           // @ts-ignore
+           const selfsigned = require("selfsigned");
+           const attributes = [{ name: "commonName", value: "localhost" }];
+-          const pems = selfsigned.generate(attributes, {
++          const pems = await selfsigned.generate(attributes, {
+             algorithm: "sha256",
+             days: 30,
+             keySize: 2048,

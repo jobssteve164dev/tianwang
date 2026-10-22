@@ -16,6 +16,9 @@
 !client/tsconfig.json
 !client/.eslintrc.json
 !client/nginx.conf
+!patches/
+!patches/**
+!scripts/apply-dependency-patches.cjs
 !docker/
 !docker/production/
 !docker/production/**

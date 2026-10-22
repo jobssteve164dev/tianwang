@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/package.json
 COPY client/package.json ./client/package.json
+COPY patches ./patches
+COPY scripts/apply-dependency-patches.cjs ./scripts/apply-dependency-patches.cjs
 COPY --chmod=755 docker/production/npm-ci-with-retry.sh /usr/local/bin/npm-ci-with-retry
 RUN npm-ci-with-retry client
 COPY client ./client
@@ -14,6 +16,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/package.json
 COPY client/package.json ./client/package.json
+COPY patches ./patches
+COPY scripts/apply-dependency-patches.cjs ./scripts/apply-dependency-patches.cjs
 COPY --chmod=755 docker/production/npm-ci-with-retry.sh /usr/local/bin/npm-ci-with-retry
 RUN npm-ci-with-retry server --omit=dev
 
