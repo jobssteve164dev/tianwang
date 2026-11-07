@@ -7,28 +7,35 @@ const semver = require('semver');
 
 const root = path.resolve(__dirname, '../..');
 const minimums = {
+  '@hono/node-server': '2.1.3',
   '@modelcontextprotocol/sdk': '1.31.0',
+  'body-parser': { 1: '1.20.8', 2: '2.4.0' },
   'brace-expansion': { 1: '1.1.21', 2: '2.1.7', 5: '5.0.12' },
   compression: '1.8.2',
+  electron: '44.9.1',
   'engine.io': '6.6.10',
   'fast-uri': '3.1.8',
   hono: '4.13.7',
   'http-cache-semantics': '4.3.0',
   'ip-address': '10.7.1',
-  joi: '17.13.8',
+  joi: '17.13.9',
+  'launch-editor': '2.14.2',
   moment: '2.31.0',
   morgan: '1.12.1',
-  nodemailer: '10.0.9',
+  nodemailer: '10.1.4',
   'postcss-selector-parser': '7.1.6',
   'proxy-addr': '2.0.8',
   'serialize-javascript': '7.1.2',
   sharp: '0.35.5',
   'shell-quote': '1.11.0',
   'source-map-js': '1.2.2',
+  systeminformation: '5.33.16',
+  undici: { 6: '6.29.1', 7: '7.30.1' },
   yaml: { 1: '1.10.3', 2: '2.8.3' },
+  zod: '4.6.6',
 };
 const safeRanges = {
-  'follow-redirects': '>=1.16.1',
+  'follow-redirects': '>=1.16.2',
   'webpack-dev-middleware': '>=7.4.6 <8.0.0 || >=8.3.0',
 };
 const forbiddenDependencies = ['node-forge', 'sprintf-js'];
@@ -166,10 +173,10 @@ test('notification delivery still produces a real MIME message with the upgraded
   }
 });
 
-test('the AI rule importer pins a GitPython release with submodule path validation', () => {
+test('the AI rule importer pins a GitPython release with command and submodule validation', () => {
   const requirements = fs.readFileSync(path.join(root, 'server/ai-engine/requirements.txt'), 'utf8');
   const version = requirements.match(/^GitPython==([^\s]+)$/m)?.[1];
-  assert.ok(version && semver.gte(version, '3.1.62'), `Vulnerable GitPython pin: ${version}`);
+  assert.ok(version && semver.gte(version, '3.2.1'), `Vulnerable GitPython pin: ${version}`);
 });
 
 test('the AI HTTP client pins an aiohttp release with resource and cookie fixes', () => {
